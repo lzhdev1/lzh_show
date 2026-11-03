@@ -39,7 +39,7 @@ export default async function HomePage({
         <HeroBackground />
         {/* 玻璃层：铺满整个 Hero，无左右 padding */}
         <div
-          className="pointer-events-none absolute inset-0 border-b border-white/10 bg-white/[0.02] backdrop-blur-lg"
+          className="pointer-events-none absolute inset-0 border-b border-white/10 bg-white/[0.01] backdrop-blur-md"
           aria-hidden
         />
         {/* 玻璃顶部高光反射线 */}

@@ -41,7 +41,7 @@ export function HeroBackground() {
       loop
       playsInline
       preload="auto"
-      className="pointer-events-none absolute inset-0 h-full w-full scale-[0.88] object-contain"
+      className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       aria-hidden
     >
       <source src="/videos/galaxy.mp4" type="video/mp4" />
