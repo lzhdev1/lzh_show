@@ -5,6 +5,7 @@ allowBuilds:
   unrs-resolver: false
   '@swc/core': true
   '@parcel/watcher': true
+  '@tailwindcss/oxide': true
 minimumReleaseAgeExclude:
   - '@next/env@16.4.4'
   - '@next/eslint-plugin-next@16.4.4'
