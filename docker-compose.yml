@@ -1,0 +1,29 @@
+# lzh_show 容器编排文件（骨架占位）
+# 待前端/后端技术栈与数据库选型确认后，再补全各服务定义。
+# 计划编排的服务：
+#   frontend  — 由 blog_front/Dockerfile 构建
+#   backend   — 由 blog_backend/Dockerfile 构建
+#   db        — 数据库服务（选型待确认）
+
+services:
+  # frontend:
+  #   build: ./blog_front
+  #   ports:
+  #     - "3000:3000"
+
+  # backend:
+  #   build: ./blog_backend
+  #   ports:
+  #     - "8000:8000"
+
+  # db:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #   volumes:
+  #     - db_data:/var/lib/postgresql/data
+
+# volumes:
+#   db_data:

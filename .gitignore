@@ -1,0 +1,31 @@
+# --- 通用 ---
+.DS_Store
+*.log
+.env
+.env.local
+
+# --- 前端 (blog_front) ---
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+
+# --- 后端 (blog_backend) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 编辑器 / IDE ---
+.idea/
+.vscode/
+*.swp
+
+# --- Docker ---
+docker-compose.override.yml
