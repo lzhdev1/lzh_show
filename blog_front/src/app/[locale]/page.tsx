@@ -31,7 +31,7 @@ export default async function HomePage({
   const featured = getFeaturedProjects();
 
   return (
-    <div className="w-full px-4 sm:px-6">
+    <div className="w-full">
       {/* Hero 区：纯黑底 + 玻璃质感铺满整个区域 */}
       <section className="relative overflow-hidden bg-black">
         {/* 彩色光晕（玻璃模糊底衬） */}
@@ -99,7 +99,7 @@ export default async function HomePage({
       </section>
 
       {/* 精选作品 */}
-      <section className="py-16">
+      <section className="px-4 py-16 sm:px-6">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-bold">{home("featuredTitle")}</h2>
@@ -123,7 +123,7 @@ export default async function HomePage({
       </section>
 
       {/* 技术栈 */}
-      <section className="pb-20 pt-6">
+      <section className="px-4 pb-20 pt-6 sm:px-6">
         <h2 className="mb-8 text-2xl font-bold">{home("skillsTitle")}</h2>
         <div className="flex flex-wrap gap-2">
           {skills.map((skill) => (
