@@ -158,6 +158,24 @@
     radial-gradient(ellipse 50% 40% at 60% 85%, oklch(0.62 0.18 310 / 0.16), transparent 70%);
 }
 
+/* ===== Hero 黑色玻璃风格（纯黑底，白色玻璃质感） ===== */
+
+/* 白细线网格（黑底上用） */
+.bg-grid-white {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* 更亮的彩色光晕（黑底上供玻璃面板模糊反射） */
+.bg-aurora-on-dark {
+  background:
+    radial-gradient(ellipse 60% 45% at 18% 15%, oklch(0.72 0.15 250 / 0.28), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 82% 25%, oklch(0.7 0.14 180 / 0.22), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 55% 95%, oklch(0.72 0.13 300 / 0.2), transparent 70%);
+}
+
 /* 渐入动画：自下而上 + 淡入 */
 @keyframes fade-up {
   from {
