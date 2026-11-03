@@ -1,6 +1,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import type { Project } from "@/lib/projects";
+import { ProjectCover } from "@/components/project-cover";
 import { ArrowRight, CalendarDays } from "lucide-react";
 
 export function ProjectCard({ project }: { project: Project }) {
@@ -10,13 +11,13 @@ export function ProjectCard({ project }: { project: Project }) {
   return (
     <Link
       href={`/projects/${project.slug}`}
-      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-border/60 hover:shadow-lg"
     >
-      {/* 封面占位区（M3 接入真实图片后替换） */}
-      <div className="flex aspect-video w-full items-center justify-center bg-muted text-muted-foreground">
-        <span className="px-4 text-center text-sm font-medium">
-          {project.title[locale]}
-        </span>
+      <div className="aspect-video w-full overflow-hidden">
+        <ProjectCover
+          project={project}
+          className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]"
+        />
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-5">

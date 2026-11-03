@@ -15,6 +15,10 @@ export interface Project {
   featured: boolean;
   /** 完成时间（ISO 格式） */
   date: string;
+  /** 封面图 URL（真实作品截图；为空时使用 coverGradient 渐变占位封面） */
+  cover?: string;
+  /** 渐变封面配色（Tailwind 渐变类，无 cover 图时渲染） */
+  coverGradient: string;
   links: {
     demo?: string;
     source?: string;
@@ -37,6 +41,7 @@ export const projects: Project[] = [
     techStack: ["Next.js", "FastAPI", "RAG", "LangGraph", "PostgreSQL"],
     featured: true,
     date: "2026-06",
+    coverGradient: "from-teal-500 to-blue-600",
     links: {
       demo: "https://lzhshow.top",
       source: "https://github.com/lzhdev1",
@@ -59,6 +64,7 @@ export const projects: Project[] = [
     techStack: ["Python", "FastAPI", "ChromaDB", "Rerank", "Docker"],
     featured: true,
     date: "2026-08",
+    coverGradient: "from-violet-500 to-fuchsia-600",
     links: {
       source: "https://github.com/lzhdev1",
     },
@@ -80,6 +86,7 @@ export const projects: Project[] = [
     techStack: ["Python", "PyTorch", "OSNet", "ReID"],
     featured: false,
     date: "2026-10",
+    coverGradient: "from-emerald-500 to-teal-600",
     links: {},
     content: {
       zh: "## 研究简介\n\n（占位内容，M3 接入后端后替换为真实数据）\n\n- BoT-R50 / OSNet 集成教师蒸馏\n- 低秩 SVD 压缩学生网络\n- 向量距离损失提升特征判别力",

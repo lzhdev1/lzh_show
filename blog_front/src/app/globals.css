@@ -128,3 +128,55 @@
     @apply font-sans;
   }
 }
+
+/* ===== 视觉装饰与动效 ===== */
+
+/* 细网格背景（首页 Hero 用） */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, oklch(0.205 0 0 / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.205 0 0 / 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.dark .bg-grid {
+  background-image:
+    linear-gradient(to right, oklch(0.985 0 0 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.985 0 0 / 0.05) 1px, transparent 1px);
+}
+
+/* 径向光晕（Hero 背景点缀） */
+.bg-aurora {
+  background:
+    radial-gradient(ellipse 60% 45% at 18% 20%, oklch(0.72 0.15 250 / 0.16), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 82% 30%, oklch(0.7 0.14 180 / 0.14), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 60% 85%, oklch(0.72 0.13 300 / 0.12), transparent 70%);
+}
+.dark .bg-aurora {
+  background:
+    radial-gradient(ellipse 60% 45% at 18% 20%, oklch(0.62 0.2 260 / 0.22), transparent 70%),
+    radial-gradient(ellipse 55% 45% at 82% 30%, oklch(0.6 0.16 190 / 0.18), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 60% 85%, oklch(0.62 0.18 310 / 0.16), transparent 70%);
+}
+
+/* 渐入动画：自下而上 + 淡入 */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+}

@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarDays, ExternalLink, GitBranch } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { getProject, projects, type Locale } from "@/lib/projects";
+import { ProjectCover } from "@/components/project-cover";
 
 // 静态生成所有作品详情页
 export function generateStaticParams() {
@@ -52,6 +53,14 @@ export default async function ProjectDetailPage({
           {t("back")}
         </Link>
       </Button>
+
+      {/* 封面区 */}
+      <div className="mb-10 overflow-hidden rounded-2xl border shadow-sm">
+        <ProjectCover
+          project={project}
+          className="h-52 w-full sm:h-72"
+        />
+      </div>
 
       <article>
         <header className="mb-10">
