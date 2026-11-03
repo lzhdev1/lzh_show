@@ -12,7 +12,7 @@ export default async function ProjectsPage({
   const t = await getTranslations("Projects");
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+    <div className="w-full px-4 py-12 sm:px-6 sm:py-16">
       <div className="mb-10">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           {t("title")}

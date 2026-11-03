@@ -171,7 +171,8 @@
 }
 
 .animate-fade-up {
-  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* backwards：动画未播放/后台标签时内容保持可见（默认 opacity:1），播放时从透明淡入 */
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: var(--delay, 0ms);
 }
 

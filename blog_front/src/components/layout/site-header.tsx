@@ -29,7 +29,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
+      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6">
         {/* 品牌 */}
         <Link href="/" className="text-lg font-bold tracking-tight">
           LZH<span className="text-primary">.</span>show
@@ -69,7 +69,7 @@ export function SiteHeader() {
           aria-label="Mobile"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-1 px-4 py-3 sm:px-6">
+          <div className="flex w-full flex-col gap-1 px-4 py-3 sm:px-6">
             {navItems.map((item) => (
               <Link key={item.key} href={item.href} className={linkClass(item.href)}>
                 {t(item.key)}

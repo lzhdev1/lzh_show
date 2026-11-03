@@ -44,7 +44,7 @@ export default async function AboutPage({
   ];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
+    <div className="w-full px-4 py-12 sm:px-6 sm:py-16">
       {/* 头部：徽标 + 身份 */}
       <header className="mb-12 flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:text-left">
         <div className="relative shrink-0">

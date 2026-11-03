@@ -33,7 +33,7 @@ export default async function HomePage({
   const featured = getFeaturedProjects();
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+    <div className="w-full px-4 sm:px-6">
       {/* Hero 区 */}
       <section className="relative overflow-hidden border-b">
         {/* 背景装饰：网格 + 光晕 */}
