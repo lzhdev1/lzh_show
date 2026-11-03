@@ -1,29 +1,46 @@
-# lzh_show 容器编排文件（骨架占位）
-# 待前端/后端技术栈与数据库选型确认后，再补全各服务定义。
-# 计划编排的服务：
-#   frontend  — 由 blog_front/Dockerfile 构建
-#   backend   — 由 blog_backend/Dockerfile 构建
-#   db        — 数据库服务（选型待确认）
+# ===== lzh_show 容器编排 =====
+# 服务规划：
+#   frontend — 前端（Next.js，开发模式热更新 / 生产模式 standalone）
+#   backend  — 后端服务（技术栈待确认后补充）
+#   db       — 数据库服务（选型待确认后补充）
 
 services:
-  # frontend:
-  #   build: ./blog_front
-  #   ports:
-  #     - "3000:3000"
+  frontend:
+    build:
+      context: ./blog_front
+      target: dev
+    container_name: lzh_show_frontend
+    ports:
+      # 注：本机 3000 被 rag-web 容器占用，临时映射到 3100（rag-web 停止后可改回 3000）
+      - "3100:3000"
+    volumes:
+      # 源码挂载实现热更新；匿名卷防止 Windows 的 node_modules 覆盖容器内 Linux 依赖
+      - ./blog_front:/app
+      - /app/node_modules
+    environment:
+      # 容器内文件监听轮询，保证 Windows 挂载卷下热更新可靠
+      - WATCHPACK_POLLING=true
+    restart: unless-stopped
 
   # backend:
-  #   build: ./blog_backend
+  #   build:
+  #     context: ./blog_backend
   #   ports:
   #     - "8000:8000"
 
   # db:
   #   image: postgres:16
   #   environment:
-  #     POSTGRES_USER: ${POSTGRES_USER}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     POSTGRES_USER: ${POSTGRES_USER:-lzh_show}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lzh_show}
+  #     POSTGRES_DB: ${POSTGRES_DB:-lzh_show}
   #   volumes:
   #     - db_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lzh_show}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
 
 # volumes:
 #   db_data:

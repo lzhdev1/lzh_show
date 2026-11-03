@@ -1,0 +1,21 @@
+{
+  "Metadata": {
+    "title": "Li Zonghan | Portfolio",
+    "description": "AI Application Developer · Person Re-identification (ReID) Researcher · Projects & Blog"
+  },
+  "Nav": {
+    "home": "Home",
+    "projects": "Projects",
+    "posts": "Posts",
+    "about": "About"
+  },
+  "Home": {
+    "greeting": "Hi, I'm Zonghan Li",
+    "subtitle": "AI Application Developer · Person Re-identification Researcher",
+    "placeholder": "Homepage content will be developed in phase M2"
+  },
+  "Common": {
+    "switchTo": "中文",
+    "switchToLabel": "Switch language"
+  }
+}

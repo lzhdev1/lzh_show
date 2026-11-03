@@ -12,6 +12,7 @@ dist/
 build/
 *.tsbuildinfo
 npm-debug.log*
+.pnpm-store/
 
 # --- 后端 (blog_backend) ---
 __pycache__/

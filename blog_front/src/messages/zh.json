@@ -1,0 +1,21 @@
+{
+  "Metadata": {
+    "title": "李宗翰 | 个人作品集",
+    "description": "AI 应用开发 · 行人重识别（ReID）研究 · 个人作品与技术博客"
+  },
+  "Nav": {
+    "home": "首页",
+    "projects": "作品",
+    "posts": "文章",
+    "about": "关于"
+  },
+  "Home": {
+    "greeting": "你好，我是李宗翰",
+    "subtitle": "AI 应用开发工程师 · 行人重识别研究者",
+    "placeholder": "首页内容将在 M2 阶段开发"
+  },
+  "Common": {
+    "switchTo": "English",
+    "switchToLabel": "切换语言"
+  }
+}
