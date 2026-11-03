@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeft, CalendarDays, ExternalLink, GitBranch } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { getProject, projects, type Locale } from "@/lib/projects";
 import { ProjectCover } from "@/components/project-cover";
 
@@ -47,12 +48,16 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-      <Button variant="ghost" size="sm" className="-ml-2 mb-8" asChild>
-        <Link href="/projects">
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          {t("back")}
-        </Link>
-      </Button>
+      <Link
+        href="/projects"
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "-ml-2 mb-8",
+        )}
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" />
+        {t("back")}
+      </Link>
 
       {/* 封面区 */}
       <div className="mb-10 overflow-hidden rounded-2xl border shadow-sm">
@@ -90,28 +95,26 @@ export default async function ProjectDetailPage({
           {(project.links.demo || project.links.source) && (
             <div className="mt-6 flex flex-wrap gap-3">
               {project.links.demo && (
-                <Button asChild>
-                  <a
-                    href={project.links.demo}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t("links")} · {tp("visitDemo")}
-                    <ExternalLink className="ml-1 h-4 w-4" />
-                  </a>
-                </Button>
+                <a
+                  href={project.links.demo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(buttonVariants())}
+                >
+                  {t("links")} · {tp("visitDemo")}
+                  <ExternalLink className="ml-1 h-4 w-4" />
+                </a>
               )}
               {project.links.source && (
-                <Button variant="outline" asChild>
-                  <a
-                    href={project.links.source}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <GitBranch className="mr-1 h-4 w-4" />
-                    {tp("sourceCode")}
-                  </a>
-                </Button>
+                <a
+                  href={project.links.source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(buttonVariants({ variant: "outline" }))}
+                >
+                  <GitBranch className="mr-1 h-4 w-4" />
+                  {tp("sourceCode")}
+                </a>
               )}
             </div>
           )}

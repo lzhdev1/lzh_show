@@ -1,7 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ProjectCard } from "@/components/project-card";
 import { getFeaturedProjects } from "@/lib/projects";
 
@@ -67,15 +68,21 @@ export default async function HomePage({
               className="animate-fade-up mt-8 flex flex-wrap gap-3"
               style={{ "--delay": "270ms" } as React.CSSProperties}
             >
-              <Button size="lg" asChild>
-                <Link href="/projects">
-                  {hero("ctaProjects")}
-                  <ArrowRight className="ml-1.5 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/about">{hero("ctaAbout")}</Link>
-              </Button>
+              <Link
+                href="/projects"
+                className={cn(buttonVariants({ size: "lg" }))}
+              >
+                {hero("ctaProjects")}
+                <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Link>
+              <Link
+                href="/about"
+                className={cn(
+                  buttonVariants({ size: "lg", variant: "outline" }),
+                )}
+              >
+                {hero("ctaAbout")}
+              </Link>
             </div>
           </div>
 
