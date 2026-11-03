@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { Providers } from "@/components/providers";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { SiteHeader } from "@/components/layout/site-header";
 import { routing } from "@/i18n/routing";
 
 // 静态枚举支持的语言，使 /zh、/en 可静态预渲染
@@ -54,7 +56,11 @@ export default async function LocaleLayout({
     >
       <body className="flex min-h-full flex-col">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers>
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

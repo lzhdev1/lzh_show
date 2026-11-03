@@ -9,13 +9,60 @@
     "posts": "Posts",
     "about": "About"
   },
-  "Home": {
+  "Hero": {
     "greeting": "Hi, I'm Zonghan Li",
     "subtitle": "AI Application Developer · Person Re-identification Researcher",
-    "placeholder": "Homepage content will be developed in phase M2"
+    "intro": "M.S. student in Artificial Intelligence at Jianghan University, focused on AI application development and person re-identification research. I love turning ideas into working products.",
+    "ctaProjects": "View Projects",
+    "ctaAbout": "About Me"
+  },
+  "Home": {
+    "featuredTitle": "Featured Projects",
+    "featuredSubtitle": "Some projects I'm proud of",
+    "viewAll": "View all",
+    "skillsTitle": "Tech Stack"
+  },
+  "Projects": {
+    "title": "Projects",
+    "subtitle": "Projects I've built or contributed to",
+    "viewDetail": "View details",
+    "visitDemo": "Live demo",
+    "sourceCode": "Source",
+    "empty": "No projects yet"
+  },
+  "ProjectDetail": {
+    "back": "Back to projects",
+    "techStack": "Tech Stack",
+    "date": "Date",
+    "links": "Links",
+    "notFoundTitle": "Project not found",
+    "notFoundDesc": "The project you're looking for doesn't exist or has been removed"
+  },
+  "About": {
+    "title": "About Me",
+    "bioTitle": "Bio",
+    "educationTitle": "Education",
+    "careerTitle": "Career Goal",
+    "career": "AI Application Developer",
+    "careerDesc": "Full-stack developer proficient in Python/FastAPI, Java/Spring Boot, Next.js/React, with hands-on experience in RAG applications and agent platforms.",
+    "bio": "M.S. student in Artificial Intelligence at Jianghan University (final year), researching person re-identification (ReID) and model distillation. I have two full-stack development internships covering Web, Android and mini-programs, and I'm seeking an AI application development role.",
+    "timelineTitle": "Timeline",
+    "timelinePlaceholder": "Detailed experience to be added"
+  },
+  "Posts": {
+    "title": "Posts",
+    "subtitle": "Technical notes & thoughts (under construction)",
+    "empty": "Posts are on the way, stay tuned"
+  },
+  "Footer": {
+    "tagline": "Building ideas with code",
+    "rights": "All rights reserved",
+    "builtWith": "Built with Next.js"
   },
   "Common": {
     "switchTo": "中文",
-    "switchToLabel": "Switch language"
+    "switchToLabel": "Switch language",
+    "toggleTheme": "Toggle theme",
+    "openMenu": "Open menu"
   }
 }
