@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { ProjectCard } from "@/components/project-card";
+import { HeroBackground } from "@/components/hero-background";
 import { getFeaturedProjects } from "@/lib/projects";
 
 const skills = [
@@ -32,10 +33,20 @@ export default async function HomePage({
 
   return (
     <div className="w-full">
-      {/* Hero 区：纯黑底 + 玻璃质感铺满整个区域 */}
+      {/* Hero 区：银河视频背景 + 玻璃质感铺满整个区域 */}
       <section className="relative overflow-hidden bg-black">
-        {/* 彩色光晕（玻璃模糊底衬） */}
-        <div className="bg-aurora-on-dark pointer-events-none absolute inset-0" aria-hidden />
+        {/* 银河系视频背景：铺满整个 Hero，无左右 padding */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          aria-hidden
+        >
+          <source src="/videos/galaxy.mp4" type="video/mp4" />
+        </video>
         {/* 玻璃层：铺满整个 Hero，无左右 padding */}
         <div
           className="pointer-events-none absolute inset-0 border-b border-white/10 bg-white/[0.04] backdrop-blur-2xl"
