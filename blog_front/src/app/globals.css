@@ -176,8 +176,21 @@
   animation-delay: var(--delay, 0ms);
 }
 
+/* 慢速旋转（Hero 徽标光环） */
+@keyframes spin-slower {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slower {
+  animation: spin-slower 12s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up {
+    animation: none;
+  }
+  .animate-spin-slower {
     animation: none;
   }
 }

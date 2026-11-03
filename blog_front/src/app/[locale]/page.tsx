@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -39,46 +39,54 @@ export default async function HomePage({
         {/* 背景装饰：网格 + 光晕 */}
         <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden />
         <div className="bg-aurora pointer-events-none absolute inset-0" aria-hidden />
+        {/* 顶部高光线：让 Hero 与导航衔接更精致 */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" aria-hidden />
         {/* 遮罩让装饰渐隐到正文背景 */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" aria-hidden />
 
-        <div className="relative flex flex-col items-start gap-10 py-20 sm:py-28 md:flex-row md:items-center md:justify-between">
+        <div className="relative flex flex-col items-start gap-14 py-24 sm:py-32 md:flex-row md:items-center md:justify-between">
           {/* 左侧文字 */}
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
+            {/* 状态徽章：玻璃拟态 + 呼吸光点 */}
             <p
-              className="animate-fade-up mb-4 inline-flex items-center gap-2 rounded-full border bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur"
+              className="animate-fade-up mb-6 inline-flex items-center gap-2.5 rounded-full border border-primary/15 bg-card/60 px-4 py-1.5 text-xs font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-md"
               style={{ "--delay": "0ms" } as React.CSSProperties}
             >
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-500" />
+              </span>
               {hero("subtitle")}
             </p>
             <h1
-              className="animate-fade-up text-4xl font-bold tracking-tight sm:text-5xl"
+              className="animate-fade-up text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl"
               style={{ "--delay": "90ms" } as React.CSSProperties}
             >
               {hero("greeting")}
             </h1>
             <p
-              className="animate-fade-up mt-5 max-w-xl text-base leading-relaxed text-muted-foreground"
+              className="animate-fade-up mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground"
               style={{ "--delay": "180ms" } as React.CSSProperties}
             >
               {hero("intro")}
             </p>
             <div
-              className="animate-fade-up mt-8 flex flex-wrap gap-3"
+              className="animate-fade-up mt-10 flex flex-wrap items-center gap-4"
               style={{ "--delay": "270ms" } as React.CSSProperties}
             >
+              {/* 主按钮：品牌渐变 + 发光 + hover 微动效 */}
               <Link
                 href="/projects"
-                className={cn(buttonVariants({ size: "lg" }))}
+                className="group inline-flex h-12 items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-violet-600 px-7 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/30 hover:brightness-110"
               >
                 {hero("ctaProjects")}
-                <ArrowRight className="ml-1.5 h-4 w-4" />
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
               </Link>
               <Link
                 href="/about"
                 className={cn(
                   buttonVariants({ size: "lg", variant: "outline" }),
+                  "rounded-full",
                 )}
               >
                 {hero("ctaAbout")}
@@ -86,24 +94,46 @@ export default async function HomePage({
             </div>
           </div>
 
-          {/* 右侧头像徽标（占位，后续替换为真实照片） */}
+          {/* 右侧徽标：旋转渐变光环 + 玻璃高光 */}
           <div
             className="animate-fade-up mx-auto shrink-0 md:mx-0"
             style={{ "--delay": "360ms" } as React.CSSProperties}
           >
-            <div className="relative flex h-44 w-44 items-center justify-center sm:h-52 sm:w-52">
-              {/* 光环 */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary via-primary/40 to-transparent opacity-20 blur-2xl" aria-hidden />
-              <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-teal-500/20 via-transparent to-violet-500/20 blur-xl" aria-hidden />
+            <div className="relative flex h-48 w-48 items-center justify-center sm:h-56 sm:w-56">
+              {/* 旋转渐变光环 */}
+              <div
+                className="animate-spin-slower absolute -inset-4 rounded-full bg-[conic-gradient(from_0deg,transparent_0%,teal-400_15%,transparent_35%,violet-500_60%,transparent_85%)] opacity-60 blur-[6px]"
+                aria-hidden
+              />
+              {/* 柔和光晕 */}
+              <div
+                className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500/25 via-violet-500/20 to-transparent blur-2xl"
+                aria-hidden
+              />
               {/* 主体 */}
-              <div className="relative flex h-36 w-36 items-center justify-center rounded-full border bg-gradient-to-br from-card to-muted shadow-lg sm:h-44 sm:w-44">
-                <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-violet-600 text-white sm:h-36 sm:w-36">
-                  <span className="text-3xl font-bold tracking-widest sm:text-4xl">LZH</span>
-                </div>
+              <div className="relative flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-violet-600 shadow-2xl shadow-violet-500/20 sm:h-48 sm:w-48">
+                {/* 内圈渐变高光（玻璃质感） */}
+                <div
+                  className="absolute inset-1 rounded-full bg-[conic-gradient(from_210deg,transparent_0%,white_18%,transparent_32%)] opacity-25"
+                  aria-hidden
+                />
+                <span className="relative text-3xl font-bold tracking-widest text-white sm:text-4xl">
+                  LZH
+                </span>
               </div>
-              {/* 小装饰点 */}
-              <span className="absolute right-2 top-3 h-3 w-3 rounded-full bg-teal-400" aria-hidden />
-              <span className="absolute bottom-4 left-1 h-2 w-2 rounded-full bg-violet-400" aria-hidden />
+              {/* 装饰浮点：带发光 */}
+              <span
+                className="absolute right-3 top-4 h-3 w-3 rounded-full bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.8)]"
+                aria-hidden
+              />
+              <span
+                className="absolute bottom-6 left-0 h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_10px_rgba(167,139,250,0.8)]"
+                aria-hidden
+              />
+              <span
+                className="absolute -right-1 bottom-12 h-1.5 w-1.5 rounded-full bg-amber-300/80"
+                aria-hidden
+              />
             </div>
           </div>
         </div>
