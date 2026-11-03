@@ -36,17 +36,7 @@ export default async function HomePage({
       {/* Hero 区：银河视频背景 + 玻璃质感铺满整个区域 */}
       <section className="relative overflow-hidden bg-black">
         {/* 银河系视频背景：铺满整个 Hero，无左右 padding */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-          aria-hidden
-        >
-          <source src="/videos/galaxy.mp4" type="video/mp4" />
-        </video>
+        <HeroBackground />
         {/* 玻璃层：铺满整个 Hero，无左右 padding */}
         <div
           className="pointer-events-none absolute inset-0 border-b border-white/10 bg-white/[0.04] backdrop-blur-2xl"
