@@ -3,6 +3,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { ProjectCard } from "@/components/project-card";
 import { HeroBackground } from "@/components/hero-background";
+import { HeroActions } from "@/components/hero-actions";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { Carousel3D } from "@/components/carousel-3d";
 import { SectionPager } from "@/components/section-pager";
@@ -39,52 +40,21 @@ export default async function HomePage({
 
         {/* 内容：居中显示 */}
         <div className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center gap-8 py-24 text-center sm:py-28">
-          {/* 状态徽章：玻璃 pill + 呼吸光点 */}
-          <p
-            className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-wide text-white/70 backdrop-blur-md"
-            style={{ "--delay": "0ms" } as React.CSSProperties}
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-400" />
-            </span>
-            {hero("subtitle")}
-          </p>
-
           <h1
             className="animate-fade-up max-w-5xl text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl"
-            style={{ "--delay": "90ms" } as React.CSSProperties}
+            style={{ "--delay": "0ms" } as React.CSSProperties}
           >
             {hero("greeting")}
           </h1>
 
           <p
             className="animate-fade-up max-w-2xl text-lg leading-relaxed text-white/70"
-            style={{ "--delay": "180ms" } as React.CSSProperties}
+            style={{ "--delay": "90ms" } as React.CSSProperties}
           >
             {hero("intro")}
           </p>
 
-          <div
-            className="animate-fade-up flex flex-wrap items-center justify-center gap-4"
-            style={{ "--delay": "270ms" } as React.CSSProperties}
-          >
-            {/* 主按钮：白色玻璃 + hover 发光 */}
-            <Link
-              href="/projects"
-              className="group inline-flex h-12 items-center gap-2 rounded-full border border-white/20 bg-white/10 px-7 text-sm font-semibold text-white backdrop-blur-md transition-all duration-300 hover:bg-white/20 hover:shadow-[0_0_28px_rgba(255,255,255,0.18)]"
-            >
-              {hero("ctaProjects")}
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </Link>
-            {/* 次按钮：白描边玻璃 */}
-            <Link
-              href="/about"
-              className="inline-flex h-12 items-center rounded-full border border-white/15 px-7 text-sm font-semibold text-white transition-colors duration-300 hover:border-white/30 hover:bg-white/5"
-            >
-              {hero("ctaAbout")}
-            </Link>
-          </div>
+          <HeroActions />
         </div>
 
         {/* 滚动提示：引导下滑进入 Featured Projects */}
