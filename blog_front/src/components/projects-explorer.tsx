@@ -37,7 +37,7 @@ export function ProjectsExplorer() {
         </div>
 
         {/* 搜索框：位于标题行的中间位置，右侧留白平衡视觉 */}
-        <div className="w-full max-w-sm sm:w-72">
+        <div className="w-full max-w-md sm:w-96">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
