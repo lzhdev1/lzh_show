@@ -28,15 +28,15 @@ export function ProjectsExplorer() {
 
   return (
     <div className="w-full px-4 py-12 sm:px-6 sm:py-16">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             {t("title")}
           </h1>
           <p className="mt-2 text-muted-foreground">{t("subtitle")}</p>
         </div>
 
-        {/* 搜索框：与标题同行，右侧固定宽度 */}
+        {/* 搜索框：位于标题行的中间位置，右侧留白平衡视觉 */}
         <div className="w-full max-w-sm sm:w-72">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -49,6 +49,7 @@ export function ProjectsExplorer() {
             />
           </div>
         </div>
+        <div className="hidden min-w-0 flex-1 sm:block" aria-hidden />
       </div>
 
       {filtered.length === 0 ? (
