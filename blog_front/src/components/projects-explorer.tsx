@@ -28,24 +28,26 @@ export function ProjectsExplorer() {
 
   return (
     <div className="w-full px-4 py-12 sm:px-6 sm:py-16">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          {t("title")}
-        </h1>
-        <p className="mt-2 text-muted-foreground">{t("subtitle")}</p>
-      </div>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            {t("title")}
+          </h1>
+          <p className="mt-2 text-muted-foreground">{t("subtitle")}</p>
+        </div>
 
-      {/* 居中搜索框 */}
-      <div className="mx-auto mb-10 max-w-md">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("searchPlaceholder")}
-            className="w-full rounded-full border bg-card/70 py-2.5 pl-10 pr-4 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary"
-          />
+        {/* 搜索框：与标题同行，右侧固定宽度 */}
+        <div className="w-full max-w-sm sm:w-72">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("searchPlaceholder")}
+              className="w-full rounded-full border bg-card/70 py-2.5 pl-10 pr-4 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary"
+            />
+          </div>
         </div>
       </div>
 
