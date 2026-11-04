@@ -86,18 +86,22 @@ export function Carousel3D({
       if (!d || e.pointerId !== d.id) return;
       const dx = e.clientX - d.startX;
       if (!d.moved && Math.abs(dx) > 6) d.moved = true;
-      d.dx = dx;
+      // 限制拖拽范围：最多偏移一个卡位（±gap），卡片跟手到头即停，
+      // 不会把整排卡片拖出视窗（虚拟焦点被限制在 [startFocus-1, startFocus+1]）
+      const gap = d.gap || 1;
+      const clamped = Math.max(-gap, Math.min(gap, dx));
+      d.dx = clamped;
       // 约 60Hz 节流驱动卡片跟手（pointermove 频率可远超帧率）
       const now = performance.now();
       if (now - lastRenderRef.current >= 16) {
         lastRenderRef.current = now;
-        setDragDx(dx);
+        setDragDx(clamped);
       }
     };
     const endDrag = (e: PointerEvent, cancelled: boolean) => {
       const d = dragRef.current;
       if (!d || e.pointerId !== d.id) return;
-      const dx = e.clientX - d.startX;
+      const dx = d.dx; // 已按 ±gap 限制的位移，用于吸附判定
       dragRef.current = null;
       setDragging(false);
       setDragDx(0);
