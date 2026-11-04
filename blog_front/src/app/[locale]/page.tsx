@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { ProjectCard } from "@/components/project-card";
 import { HeroBackground } from "@/components/hero-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
-import { DragToScroll } from "@/components/drag-to-scroll";
+import { SectionPager } from "@/components/section-pager";
 import { getFeaturedProjects } from "@/lib/projects";
 
 const skills = [
@@ -34,10 +34,9 @@ export default async function HomePage({
   const featured = getFeaturedProjects();
 
   return (
-    <div className="w-full">
-      {/* Hero 区：银河视频背景 + 玻璃质感铺满整个区域（按住左键/手指向上拖进入精选作品） */}
-      <DragToScroll targetId="featured-projects" className="w-full">
-        <section className="relative overflow-hidden bg-black">
+    <SectionPager className="w-full">
+      {/* 板块 1：Hero 银河视频背景 + 玻璃质感铺满整个区域 */}
+      <section className="relative scroll-mt-16 overflow-hidden bg-black">
         {/* 银河系视频背景：铺满整个 Hero，无左右 padding */}
         <HeroBackground />
         {/* 玻璃层：铺满整个 Hero，无左右 padding */}
@@ -111,10 +110,12 @@ export default async function HomePage({
           </div>
         </div>
       </section>
-      </DragToScroll>
 
-      {/* 精选作品：进入视口时上滑淡入（拖拽翻页目标区） */}
-      <section id="featured-projects" className="scroll-mt-16 px-4 py-16 sm:px-6">
+      {/* 板块 2：精选作品（进入视口时上滑淡入） */}
+      <section
+        id="featured-projects"
+        className="scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 py-16 sm:px-6"
+      >
         <ScrollReveal>
           <div className="mb-8 flex items-end justify-between">
             <div>
@@ -141,8 +142,8 @@ export default async function HomePage({
         </ScrollReveal>
       </section>
 
-      {/* 技术栈 */}
-      <section className="px-4 pb-20 pt-6 sm:px-6">
+      {/* 板块 3：技术栈 */}
+      <section className="scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 pb-20 pt-6 sm:px-6">
         <h2 className="mb-8 text-2xl font-bold">{home("skillsTitle")}</h2>
         <div className="flex flex-wrap gap-2">
           {skills.map((skill) => (
@@ -155,6 +156,6 @@ export default async function HomePage({
           ))}
         </div>
       </section>
-    </div>
+    </SectionPager>
   );
 }
