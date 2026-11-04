@@ -115,8 +115,21 @@ export default async function HomePage({
       {/* 板块 2：精选作品（进入视口时上滑淡入） */}
       <section
         id="featured-projects"
-        className="scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 py-16 sm:px-6"
+        className="relative scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 py-16 sm:px-6"
       >
+        {/* 背景：七彩水墨涂鸦，cover 平铺板块不失真 */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "url('/featured-bg.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        {/* 主题遮罩：仅暗色主题压暗，保证文字与卡片可读；亮色白底天然可读 */}
+        <div aria-hidden className="absolute inset-0 dark:bg-black/55" />
+        <div className="relative">
         <ScrollReveal>
           <div className="mb-8 flex items-end justify-between">
             <div>
@@ -141,6 +154,7 @@ export default async function HomePage({
             ))}
           />
         </ScrollReveal>
+        </div>
       </section>
 
       {/* 板块 3：技术栈 */}
