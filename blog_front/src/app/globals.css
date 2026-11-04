@@ -188,11 +188,28 @@
   animation: spin-slower 12s linear infinite;
 }
 
+/* 滚动提示：上下浮动（引导下滑进入下一区域） */
+@keyframes hero-scroll {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+.animate-hero-scroll {
+  animation: hero-scroll 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up {
     animation: none;
   }
   .animate-spin-slower {
+    animation: none;
+  }
+  .animate-hero-scroll {
     animation: none;
   }
 }

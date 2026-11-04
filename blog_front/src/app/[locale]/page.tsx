@@ -1,8 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { ProjectCard } from "@/components/project-card";
 import { HeroBackground } from "@/components/hero-background";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { getFeaturedProjects } from "@/lib/projects";
 
 const skills = [
@@ -97,30 +98,44 @@ export default async function HomePage({
             </Link>
           </div>
         </div>
+
+        {/* 滚动提示：引导下滑进入 Featured Projects */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center">
+          <div className="animate-hero-scroll flex flex-col items-center gap-1.5 text-white/45">
+            <span className="text-[11px] font-medium uppercase tracking-[0.2em]">
+              {hero("scroll")}
+            </span>
+            <ArrowDown className="h-4 w-4" />
+          </div>
+        </div>
       </section>
 
-      {/* 精选作品 */}
+      {/* 精选作品：进入视口时上滑淡入 */}
       <section className="px-4 py-16 sm:px-6">
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{home("featuredTitle")}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {home("featuredSubtitle")}
-            </p>
+        <ScrollReveal>
+          <div className="mb-8 flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">{home("featuredTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {home("featuredSubtitle")}
+              </p>
+            </div>
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              {home("viewAll")}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link
-            href="/projects"
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            {home("viewAll")}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((project) => (
-            <ProjectCard key={project.slug} project={project} />
-          ))}
-        </div>
+        </ScrollReveal>
+        <ScrollReveal delay={120}>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featured.map((project) => (
+              <ProjectCard key={project.slug} project={project} />
+            ))}
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* 技术栈 */}
