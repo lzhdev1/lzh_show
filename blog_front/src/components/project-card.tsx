@@ -11,7 +11,7 @@ export function ProjectCard({ project }: { project: Project }) {
   return (
     <Link
       href={`/projects/${project.slug}`}
-      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-border/60 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-xl border-transparent bg-card transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-lg"
     >
       <div className="aspect-video w-full overflow-hidden">
         <ProjectCover

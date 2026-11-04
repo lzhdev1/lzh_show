@@ -127,8 +127,8 @@ export default async function HomePage({
             backgroundPosition: "center",
           }}
         />
-        {/* 模糊玻璃层：雾化背景涂鸦，亮色半透明白、暗色压暗，保证文字与卡片可读 */}
-        <div aria-hidden className="absolute inset-0 backdrop-blur-md bg-white/15 dark:bg-black/55" />
+        {/* 模糊玻璃层：雾化背景涂鸦，透明度 80%（亮色白、暗色黑），保证文字与卡片可读 */}
+        <div aria-hidden className="absolute inset-0 backdrop-blur-md bg-white/80 dark:bg-black/80" />
         <div className="relative">
         <ScrollReveal>
           <div className="mb-8 flex items-end justify-between">
