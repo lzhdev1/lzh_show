@@ -10,11 +10,11 @@ import {
 } from "react";
 
 const CARD_OFFSET = 0.6; // 相邻卡片中心间距 = 卡宽 * 0.6（与 translateX d*60% 对应）
-const MIN_SCALE = 0.55;
-const SCALE_STEP = 0.14;
-const ROTATE_STEP = 26;
-const MIN_OPACITY = 0.1;
-const OPACITY_STEP = 0.32;
+const MIN_SCALE = 0.48;
+const SCALE_STEP = 0.17;
+const ROTATE_STEP = 36;
+const MIN_OPACITY = 0.12;
+const OPACITY_STEP = 0.38;
 
 /**
  * Coverflow 3D 横向画廊：作品单行排列，可左右滑动查看，
@@ -69,10 +69,18 @@ export function Carousel3D({
     const abs = Math.abs(d);
     const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_STEP);
     const opacity = Math.max(MIN_OPACITY, 1 - abs * OPACITY_STEP);
+    // 加强立体纵深：焦点卡前凸，侧卡沿 Z 轴后退
+    const depth = abs > 0 ? -Math.min(abs, 2) * 100 : 30;
+    // 阴影随离焦距离衰减：焦点卡厚重投影，侧卡阴影轻浅
+    const shadow =
+      abs < 0.6
+        ? "0 30px 70px -20px rgba(0,0,0,0.55)"
+        : "0 12px 30px -12px rgba(0,0,0,0.3)";
     return {
       zIndex: 100 - Math.round(abs),
       opacity,
-      transform: `translate(-50%, -50%) translateX(${d * 100 * CARD_OFFSET}%) scale(${scale}) rotateY(${d * ROTATE_STEP}deg)`,
+      boxShadow: shadow,
+      transform: `translate(-50%, -50%) translateX(${d * 100 * CARD_OFFSET}%) translateZ(${depth}px) scale(${scale}) rotateY(${d * ROTATE_STEP}deg)`,
       transition: dragging
         ? "none"
         : "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease",
@@ -159,7 +167,7 @@ export function Carousel3D({
   return (
     <div
       className={`relative h-[32rem] w-full select-none overflow-hidden sm:h-[32rem] ${className}`}
-      style={{ perspective: 1400, touchAction: "pan-y" }}
+      style={{ perspective: 1100, touchAction: "pan-y" }}
       onPointerDown={onPointerDown}
       onDragStart={(e) => e.preventDefault()}
       tabIndex={0}
