@@ -136,7 +136,6 @@ export default async function HomePage({
         </ScrollReveal>
         <ScrollReveal delay={120}>
           <Carousel3D
-            className="mx-auto w-full max-w-4xl"
             items={featured.map((project) => (
               <ProjectCard key={project.slug} project={project} />
             ))}

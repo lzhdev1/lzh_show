@@ -1,13 +1,13 @@
 "use client";
 
 import {
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
  * Coverflow 3D 横向画廊：作品单行排列，可左右滑动查看，
@@ -16,7 +16,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
  * - 鼠标左键按住左右拖 / 手指左右滑：跟手滑动，松手切换焦点
  * - 点击两侧卡片：直接将其设为焦点（不触发卡片内部链接）
  * - 焦点卡片：保留内部链接行为（如跳转详情页）
- * - 左右箭头按钮 / 键盘方向键：切换焦点
+ * - 键盘方向键：切换焦点
  * - 垂直滚动不受影响（touch-action: pan-y），与全屏板块翻页共存
  *
  * 用法：<Carousel3D items={[<CardA/>, <CardB/>, ...]} />
@@ -35,6 +35,17 @@ export function Carousel3D({
   const dragRef = useRef<{ id: number; startX: number; moved: boolean } | null>(
     null,
   );
+  const suppressClickRef = useRef(false);
+
+  // 窗口级监听 handler 需要最新状态，用 ref 兜底
+  const stateRef = useRef({ focus, dragDx, dragging });
+  stateRef.current = { focus, dragDx, dragging };
+
+  const moveTo = (target: number) => {
+    setFocus(Math.max(0, Math.min(count - 1, target)));
+  };
+  const moveToRef = useRef(moveTo);
+  moveToRef.current = moveTo;
 
   /** 每张卡根据与焦点的距离计算 3D 姿态 */
   const cardStyle = (i: number): CSSProperties => {
@@ -54,62 +65,80 @@ export function Carousel3D({
     };
   };
 
-  const moveTo = (target: number) => {
-    setFocus(Math.max(0, Math.min(count - 1, target)));
-  };
-
-  const onPointerDown = (e: ReactPointerEvent) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    dragRef.current = { id: e.pointerId, startX: e.clientX, moved: false };
-    setDragging(true);
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      /* 合成事件无 capture，忽略 */
-    }
-  };
-
-  const onPointerMove = (e: ReactPointerEvent) => {
+  /** 结束拖动：归位并决定是否切换焦点 */
+  const endDrag = (dx: number) => {
     const d = dragRef.current;
-    if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.startX;
-    if (!d.moved && Math.abs(dx) > 6) d.moved = true;
-    setDragDx(dx);
-  };
-
-  const onPointerUp = (e: ReactPointerEvent) => {
-    const d = dragRef.current;
-    if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.startX;
+    if (!d) return;
     const moved = d.moved;
     dragRef.current = null;
     setDragging(false);
     setDragDx(0);
     if (!moved) return;
-    // 横向滑动切换焦点
-    if (dx <= -60) moveTo(focus + 1);
-    else if (dx >= 60) moveTo(focus - 1);
+    if (dx <= -60) {
+      suppressClickRef.current = true; // 拦截拖动松手误触发的 click
+      moveToRef.current(stateRef.current.focus + 1);
+    } else if (dx >= 60) {
+      suppressClickRef.current = true;
+      moveToRef.current(stateRef.current.focus - 1);
+    }
   };
 
-  const onPointerCancel = () => {
-    dragRef.current = null;
-    setDragging(false);
-    setDragDx(0);
+  // 窗口级监听 pointer 事件：即使指针移出容器 / capture 失效，松手也必定复位
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.id) return;
+      const dx = e.clientX - d.startX;
+      if (!d.moved && Math.abs(dx) > 6) d.moved = true;
+      setDragDx(dx);
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.id) return;
+      endDrag(e.clientX - d.startX);
+    };
+    const onCancel = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.id) return;
+      endDrag(0); // 取消：复位不翻页
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onPointerDown = (e: ReactPointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (dragRef.current) return; // 已有拖动进行中
+    dragRef.current = { id: e.pointerId, startX: e.clientX, moved: false };
+    setDragging(true);
   };
 
   return (
     <div
-      className={`relative h-[30rem] select-none overflow-hidden sm:h-[32rem] ${className}`}
+      className={`relative h-[40rem] w-full select-none overflow-hidden sm:h-[40rem] ${className}`}
       style={{ perspective: 1400, touchAction: "pan-y" }}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      onDragStart={(e) => e.preventDefault()}
       tabIndex={0}
       aria-label="作品画廊，可左右滑动"
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft") moveTo(focus - 1);
         if (e.key === "ArrowRight") moveTo(focus + 1);
+      }}
+      onClickCapture={(e) => {
+        // 拖动松手误触的 click：拦截一次
+        if (suppressClickRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          suppressClickRef.current = false;
+        }
       }}
     >
       {/* 卡片舞台：跟手平移；松手后平滑归位 */}
@@ -125,7 +154,7 @@ export function Carousel3D({
         {items.map((item, i) => (
           <div
             key={i}
-            className="absolute left-1/2 top-1/2 w-[min(80vw,24rem)]"
+            className="absolute left-1/2 top-1/2 w-[min(calc(100vw-2rem),38rem)]"
             style={cardStyle(i)}
             onClickCapture={(e) => {
               // 侧卡点击：聚焦而非触发内部链接；焦点卡保留链接行为
@@ -140,30 +169,6 @@ export function Carousel3D({
           </div>
         ))}
       </div>
-
-      {/* 左右切换按钮 */}
-      {count > 1 && (
-        <>
-          <button
-            type="button"
-            aria-label="上一张"
-            onClick={() => moveTo(focus - 1)}
-            className="absolute left-3 top-1/2 z-[200] -translate-y-1/2 rounded-full border bg-background/60 p-2 text-foreground/70 backdrop-blur-sm transition-colors hover:bg-background/80 hover:text-foreground disabled:opacity-30"
-            disabled={focus === 0}
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="下一张"
-            onClick={() => moveTo(focus + 1)}
-            className="absolute right-3 top-1/2 z-[200] -translate-y-1/2 rounded-full border bg-background/60 p-2 text-foreground/70 backdrop-blur-sm transition-colors hover:bg-background/80 hover:text-foreground disabled:opacity-30"
-            disabled={focus === count - 1}
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </>
-      )}
     </div>
   );
 }
