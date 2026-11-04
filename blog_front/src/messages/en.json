@@ -34,7 +34,9 @@
     "viewDetail": "View details",
     "visitDemo": "Live demo",
     "sourceCode": "Source",
-    "empty": "No projects yet"
+    "empty": "No projects yet",
+    "searchPlaceholder": "Search projects…",
+    "noResults": "No matching projects"
   },
   "ProjectDetail": {
     "back": "Back to projects",

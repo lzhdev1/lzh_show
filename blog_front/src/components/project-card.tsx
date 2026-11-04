@@ -4,7 +4,13 @@ import type { Project } from "@/lib/projects";
 import { ProjectCover } from "@/components/project-cover";
 import { ArrowRight, CalendarDays } from "lucide-react";
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({
+  project,
+  compact = false,
+}: {
+  project: Project;
+  compact?: boolean;
+}) {
   const locale = useLocale();
   const t = useTranslations("Projects");
 
@@ -20,16 +26,28 @@ export function ProjectCard({ project }: { project: Project }) {
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
-        <h3 className="text-lg font-semibold leading-tight group-hover:text-primary">
+      <div
+        className={`flex flex-1 flex-col ${
+          compact ? "gap-2 p-4" : "gap-3 p-5"
+        }`}
+      >
+        <h3
+          className={`font-semibold leading-tight group-hover:text-primary ${
+            compact ? "text-base" : "text-lg"
+          }`}
+        >
           {project.title[locale]}
         </h3>
-        <p className="line-clamp-2 flex-1 text-sm text-muted-foreground">
+        <p
+          className={`flex-1 text-sm text-muted-foreground ${
+            compact ? "line-clamp-1" : "line-clamp-2"
+          }`}
+        >
           {project.summary[locale]}
         </p>
 
         <div className="flex flex-wrap gap-1.5">
-          {project.techStack.slice(0, 4).map((tech) => (
+          {project.techStack.slice(0, compact ? 3 : 4).map((tech) => (
             <span
               key={tech}
               className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium"
@@ -39,8 +57,12 @@ export function ProjectCard({ project }: { project: Project }) {
           ))}
         </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <div
+          className={`flex items-center justify-between text-muted-foreground ${
+            compact ? "text-xs" : "text-sm"
+          }`}
+        >
+          <span className="inline-flex items-center gap-1">
             <CalendarDays className="h-3.5 w-3.5" />
             {project.date}
           </span>

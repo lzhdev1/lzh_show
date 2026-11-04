@@ -34,7 +34,9 @@
     "viewDetail": "查看详情",
     "visitDemo": "在线演示",
     "sourceCode": "源码",
-    "empty": "暂无作品"
+    "empty": "暂无作品",
+    "searchPlaceholder": "搜索项目…",
+    "noResults": "没有找到匹配的项目"
   },
   "ProjectDetail": {
     "back": "返回作品列表",
