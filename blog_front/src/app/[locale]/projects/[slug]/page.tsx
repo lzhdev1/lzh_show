@@ -53,7 +53,7 @@ export default async function ProjectDetailPage({
       <Link
         href="/projects"
         className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
+          buttonVariants({ variant: "outline", size: "sm" }),
           "absolute left-4 top-4 sm:left-6 sm:top-6",
         )}
       >
