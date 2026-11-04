@@ -166,7 +166,7 @@ export function Carousel3D({
 
   return (
     <div
-      className={`relative h-[32rem] w-full select-none overflow-hidden sm:h-[32rem] ${className}`}
+      className={`relative h-[28rem] w-full select-none overflow-hidden sm:h-[28rem] ${className}`}
       style={{ perspective: 1100, touchAction: "pan-y" }}
       onPointerDown={onPointerDown}
       onDragStart={(e) => e.preventDefault()}
