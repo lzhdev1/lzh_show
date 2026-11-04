@@ -4,6 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { ProjectCard } from "@/components/project-card";
 import { HeroBackground } from "@/components/hero-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
+import { Carousel3D } from "@/components/carousel-3d";
 import { SectionPager } from "@/components/section-pager";
 import { getFeaturedProjects } from "@/lib/projects";
 
@@ -134,11 +135,12 @@ export default async function HomePage({
           </div>
         </ScrollReveal>
         <ScrollReveal delay={120}>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.map((project) => (
+          <Carousel3D
+            className="mx-auto w-full max-w-4xl"
+            items={featured.map((project) => (
               <ProjectCard key={project.slug} project={project} />
             ))}
-          </div>
+          />
         </ScrollReveal>
       </section>
 
