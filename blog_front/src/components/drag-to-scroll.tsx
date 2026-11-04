@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -11,6 +12,7 @@ import {
  * 平滑滚入 `#targetId` 区域；未过阈值则回弹到起点。
  * - 桌面鼠标：按住左键向上拖动，页面实时跟随，松手判定
  * - 触摸：兼容原生纵向滚动，手指上划超过阈值触发翻页
+ * - 滚轮：向下滚动一格直接翻入目标区域（动画期间防抖）
  * - 点击（位移 < 6px）不受影响，正常触发按钮/链接
  */
 export function DragToScroll({
@@ -24,6 +26,7 @@ export function DragToScroll({
   className?: string;
   children: ReactNode;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     id: number;
     startY: number;
@@ -107,8 +110,35 @@ export function DragToScroll({
     endDrag(d);
   };
 
+  // 滚轮翻页：区域内向下滚动一格 → 平滑进入目标区域；动画期间防抖
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || !targetId) return;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    let locked = false;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY <= 0) return; // 向上滚动不拦截
+      if (locked) return;
+      const rect = target.getBoundingClientRect();
+      // 已进入目标区域（顶部进入视口 30% 内）不再重复翻页
+      if (rect.top <= window.innerHeight * 0.3) return;
+      e.preventDefault();
+      locked = true;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => {
+        locked = false;
+      }, 900);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [targetId]);
+
   return (
     <div
+      ref={rootRef}
       data-drag-scroll
       className={className}
       onPointerDown={onPointerDown}
