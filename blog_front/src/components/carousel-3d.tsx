@@ -139,13 +139,17 @@ export function Carousel3D({
       e.stopPropagation();
     }
     if (dragRef.current) return; // 已有拖动进行中
+    // 层级限制：只有最上方的卡片（当前焦点卡）允许拖动画廊；
+    // 位于下方/两侧的卡片按住不启动拖拽（保留"点击聚焦"，onClickCapture 处理）
+    const card = (e.target as HTMLElement).closest("[data-card]");
+    if (card && Number(card.dataset.card) !== focus) return;
     // 实测相邻卡片中心距（卡宽 * 0.6），供拖拽位移换算为"卡位"
-    const card = stageRef.current?.querySelector<HTMLElement>("[data-card]");
+    const first = stageRef.current?.querySelector<HTMLElement>("[data-card]");
     dragRef.current = {
       id: e.pointerId,
       startX: e.clientX,
       startFocus: focus,
-      gap: card ? card.offsetWidth * CARD_OFFSET : 0,
+      gap: first ? first.offsetWidth * CARD_OFFSET : 0,
       dx: 0,
       moved: false,
     };
