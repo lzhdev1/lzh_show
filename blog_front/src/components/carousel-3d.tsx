@@ -71,11 +71,11 @@ export function Carousel3D({
     const opacity = Math.max(MIN_OPACITY, 1 - abs * OPACITY_STEP);
     // 加强立体纵深：焦点卡前凸，侧卡沿 Z 轴后退
     const depth = abs > 0 ? -Math.min(abs, 2) * 100 : 30;
-    // 阴影随离焦距离衰减：焦点卡厚重投影，侧卡阴影轻浅
+    // 阴影随离焦距离衰减：焦点卡轻投影，侧卡阴影更浅
     const shadow =
       abs < 0.6
-        ? "0 30px 70px -20px rgba(0,0,0,0.55)"
-        : "0 12px 30px -12px rgba(0,0,0,0.3)";
+        ? "0 15px 35px -15px rgba(0,0,0,0.28)"
+        : "0 8px 20px -10px rgba(0,0,0,0.15)";
     return {
       zIndex: 100 - Math.round(abs),
       opacity,
