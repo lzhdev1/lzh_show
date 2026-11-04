@@ -4,6 +4,19 @@
 
 export type Locale = "zh" | "en";
 
+/** 详细介绍条目（表格行）：模块/能力 + 说明 */
+export interface DetailItem {
+  label: Record<Locale, string>;
+  value: Record<Locale, string>;
+}
+
+/** 更新日志条目（表格行）：版本 + 日期 + 更新内容列表 */
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  changes: Record<Locale, string[]>;
+}
+
 export interface Project {
   /** 唯一标识，用于路由 /projects/[slug] */
   slug: string;
@@ -25,6 +38,10 @@ export interface Project {
   };
   /** 详情页长文（Markdown 占位） */
   content: Record<Locale, string>;
+  /** 详细介绍（表格展示：模块 + 说明） */
+  details: DetailItem[];
+  /** 更新日志（表格展示：版本 + 日期 + 更新内容） */
+  changelog: ChangelogEntry[];
 }
 
 export const projects: Project[] = [
@@ -50,6 +67,54 @@ export const projects: Project[] = [
       zh: "## 项目简介\n\n（占位内容，M3 接入后端后替换为真实数据）\n\n- 支持主题输入 → 大纲 → 图文生成全流程\n- RAG 知识库增强写作素材\n- 前后端分离，Docker 部署",
       en: "## Overview\n\n(Placeholder content, to be replaced with real data in M3)\n\n- End-to-end pipeline: topic → outline → illustrated article\n- RAG knowledge base for richer writing material\n- Separated frontend/backend, Docker deployment",
     },
+    details: [
+      {
+        label: { zh: "核心流程", en: "Core Pipeline" },
+        value: {
+          zh: "主题输入 → 大纲生成 → 图文内容生成 → 一键发布，全流程自动化",
+          en: "Topic → outline → illustrated article → one-click publish, fully automated",
+        },
+      },
+      {
+        label: { zh: "RAG 知识增强", en: "RAG Enhancement" },
+        value: {
+          zh: "接入知识库检索，写作素材更丰富、内容更专业",
+          en: "Knowledge base retrieval for richer, more professional writing material",
+        },
+      },
+      {
+        label: { zh: "技术架构", en: "Architecture" },
+        value: {
+          zh: "Next.js 前端 + FastAPI 后端 + PostgreSQL 存储，前后端分离",
+          en: "Next.js frontend + FastAPI backend + PostgreSQL, separated frontend/backend",
+        },
+      },
+      {
+        label: { zh: "部署方式", en: "Deployment" },
+        value: {
+          zh: "Docker Compose 容器化部署，一键启动整套服务",
+          en: "Docker Compose containerized deployment, one-command startup",
+        },
+      },
+    ],
+    changelog: [
+      {
+        version: "v1.1",
+        date: "2026-08",
+        changes: {
+          zh: ["新增 RAG 知识库增强", "支持大纲自定义编辑"],
+          en: ["Added RAG knowledge base enhancement", "Custom outline editing"],
+        },
+      },
+      {
+        version: "v1.0",
+        date: "2026-06",
+        changes: {
+          zh: ["初始版本：主题输入与图文生成上线", "一键发布到博客"],
+          en: ["Initial release: topic input & illustrated generation", "One-click publish to blog"],
+        },
+      },
+    ],
   },
   {
     slug: "rag-assistant",
@@ -72,6 +137,54 @@ export const projects: Project[] = [
       zh: "## 项目简介\n\n（占位内容，M3 接入后端后替换为真实数据）\n\n- 支持 PDF/Markdown 等多格式文档入库\n- 混合检索 + Rerank 精排提升答案质量\n- RAGAS 评估检索与生成效果",
       en: "## Overview\n\n(Placeholder content, to be replaced with real data in M3)\n\n- Ingest PDF/Markdown and more document formats\n- Hybrid retrieval + rerank for better answers\n- RAGAS evaluation for retrieval and generation quality",
     },
+    details: [
+      {
+        label: { zh: "文档解析", en: "Document Parsing" },
+        value: {
+          zh: "支持 PDF / Markdown / 纯文本等多格式文档入库",
+          en: "Ingest PDF / Markdown / plain text and more formats",
+        },
+      },
+      {
+        label: { zh: "混合检索", en: "Hybrid Retrieval" },
+        value: {
+          zh: "BM25 关键词与向量语义双路召回，兼顾精确与泛化",
+          en: "BM25 keyword + vector semantic dual recall, balancing precision and recall",
+        },
+      },
+      {
+        label: { zh: "Rerank 精排", en: "Reranking" },
+        value: {
+          zh: "对召回结果重排，显著提升答案相关性",
+          en: "Re-rank retrieved passages for significantly better answer relevance",
+        },
+      },
+      {
+        label: { zh: "效果评估", en: "Evaluation" },
+        value: {
+          zh: "RAGAS 框架量化检索与生成质量",
+          en: "RAGAS framework for retrieval & generation quality metrics",
+        },
+      },
+    ],
+    changelog: [
+      {
+        version: "v1.1",
+        date: "2026-09",
+        changes: {
+          zh: ["接入 Rerank 精排", "加入 RAGAS 效果评估"],
+          en: ["Integrated rerank pipeline", "Added RAGAS evaluation"],
+        },
+      },
+      {
+        version: "v1.0",
+        date: "2026-08",
+        changes: {
+          zh: ["初始版本：多格式文档入库与问答上线", "BM25 + 向量混合检索"],
+          en: ["Initial release: document ingestion & Q&A", "BM25 + vector hybrid retrieval"],
+        },
+      },
+    ],
   },
   {
     slug: "reid-distillation",
@@ -92,6 +205,54 @@ export const projects: Project[] = [
       zh: "## 研究简介\n\n（占位内容，M3 接入后端后替换为真实数据）\n\n- BoT-R50 / OSNet 集成教师蒸馏\n- 低秩 SVD 压缩学生网络\n- 向量距离损失提升特征判别力",
       en: "## Overview\n\n(Placeholder content, to be replaced with real data in M3)\n\n- Ensemble distillation from BoT-R50 / OSNet teachers\n- Low-rank SVD compression for the student\n- Vector distance loss for discriminative features",
     },
+    details: [
+      {
+        label: { zh: "蒸馏框架", en: "Distillation" },
+        value: {
+          zh: "BoT-R50 / OSNet 集成教师蒸馏，知识迁移至轻量学生网络",
+          en: "Ensemble teachers (BoT-R50 / OSNet) distill knowledge into a lightweight student",
+        },
+      },
+      {
+        label: { zh: "模型压缩", en: "Compression" },
+        value: {
+          zh: "低秩 SVD 分解压缩学生网络，显著减少参数量",
+          en: "Low-rank SVD compression for a much smaller student network",
+        },
+      },
+      {
+        label: { zh: "损失设计", en: "Loss Design" },
+        value: {
+          zh: "向量距离损失增强特征判别力",
+          en: "Vector distance loss for more discriminative features",
+        },
+      },
+      {
+        label: { zh: "实验验证", en: "Evaluation" },
+        value: {
+          zh: "Market1501 数据集评估，压缩模型同时保持 mAP",
+          en: "Evaluated on Market1501, preserving mAP while compressing",
+        },
+      },
+    ],
+    changelog: [
+      {
+        version: "v0.2",
+        date: "2026-11",
+        changes: {
+          zh: ["加入向量距离损失", "完成首轮消融实验"],
+          en: ["Added vector distance loss", "Completed first ablation study"],
+        },
+      },
+      {
+        version: "v0.1",
+        date: "2026-10",
+        changes: {
+          zh: ["实验框架搭建：集成教师 + 低秩 SVD 蒸馏管线"],
+          en: ["Experiment framework: ensemble teacher + low-rank SVD pipeline"],
+        },
+      },
+    ],
   },
 ];
 

@@ -44,7 +44,14 @@
     "date": "Date",
     "links": "Links",
     "notFoundTitle": "Project not found",
-    "notFoundDesc": "The project you're looking for doesn't exist or has been removed"
+    "notFoundDesc": "The project you're looking for doesn't exist or has been removed",
+    "detailsTitle": "Details",
+    "detailsLabel": "Module",
+    "detailsDesc": "Description",
+    "changelogTitle": "Changelog",
+    "colVersion": "Version",
+    "colDate": "Date",
+    "colChanges": "Changes"
   },
   "About": {
     "title": "About Me",
