@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getProject, projects, type Locale } from "@/lib/projects";
 import { ProjectCover } from "@/components/project-cover";
+import { ProjectTabs } from "@/components/project-tabs";
 
 // 静态生成所有作品详情页
 export function generateStaticParams() {
@@ -120,81 +121,18 @@ export default async function ProjectDetailPage({
         )}
       </article>
 
-      {/* 详细介绍：表格一 */}
-      {project.details.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-bold">{t("detailsTitle")}</h2>
-          <div className="mt-4 overflow-hidden rounded-xl border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/60">
-                <tr>
-                  <th className="w-36 px-4 py-2.5 font-semibold sm:w-40">
-                    {t("detailsLabel")}
-                  </th>
-                  <th className="px-4 py-2.5 font-semibold">
-                    {t("detailsDesc")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {project.details.map((d) => (
-                  <tr key={d.label.zh} className="border-t">
-                    <td className="px-4 py-3 align-top font-medium">
-                      {d.label[l]}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {d.value[l]}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* 更新日志：表格二 */}
-      {project.changelog.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-xl font-bold">{t("changelogTitle")}</h2>
-          <div className="mt-4 overflow-hidden rounded-xl border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/60">
-                <tr>
-                  <th className="w-24 px-4 py-2.5 font-semibold">
-                    {t("colVersion")}
-                  </th>
-                  <th className="w-28 px-4 py-2.5 font-semibold">
-                    {t("colDate")}
-                  </th>
-                  <th className="px-4 py-2.5 font-semibold">
-                    {t("colChanges")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {project.changelog.map((c) => (
-                  <tr key={c.version} className="border-t">
-                    <td className="whitespace-nowrap px-4 py-3 font-medium">
-                      {c.version}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                      {c.date}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {c.changes[l].map((ch, i) => (
-                        <div key={i} className={i > 0 ? "mt-1" : undefined}>
-                          · {ch}
-                        </div>
-                      ))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      {/* 详细介绍 / 更新日志：Tab 切换展示 */}
+      <ProjectTabs
+        details={project.details.map((d) => ({
+          label: d.label[l],
+          value: d.value[l],
+        }))}
+        changelog={project.changelog.map((c) => ({
+          version: c.version,
+          date: c.date,
+          changes: c.changes[l],
+        }))}
+      />
     </div>
   );
 }
