@@ -158,7 +158,7 @@ export function Carousel3D({
 
   return (
     <div
-      className={`relative h-[40rem] w-full select-none overflow-hidden sm:h-[40rem] ${className}`}
+      className={`relative h-[32rem] w-full select-none overflow-hidden sm:h-[32rem] ${className}`}
       style={{ perspective: 1400, touchAction: "pan-y" }}
       onPointerDown={onPointerDown}
       onDragStart={(e) => e.preventDefault()}
@@ -182,7 +182,7 @@ export function Carousel3D({
           <div
             key={i}
             data-card={i}
-            className="absolute left-1/2 top-1/2 w-[min(calc(100vw-2rem),38rem)] will-change-transform"
+            className="absolute left-1/2 top-1/2 w-[min(calc(100vw-2rem),28rem)] will-change-transform"
             style={cardStyle(i)}
             onClickCapture={(e) => {
               // 侧卡点击：聚焦而非触发内部链接；焦点卡保留链接行为
