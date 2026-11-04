@@ -117,13 +117,13 @@ export default async function HomePage({
         id="featured-projects"
         className="relative scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 py-16 sm:px-6"
       >
-        {/* 背景：七彩水墨涂鸦，cover 平铺板块不失真 */}
+        {/* 背景：七彩水墨涂鸦，cover 放大平铺板块不失真 */}
         <div
           aria-hidden
           className="absolute inset-0"
           style={{
             backgroundImage: "url('/featured-bg.jpg')",
-            backgroundSize: "cover",
+            backgroundSize: "150%",
             backgroundPosition: "center",
           }}
         />
