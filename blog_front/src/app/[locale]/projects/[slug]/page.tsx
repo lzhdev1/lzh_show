@@ -47,12 +47,13 @@ export default async function ProjectDetailPage({
   const summary = project.summary[l];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+    <div className="relative mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
+      {/* 返回按钮：页面左上角 */}
       <Link
         href="/projects"
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
-          "-ml-2 mb-8",
+          "absolute left-4 top-4 sm:left-6 sm:top-6",
         )}
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
