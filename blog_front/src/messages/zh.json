@@ -21,7 +21,12 @@
     "featuredTitle": "精选作品",
     "featuredSubtitle": "一些让我自豪的项目",
     "viewAll": "查看全部",
-    "skillsTitle": "技术栈"
+    "skillsTitle": "技术栈",
+    "notesTitle": "笔记",
+    "notesSubtitle": "随手记录，按主题整理",
+    "notesSearchPlaceholder": "搜索笔记…",
+    "notesEmpty": "没有匹配的笔记",
+    "notesUpdated": "更新于"
   },
   "Projects": {
     "title": "作品集",

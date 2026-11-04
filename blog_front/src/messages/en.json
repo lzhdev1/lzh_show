@@ -21,7 +21,12 @@
     "featuredTitle": "Featured Projects",
     "featuredSubtitle": "Some projects I'm proud of",
     "viewAll": "View all",
-    "skillsTitle": "Tech Stack"
+    "skillsTitle": "Tech Stack",
+    "notesTitle": "Notes",
+    "notesSubtitle": "Snippets & takeaways, organized by topic",
+    "notesSearchPlaceholder": "Search notes…",
+    "notesEmpty": "No matching notes",
+    "notesUpdated": "Updated"
   },
   "Projects": {
     "title": "Projects",

@@ -6,22 +6,8 @@ import { HeroBackground } from "@/components/hero-background";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { Carousel3D } from "@/components/carousel-3d";
 import { SectionPager } from "@/components/section-pager";
+import { NotesSection } from "@/components/notes-section";
 import { getFeaturedProjects } from "@/lib/projects";
-
-const skills = [
-  "Python",
-  "FastAPI",
-  "Next.js",
-  "React",
-  "TypeScript",
-  "Java",
-  "Spring Boot",
-  "PyTorch",
-  "PostgreSQL",
-  "Docker",
-  "RAG",
-  "LangGraph",
-];
 
 export default async function HomePage({
   params,
@@ -157,19 +143,9 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* 板块 3：技术栈 */}
-      <section className="scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 pb-20 pt-6 sm:px-6">
-        <h2 className="mb-8 text-2xl font-bold">{home("skillsTitle")}</h2>
-        <div className="flex flex-wrap gap-2">
-          {skills.map((skill) => (
-            <span
-              key={skill}
-              className="rounded-full border bg-card px-4 py-1.5 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-muted"
-            >
-              {skill}
-            </span>
-          ))}
-        </div>
+      {/* 板块 3：笔记（左侧搜索+目录 30% / 右侧内容 70%） */}
+      <section className="flex h-[calc(100vh-4rem)] scroll-mt-16 flex-col px-4 pb-6 pt-6 sm:px-6">
+        <NotesSection />
       </section>
     </SectionPager>
   );
