@@ -114,7 +114,12 @@ export function Carousel3D({
   }, []);
 
   const onPointerDown = (e: ReactPointerEvent) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    // 区域边界：鼠标左键在画廊上的拖动归画廊（横向滑动），
+    // 不再冒泡触发外层 SectionPager 的垂直翻页；非左键、触摸放行
+    if (e.pointerType === "mouse") {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+    }
     if (dragRef.current) return; // 已有拖动进行中
     dragRef.current = { id: e.pointerId, startX: e.clientX, moved: false };
     setDragging(true);
