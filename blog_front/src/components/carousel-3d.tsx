@@ -69,17 +69,11 @@ export function Carousel3D({
     const abs = Math.abs(d);
     const scale = Math.max(MIN_SCALE, 1 - abs * SCALE_STEP);
     const opacity = Math.max(MIN_OPACITY, 1 - abs * OPACITY_STEP);
-    // 加强立体纵深：焦点卡前凸，侧卡沿 Z 轴后退
+    // 加强立体纵深：焦点卡前凸，侧卡沿 Z 轴后退（立体感由透视本身承担，不再叠加投影）
     const depth = abs > 0 ? -Math.min(abs, 2) * 100 : 30;
-    // 阴影随离焦距离衰减：焦点卡轻投影，侧卡阴影更浅
-    const shadow =
-      abs < 0.6
-        ? "0 15px 35px -15px rgba(0,0,0,0.28)"
-        : "0 8px 20px -10px rgba(0,0,0,0.15)";
     return {
       zIndex: 100 - Math.round(abs),
       opacity,
-      boxShadow: shadow,
       transform: `translate(-50%, -50%) translateX(${d * 100 * CARD_OFFSET}%) translateZ(${depth}px) scale(${scale}) rotateY(${d * ROTATE_STEP}deg)`,
       transition: dragging
         ? "none"
