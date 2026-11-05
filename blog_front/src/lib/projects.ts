@@ -131,6 +131,7 @@ export const projects: Project[] = [
     date: "2026-08",
     coverGradient: "from-violet-500 to-fuchsia-600",
     links: {
+      demo: "https://lzhshow.top/rag-assistant/",
       source: "https://github.com/lzhdev1",
     },
     content: {
