@@ -1,10 +1,9 @@
-import type { ComponentType } from "react";
-import { Bot, Boxes, ScanSearch, Sparkles } from "lucide-react";
+import { Bot, Boxes, ScanSearch, Sparkles, type LucideIcon } from "lucide-react";
 import { useLocale } from "next-intl";
-import type { Project } from "@/lib/projects";
+import type { Locale, Project } from "@/lib/projects";
 
 // slug → 封面图标映射（后续可按项目类型扩展）
-const coverIcons: Record<string, ComponentType<{ className?: string }>> = {
+const coverIcons: Record<string, LucideIcon> = {
   "blog-agent-platform": Bot,
   "rag-assistant": Sparkles,
   "reid-distillation": ScanSearch,
@@ -28,7 +27,7 @@ export function ProjectCover({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={project.cover}
-        alt={project.title[locale]}
+        alt={project.title[locale as Locale]}
         className={`object-cover ${className ?? ""}`}
       />
     );

@@ -1,6 +1,6 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import type { Project } from "@/lib/projects";
+import type { Locale, Project } from "@/lib/projects";
 import { ProjectCover } from "@/components/project-cover";
 import { ArrowRight, CalendarDays } from "lucide-react";
 
@@ -36,14 +36,14 @@ export function ProjectCard({
             compact ? "text-base" : "text-lg"
           }`}
         >
-          {project.title[locale]}
+          {project.title[locale as Locale]}
         </h3>
         <p
           className={`flex-1 text-sm text-muted-foreground ${
             compact ? "line-clamp-1" : "line-clamp-2"
           }`}
         >
-          {project.summary[locale]}
+          {project.summary[locale as Locale]}
         </p>
 
         <div className="flex flex-wrap gap-1.5">

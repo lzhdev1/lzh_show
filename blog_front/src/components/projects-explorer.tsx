@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Search } from "lucide-react";
 import { ProjectCard } from "@/components/project-card";
-import { projects } from "@/lib/projects";
+import { projects, type Locale } from "@/lib/projects";
 
 /**
  * 作品列表：顶部居中实时搜索框，按标题 / 摘要 / 技术栈过滤；
@@ -20,8 +20,8 @@ export function ProjectsExplorer() {
     if (!q) return projects;
     return projects.filter(
       (p) =>
-        p.title[locale].toLowerCase().includes(q) ||
-        p.summary[locale].toLowerCase().includes(q) ||
+        p.title[locale as Locale].toLowerCase().includes(q) ||
+        p.summary[locale as Locale].toLowerCase().includes(q) ||
         p.techStack.some((tech) => tech.toLowerCase().includes(q))
     );
   }, [query, locale]);
