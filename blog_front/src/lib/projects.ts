@@ -60,7 +60,7 @@ export const projects: Project[] = [
     date: "2026-06",
     coverGradient: "from-teal-500 to-blue-600",
     links: {
-      demo: "https://lzhshow.top",
+      demo: "https://lzhshow.top/blog-agent/",
       source: "https://github.com/lzhdev1",
     },
     content: {
