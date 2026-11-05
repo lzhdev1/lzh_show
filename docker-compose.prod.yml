@@ -1,0 +1,12 @@
+# ===== lzh_show 服务器生产部署编排 =====
+# 用途：服务器生产模式运行（Next.js standalone），仅前端（静态作品集站点，无后端依赖）
+services:
+  frontend:
+    build:
+      context: ./blog_front
+      target: runner
+    container_name: lzh_show_frontend_prod
+    ports:
+      # 本机 8090 被 blog-agent-l 占用，lzh_show 使用 8100
+      - "8100:3000"
+    restart: unless-stopped
