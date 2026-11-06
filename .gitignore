@@ -30,3 +30,6 @@ venv/
 
 # --- Docker ---
 docker-compose.override.yml
+
+# --- 设计过程文件（画布/题材草稿，不入库）---
+.creative-design/

@@ -1,4 +1,4 @@
-import { Bot, Boxes, ScanSearch, Sparkles, type LucideIcon } from "lucide-react";
+import { Bot, Boxes, ScanSearch, Sparkles, Sprout, type LucideIcon } from "lucide-react";
 import { useLocale } from "next-intl";
 import type { Locale, Project } from "@/lib/projects";
 
@@ -7,6 +7,7 @@ const coverIcons: Record<string, LucideIcon> = {
   "blog-agent-platform": Bot,
   "rag-assistant": Sparkles,
   "reid-distillation": ScanSearch,
+  ttfarm: Sprout,
 };
 
 /**

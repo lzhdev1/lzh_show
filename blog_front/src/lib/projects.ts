@@ -58,6 +58,7 @@ export const projects: Project[] = [
     techStack: ["Next.js", "FastAPI", "RAG", "LangGraph", "PostgreSQL"],
     featured: true,
     date: "2026-06",
+    cover: "/covers/blog-agent.png",
     coverGradient: "from-teal-500 to-blue-600",
     links: {
       demo: "https://lzhshow.top/blog-agent/",
@@ -129,6 +130,7 @@ export const projects: Project[] = [
     techStack: ["Python", "FastAPI", "ChromaDB", "Rerank", "Docker"],
     featured: true,
     date: "2026-08",
+    cover: "/covers/rag-assistant.png",
     coverGradient: "from-violet-500 to-fuchsia-600",
     links: {
       demo: "https://lzhshow.top/rag-assistant/",
@@ -251,6 +253,86 @@ export const projects: Project[] = [
         changes: {
           zh: ["实验框架搭建：集成教师 + 低秩 SVD 蒸馏管线"],
           en: ["Experiment framework: ensemble teacher + low-rank SVD pipeline"],
+        },
+      },
+    ],
+  },
+  {
+    slug: "ttfarm",
+    title: {
+      zh: "TT农场",
+      en: "TT Farm",
+    },
+    summary: {
+      zh: "浏览器里的 3D 农场经营小游戏：开地、买种子、播种、浇水、收获、卖菜、扩地。等距视角，可操控角色，点地块它会自己走过去。",
+      en: "A lightweight 3D farming game in the browser: clear land, buy seeds, plant, water, harvest, sell and expand. Isometric view with a controllable character that walks to whatever plot you tap.",
+    },
+    techStack: ["Three.js", "TypeScript", "Vite", "Zustand", "React"],
+    featured: true,
+    date: "2026-11",
+    cover: "/covers/ttfarm.png",
+    coverGradient: "from-lime-500 to-emerald-600",
+    links: {
+      demo: "https://lzhshow.top/ttfarm/",
+      source: "https://github.com/lzhdev1",
+    },
+    content: {
+      zh: "## 项目简介\n\n一个纯静态的网页 3D 农场游戏，打开就能玩，进度存在浏览器里。\n\n- 12 块地、6 种作物，按等级逐步解锁\n- 买种子 → 播种 → 浇水 → 收获 → 卖菜 → 扩地的完整循环\n- 可操控角色：点地块自动寻路，也可以 WASD 自由走\n- 昵称可改、4 套角色形象随时切换\n- 离线期间按时间戳继续生长，刷新不丢进度",
+      en: "## Overview\n\nA static 3D farming game that runs in the browser, with progress saved locally.\n\n- 12 plots and 6 crops, unlocked as you level up\n- Full loop: buy seeds → plant → water → harvest → sell → expand\n- Controllable character: tap a plot to walk there, or move freely with WASD\n- Editable nickname and 4 switchable avatars\n- Crops keep growing while offline via timestamps; refresh-safe saves",
+    },
+    details: [
+      {
+        label: { zh: "玩法循环", en: "Game Loop" },
+        value: {
+          zh: "买种 → 播种 → 浇水（最多 3 次，每次缩短 18% 生长时间）→ 收获 → 商店卖菜 → 攒钱扩地",
+          en: "Buy → plant → water (up to 3 times, each cutting 18% of grow time) → harvest → sell in shop → save up to expand",
+        },
+      },
+      {
+        label: { zh: "3D 表现", en: "3D Rendering" },
+        value: {
+          zh: "Three.js 正交等距相机 + 程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段",
+          en: "Three.js orthographic isometric camera with a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages",
+        },
+      },
+      {
+        label: { zh: "角色系统", en: "Character" },
+        value: {
+          zh: "点击地块自动寻路到地边并弹出操作卡；昵称与形象改动会同步到 3D 模型",
+          en: "Tap a plot to path to its edge and open the action sheet; nickname and avatar changes sync to the 3D model",
+        },
+      },
+      {
+        label: { zh: "存档与部署", en: "Save & Deploy" },
+        value: {
+          zh: "localStorage 存档 + 时间戳推导离线生长；构建产物并入作品集主站，同域名同端口，无独立容器",
+          en: "localStorage saves with timestamp-based offline growth; the build ships inside the portfolio site itself — same domain, same port, no extra container",
+        },
+      },
+    ],
+    changelog: [
+      {
+        version: "v0.2",
+        date: "2026-11",
+        changes: {
+          zh: [
+            "3D 场景与角色成型：等距相机、谷仓与水井、可操控角色与四套形象",
+            "完整经济循环：扩地价 150 起、6 种作物分等级解锁、卖菜结算",
+            "存档支持离线生长，刷新后进度不丢",
+          ],
+          en: [
+            "3D scene and character in place: isometric camera, barn and well, controllable character with four avatars",
+            "Full economy loop: land expansion from 150 coins, 6 level-gated crops, selling payouts",
+            "Save system with offline growth; progress survives refresh",
+          ],
+        },
+      },
+      {
+        version: "v0.1",
+        date: "2026-11",
+        changes: {
+          zh: ["技术选型定稿：Three.js + TypeScript + Vite + Zustand + React", "完成工程骨架与存档契约设计"],
+          en: ["Stack decided: Three.js + TypeScript + Vite + Zustand + React", "Project skeleton and save contract designed"],
         },
       },
     ],
