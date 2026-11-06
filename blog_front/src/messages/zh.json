@@ -22,11 +22,8 @@
     "featuredSubtitle": "一些让我自豪的项目",
     "viewAll": "查看全部",
     "skillsTitle": "技术栈",
-    "notesTitle": "笔记",
-    "notesSubtitle": "随手记录，按主题整理",
-    "notesSearchPlaceholder": "搜索笔记…",
-    "notesEmpty": "没有匹配的笔记",
-    "notesUpdated": "更新于"
+    "latestPostsTitle": "最新文章",
+    "latestPostsSubtitle": "随手记录的工程笔记，按主题整理"
   },
   "Projects": {
     "title": "作品集",
@@ -71,8 +68,11 @@
   },
   "Posts": {
     "title": "文章",
-    "subtitle": "技术笔记与思考（建设中）",
-    "empty": "文章正在筹备中，敬请期待"
+    "subtitle": "技术笔记与思考，随手记录、按主题整理",
+    "count": "共 {count} 篇",
+    "searchPlaceholder": "搜索文章…",
+    "empty": "没有匹配的文章",
+    "updated": "更新于"
   },
   "Footer": {
     "tagline": "用代码构建想法",

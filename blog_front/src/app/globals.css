@@ -202,6 +202,22 @@
   animation: hero-scroll 2s ease-in-out infinite;
 }
 
+/* 便签墙：每张便签按自己的周期与相位极轻浮动，--tilt 控制纸张倾斜 */
+@keyframes notes-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  50% {
+    transform: translateY(-8px) rotate(calc(var(--tilt, 0deg) + 0.5deg));
+  }
+}
+.animate-notes-float {
+  animation: notes-float var(--float-duration, 14s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up {
     animation: none;
@@ -211,5 +227,9 @@
   }
   .animate-hero-scroll {
     animation: none;
+  }
+  .animate-notes-float {
+    animation: none;
+    transform: rotate(var(--tilt, 0deg));
   }
 }

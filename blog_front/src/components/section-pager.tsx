@@ -103,11 +103,8 @@ export function SectionPager({
       moved: false,
       pointerType: e.pointerType,
     };
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      /* 合成事件无 capture，忽略 */
-    }
+    // 不在按下时就 capture：捕获会把后续 click 的目标重定向到本容器，
+    // 导致板块内的链接/按钮点不动。等真正开始拖动后再捕获。
   };
 
   const onPointerMove = (e: ReactPointerEvent) => {
@@ -118,6 +115,11 @@ export function SectionPager({
       d.moved = true;
       document.body.style.userSelect = "none";
       document.body.style.cursor = "grabbing";
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* 合成事件无 capture，忽略 */
+      }
     }
     if (d.moved && d.pointerType === "mouse") {
       // 桌面：页面实时跟随拖动（触摸端交给原生滚动）

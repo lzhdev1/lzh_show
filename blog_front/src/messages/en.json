@@ -22,11 +22,8 @@
     "featuredSubtitle": "Some projects I'm proud of",
     "viewAll": "View all",
     "skillsTitle": "Tech Stack",
-    "notesTitle": "Notes",
-    "notesSubtitle": "Snippets & takeaways, organized by topic",
-    "notesSearchPlaceholder": "Search notes…",
-    "notesEmpty": "No matching notes",
-    "notesUpdated": "Updated"
+    "latestPostsTitle": "Latest Posts",
+    "latestPostsSubtitle": "Engineering notes, loosely organised by topic"
   },
   "Projects": {
     "title": "Projects",
@@ -71,8 +68,11 @@
   },
   "Posts": {
     "title": "Posts",
-    "subtitle": "Technical notes & thoughts (under construction)",
-    "empty": "Posts are on the way, stay tuned"
+    "subtitle": "Technical notes and thoughts, loosely organised",
+    "count": "{count} posts",
+    "searchPlaceholder": "Search posts…",
+    "empty": "No matching posts",
+    "updated": "Updated"
   },
   "Footer": {
     "tagline": "Building ideas with code",

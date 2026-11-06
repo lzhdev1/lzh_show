@@ -7,7 +7,7 @@ import { HeroActions } from "@/components/hero-actions";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { Carousel3D } from "@/components/carousel-3d";
 import { SectionPager } from "@/components/section-pager";
-import { NotesSection } from "@/components/notes-section";
+import { NotesWall } from "@/components/notes-wall";
 import { getFeaturedProjects } from "@/lib/projects";
 
 export default async function HomePage({
@@ -113,9 +113,31 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* 板块 3：笔记（左侧搜索+目录 30% / 右侧内容 70%） */}
-      <section className="flex h-[calc(100vh-4rem)] scroll-mt-16 flex-col px-4 pb-6 pt-6 sm:px-6">
-        <NotesSection />
+      {/* 板块 3：最新文章（便签墙，随机展示几篇，点击进入文章页） */}
+      <section className="relative flex min-h-[calc(100vh-4rem)] scroll-mt-16 flex-col justify-center px-4 py-14 sm:px-6">
+        {/* 背景：极光渐变，压得很淡，衬托便签纸面 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-aurora opacity-80"
+        />
+        <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-7">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-bold">{home("latestPostsTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {home("latestPostsSubtitle")}
+              </p>
+            </div>
+            <Link
+              href="/posts"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              {home("viewAll")}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <NotesWall />
+        </div>
       </section>
     </SectionPager>
   );
