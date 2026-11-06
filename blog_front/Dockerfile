@@ -5,6 +5,9 @@
 # ---- 依赖安装阶段 ----
 FROM node:20-alpine AS deps
 WORKDIR /app
+# 服务器直连 registry.npmjs.org 极慢（corepack 下载 pnpm 会卡在 0%），统一走 npmmirror
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -12,6 +15,9 @@ RUN pnpm install --frozen-lockfile
 # ---- 开发阶段：热更新 ----
 FROM node:20-alpine AS dev
 WORKDIR /app
+# 服务器直连 registry.npmjs.org 极慢（corepack 下载 pnpm 会卡在 0%），统一走 npmmirror
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com
 RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -23,6 +29,9 @@ CMD ["pnpm", "dev", "--webpack"]
 # ---- 构建阶段 ----
 FROM node:20-alpine AS builder
 WORKDIR /app
+# 服务器直连 registry.npmjs.org 极慢（corepack 下载 pnpm 会卡在 0%），统一走 npmmirror
+ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+    npm_config_registry=https://registry.npmmirror.com
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
