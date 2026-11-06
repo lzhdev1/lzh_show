@@ -1,14 +1,16 @@
 # ===== lzh_show 前端镜像（多阶段构建） =====
+# 基础镜像固定 node:20-alpine：服务器上已有该镜像（v20.20.2，满足 Next 16 的 >=20.9 要求），
+# 可完全离线构建；Docker Hub 直连在服务器上拉取大层会长时间 0B 卡住。
 
 # ---- 依赖安装阶段 ----
-FROM node:22-alpine AS deps
+FROM node:20-alpine AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ---- 开发阶段：热更新 ----
-FROM node:22-alpine AS dev
+FROM node:20-alpine AS dev
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
 COPY --from=deps /app/node_modules ./node_modules
@@ -19,7 +21,7 @@ EXPOSE 3000
 CMD ["pnpm", "dev", "--webpack"]
 
 # ---- 构建阶段 ----
-FROM node:22-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -28,7 +30,7 @@ COPY . .
 RUN pnpm build
 
 # ---- 生产运行阶段：standalone 最小运行时 ----
-FROM node:22-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
