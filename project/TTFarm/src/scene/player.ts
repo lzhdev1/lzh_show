@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { AvatarId } from "../game/state";
+import { buildGirlRig, type AvatarRig } from "./character";
 
 interface Palette {
   skin: number;
@@ -17,17 +18,6 @@ const PALETTES: Record<AvatarId, Palette> = {
   xiaodou: { skin: 0xf3c9a4, shirt: 0x7a5bbd, torso: 0x7a5bbd, pants: 0x3a3a4a, hair: 0x22222a, accent: 0x5b3f96 },
 };
 
-interface AvatarRig {
-  visual: THREE.Group;
-  body: THREE.Mesh;
-  head: THREE.Mesh;
-  leftLeg: THREE.Mesh;
-  rightLeg: THREE.Mesh;
-  leftArm: THREE.Mesh;
-  rightArm: THREE.Mesh;
-  dispose: () => void;
-}
-
 function capsule(radius: number, length: number, color: number): THREE.Mesh {
   const mesh = new THREE.Mesh(
     new THREE.CapsuleGeometry(radius, length, 4, 10),
@@ -35,6 +25,11 @@ function capsule(radius: number, length: number, color: number): THREE.Mesh {
   );
   mesh.castShadow = true;
   return mesh;
+}
+
+function buildRig(avatarId: AvatarId): AvatarRig {
+  // 「小穗」用贴图少女模型，其余三套先沿用程序化低模
+  return avatarId === "xiaosui" ? buildGirlRig() : buildAvatar(avatarId);
 }
 
 function buildAvatar(avatarId: AvatarId): AvatarRig {
@@ -233,7 +228,7 @@ export class Player {
 
   constructor(avatarId: AvatarId) {
     this.avatarId = avatarId;
-    this.rig = buildAvatar(avatarId);
+    this.rig = buildRig(avatarId);
     this.root.add(this.rig.visual);
     this.root.position.copy(this.position);
     this.root.rotation.y = this.facing;
@@ -252,7 +247,7 @@ export class Player {
     this.root.remove(this.rig.visual);
     this.rig.dispose();
     this.avatarId = avatarId;
-    this.rig = buildAvatar(avatarId);
+    this.rig = buildRig(avatarId);
     this.root.add(this.rig.visual);
   }
 
@@ -330,6 +325,7 @@ export class Player {
       ? Math.abs(Math.sin(this.walkPhase)) * 0.04
       : Math.sin(t * 1.6) * 0.012;
     this.rig.body.rotation.z = this.moving ? Math.sin(this.walkPhase) * 0.03 : 0;
+    this.rig.animate?.(dt, t, this.moving, this.walkPhase);
 
     this.root.position.set(this.position.x, 0, this.position.z);
     this.root.rotation.y = this.facing;

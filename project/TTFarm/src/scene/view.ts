@@ -46,14 +46,15 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     renderer.setSize(width, height);
   };
 
-  // 三个光源角色：天空补光决定暗部可读性，主光决定形体与投影，冷补光把轮廓从背景剥开
-  const hemi = new THREE.HemisphereLight(0xdcf1ff, 0x8a805c, 1.15);
+  // 光效关系：天空补光让暗部仍能读出结构，暖主光给出形体与投影方向，
+  // 冷补光从侧后剥开轮廓，最后加一盏低强度暖轮廓光把角色头顶和长发边缘挑亮
+  const hemi = new THREE.HemisphereLight(0xdcf1ff, 0x8a805c, 1.2);
   scene.add(hemi);
 
-  const keyLight = new THREE.DirectionalLight(0xfff2d2, 2.3);
+  const keyLight = new THREE.DirectionalLight(0xfff2d2, 2.35);
   keyLight.position.set(7.5, 13, 5.5);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.shadow.mapSize.set(1536, 1536);
   keyLight.shadow.camera.left = -11;
   keyLight.shadow.camera.right = 11;
   keyLight.shadow.camera.top = 11;
@@ -61,13 +62,23 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   keyLight.shadow.camera.near = 1;
   keyLight.shadow.camera.far = 40;
   keyLight.shadow.bias = -0.0006;
-  keyLight.shadow.radius = 2;
+  keyLight.shadow.radius = 2.4;
   scene.add(keyLight);
   scene.add(keyLight.target);
 
-  const fillLight = new THREE.DirectionalLight(0xc9deff, 0.85);
+  const fillLight = new THREE.DirectionalLight(0xc9deff, 0.8);
   fillLight.position.set(-9, 6, -7);
   scene.add(fillLight);
+
+  // 逆光轮廓：低角度、偏暖，专门用来勾出头发与肩线的高光边
+  const rimLight = new THREE.DirectionalLight(0xffd9b0, 1.15);
+  rimLight.position.set(-3.5, 4.2, -11);
+  scene.add(rimLight);
+
+  // 地面反光：极弱的一层暖色，避免裙摆与鞋底死黑
+  const bounceLight = new THREE.HemisphereLight(0xffe7bd, 0x6c7c4c, 0.35);
+  scene.add(bounceLight);
+
 
   resize();
   window.addEventListener("resize", resize);

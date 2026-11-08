@@ -264,8 +264,8 @@ export const projects: Project[] = [
       en: "TT Farm",
     },
     summary: {
-      zh: "浏览器里的 3D 农场经营小游戏：开地、买种子、播种、浇水、收获、卖菜、扩地。自由环绕的透视视角，可操控角色，点地块它会自己走过去。",
-      en: "A lightweight 3D farming game in the browser: clear land, buy seeds, plant, water, harvest, sell and expand. Isometric view with a controllable character that walks to whatever plot you tap.",
+      zh: "浏览器里的 3D 农场经营小游戏：开地、买种子、播种、浇水、收获、卖菜、扩地。宽幅自由环绕视角，可操控的日系少女角色，点地块它会自己走过去。",
+      en: "A lightweight 3D farming game in the browser: clear land, buy seeds, plant, water, harvest, sell and expand. Wide free-orbit camera with a textured anime heroine who walks to whatever plot you tap.",
     },
     techStack: ["Three.js", "TypeScript", "Vite", "Zustand", "React"],
     featured: true,
@@ -291,15 +291,15 @@ export const projects: Project[] = [
       {
         label: { zh: "3D 表现", en: "3D Rendering" },
         value: {
-          zh: "Three.js 透视相机 + 自由环绕视角，程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段",
-          en: "Three.js perspective camera with free orbit controls over a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages",
+          zh: "Three.js 透视相机 + 自由环绕视角（低到贴地、拉到俯视、远推 46 单位），程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段；逆光轮廓光 + 地面反射光 + 加法混合的光尘",
+          en: "Three.js perspective camera with a wide free-orbit range (from ground level to top-down, out to 46 units) over a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages, lit by a rim light, ground bounce and additive dust motes",
         },
       },
       {
         label: { zh: "角色系统", en: "Character" },
         value: {
-          zh: "点击地块自动寻路到地边并弹出操作卡；昵称与形象改动会同步到 3D 模型",
-          en: "Tap a plot to path to its edge and open the action sheet; nickname and avatar changes sync to the 3D model",
+          zh: "点击地块自动寻路到地边并弹出操作卡；主角小穗是贴图化的日系长发少女（卡通着色 + 描边 + 程序化百褶裙与双马尾摆动），昵称与形象改动会同步到 3D 模型",
+          en: "Tap a plot to path to its edge and open the action sheet; the heroine is a textured anime girl — toon shading, outlines, procedural pleated skirt and swaying twin tails — with nickname and avatar changes synced to the model",
         },
       },
       {
@@ -311,6 +311,22 @@ export const projects: Project[] = [
       },
     ],
     changelog: [
+      {
+        version: "v0.4",
+        date: "2026-11",
+        changes: {
+          zh: [
+            "新增贴图化的日系长发少女角色：面部、发丝、上衣与裙布四张可平铺贴图，卡通明暗 + 描边，程序化百褶裙、双马尾与呆毛的次级摆动",
+            "视角放开到 5.5–46 距离、16°–84° 极角，可以贴地平视、俯视全场，也能远远拉出去看整片农场",
+            "补光效：逆光轮廓光把角色从背景里剥出来，地面反弹光提亮暗部，空中加一层加法混合的暖色光尘",
+          ],
+          en: [
+            "New textured anime heroine: four tileable maps (face, hair, blouse, skirt) with toon shading and outlines, plus a procedural pleated skirt, twin tails and ahoge that sway with movement",
+            "Camera range widened to 5.5–46 units and 16°–84° polar, so you can graze the ground, look straight down, or pull far back over the farm",
+            "Lighting pass: a rim light separates the character from the background, a ground bounce lifts the shadows, and additive warm dust motes drift in the air",
+          ],
+        },
+      },
       {
         version: "v0.3",
         date: "2026-11",

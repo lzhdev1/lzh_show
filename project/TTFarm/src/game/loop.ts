@@ -28,19 +28,19 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const screenRight = new THREE.Vector3();
   const screenUp = new THREE.Vector3();
 
-  // 60° 自由环绕：方位不设限，但极角与距离都限位，保证任何角度都是成立的构图，
-  // 不会转到地面以下、也不会把主体挤出画面
+  // 宽幅自由环绕：方位不设限，极角放开到接近贴地平视、也能俯冲到近乎正俯视，
+  // 距离从贴身特写到整片农场远景都允许，但上下两极和最近最远仍留一格余量
   const controls = new OrbitControls(view.camera, canvas);
   controls.target.copy(CAMERA_TARGET);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.rotateSpeed = 0.55;
-  controls.zoomSpeed = 0.7;
+  controls.dampingFactor = 0.07;
+  controls.rotateSpeed = 0.62;
+  controls.zoomSpeed = 0.8;
   controls.enablePan = false;
-  controls.minDistance = 9;
-  controls.maxDistance = 34;
-  controls.minPolarAngle = 0.5;
-  controls.maxPolarAngle = 1.2;
+  controls.minDistance = 5.5;
+  controls.maxDistance = 46;
+  controls.minPolarAngle = 0.16;
+  controls.maxPolarAngle = 1.47;
   controls.update();
 
   const raycaster = new THREE.Raycaster();
@@ -195,6 +195,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
 
     controls.update();
+    world.update?.(elapsed);
     view.renderer.render(view.scene, view.camera);
   };
   raf = requestAnimationFrame(frame);

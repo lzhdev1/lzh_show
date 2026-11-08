@@ -267,9 +267,69 @@ function buildSign(): THREE.Group {
   return group;
 }
 
+function createGlowSprite(): THREE.CanvasTexture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, "rgba(255,246,214,1)");
+  grad.addColorStop(0.35, "rgba(255,238,186,0.55)");
+  grad.addColorStop(1, "rgba(255,232,170,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** 空气里的暖色光尘：主光方向上的细碎亮点，让画面有光照在空气里的层次 */
+function createDustMotes(): { points: THREE.Points; update: (t: number) => void } {
+  const count = 72;
+  const positions = new Float32Array(count * 3);
+  const seeds = new Float32Array(count);
+  const heights = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) {
+    positions[i * 3] = (Math.random() - 0.5) * 20;
+    positions[i * 3 + 1] = 0.5 + Math.random() * 4.2;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+    seeds[i] = Math.random() * Math.PI * 2;
+    heights[i] = 0.5 + Math.random() * 4.2;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    map: createGlowSprite(),
+    color: 0xfff3c4,
+    size: 0.22,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const points = new THREE.Points(geo, material);
+  points.frustumCulled = false;
+
+  const update = (t: number) => {
+    const attr = geo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < count; i += 1) {
+      const y = heights[i] + Math.sin(t * 0.35 + seeds[i]) * 0.35;
+      attr.setY(i, y);
+      attr.setX(i, attr.getX(i) + Math.sin(t * 0.2 + seeds[i]) * 0.0006);
+    }
+    attr.needsUpdate = true;
+    material.opacity = 0.3 + Math.sin(t * 0.8) * 0.07;
+  };
+
+  return { points, update };
+}
+
 export interface World {
   group: THREE.Group;
   ground: THREE.Mesh;
+  update?: (t: number) => void;
 }
 
 export function createWorld(): World {
@@ -300,6 +360,9 @@ export function createWorld(): World {
   group.add(buildBarn());
   group.add(buildWell());
   group.add(buildSign());
+
+  const dust = createDustMotes();
+  group.add(dust.points);
 
   const trees: Array<[number, number, number]> = [
     [-9.2, -7.4, 1.15],
@@ -349,5 +412,5 @@ export function createWorld(): World {
     }
   });
 
-  return { group, ground };
+  return { group, ground, update: dust.update };
 }
