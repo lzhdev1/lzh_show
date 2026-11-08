@@ -264,13 +264,13 @@ export const projects: Project[] = [
       en: "TT Farm",
     },
     summary: {
-      zh: "浏览器里的 3D 农场经营小游戏：开地、买种子、播种、浇水、收获、卖菜、扩地。等距视角，可操控角色，点地块它会自己走过去。",
+      zh: "浏览器里的 3D 农场经营小游戏：开地、买种子、播种、浇水、收获、卖菜、扩地。自由环绕的透视视角，可操控角色，点地块它会自己走过去。",
       en: "A lightweight 3D farming game in the browser: clear land, buy seeds, plant, water, harvest, sell and expand. Isometric view with a controllable character that walks to whatever plot you tap.",
     },
     techStack: ["Three.js", "TypeScript", "Vite", "Zustand", "React"],
     featured: true,
     date: "2026-11",
-    cover: "/covers/ttfarm.png",
+    cover: "/covers/ttfarm.jpg",
     coverGradient: "from-lime-500 to-emerald-600",
     links: {
       demo: "https://lzhshow.top/ttfarm/",
@@ -291,8 +291,8 @@ export const projects: Project[] = [
       {
         label: { zh: "3D 表现", en: "3D Rendering" },
         value: {
-          zh: "Three.js 正交等距相机 + 程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段",
-          en: "Three.js orthographic isometric camera with a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages",
+          zh: "Three.js 透视相机 + 自由环绕视角，程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段",
+          en: "Three.js perspective camera with free orbit controls over a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages",
         },
       },
       {
@@ -311,6 +311,22 @@ export const projects: Project[] = [
       },
     ],
     changelog: [
+      {
+        version: "v0.3",
+        date: "2026-11",
+        changes: {
+          zh: [
+            "相机改为透视投影 + 自由环绕：拖拽旋转、滚轮缩放、R 或双击复位",
+            "WASD 跟随当前视角移动，转到任何角度方向键都不会错位",
+            "环绕极角与距离限位，地面扩到 220×220，任意角度都不会穿地或露出边界",
+          ],
+          en: [
+            "Camera switched to perspective with free orbit: drag to rotate, wheel to zoom, R or double-click to reset",
+            "WASD now follows the current camera orientation at any angle",
+            "Polar angle and distance clamped; ground extended to 220×220 so no angle reveals an edge",
+          ],
+        },
+      },
       {
         version: "v0.2",
         date: "2026-11",

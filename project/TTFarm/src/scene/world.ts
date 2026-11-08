@@ -39,7 +39,7 @@ function createGrassTexture(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(10, 10);
+  tex.repeat.set(27, 27);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
@@ -281,7 +281,7 @@ export function createWorld(): World {
     roughness: 0.96,
     metalness: 0,
   });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), groundMat);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   group.add(ground);

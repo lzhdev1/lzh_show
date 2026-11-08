@@ -53,7 +53,9 @@ export function App() {
         </div>
       </header>
 
-      {selectedPlot === null && <div className="hint">点击地块让角色走过去 · 也可以用 WASD 走动</div>}
+      {selectedPlot === null && (
+        <div className="hint">点击地块走过去 · WASD 走动 · 拖拽旋转视角 · 滚轮缩放 · 按 R 或双击画面复位</div>
+      )}
 
       <div className="dock">
         <div className="dock-label">

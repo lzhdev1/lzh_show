@@ -3,16 +3,16 @@ import * as THREE from "three";
 export interface SceneView {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
-  camera: THREE.OrthographicCamera;
-  setViewHeight: (height: number) => void;
-  getViewHeight: () => number;
+  camera: THREE.PerspectiveCamera;
   resize: () => void;
   dispose: () => void;
 }
 
-const BASE_VIEW_HEIGHT = 15;
-const MIN_VIEW_HEIGHT = 9;
-const MAX_VIEW_HEIGHT = 21;
+// 透视相机：40° 左右的视场既保留尺度感，又不像 70° 那样把地块拉变形
+const FIELD_FOV = 42;
+// 初始机位沿用原来的等距方向（方位 45°、俯角约 40°），换投影不换构图
+export const CAMERA_HOME = new THREE.Vector3(14.9, 15.9, 14.9);
+export const CAMERA_TARGET = new THREE.Vector3(0, 0.6, 0.6);
 
 export function createView(canvas: HTMLCanvasElement): SceneView {
   const renderer = new THREE.WebGLRenderer({
@@ -32,30 +32,18 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
 
   const scene = new THREE.Scene();
 
-  // 正交等距相机：35° 俯角 + 45° 方位，项目只做缩放，不做自由环绕
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
-  camera.position.set(16, 17, 16);
-  camera.lookAt(0, 0.5, 0.4);
-
-  let viewHeight = BASE_VIEW_HEIGHT;
+  // 透视相机：构图的自由度交给 OrbitControls，这里只给一个成立的初始机位
+  const camera = new THREE.PerspectiveCamera(FIELD_FOV, 1, 0.1, 300);
+  camera.position.copy(CAMERA_HOME);
+  camera.lookAt(CAMERA_TARGET);
 
   const resize = () => {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const aspect = width / height;
-    const halfH = viewHeight / 2;
-    camera.left = -halfH * aspect;
-    camera.right = halfH * aspect;
-    camera.top = halfH;
-    camera.bottom = -halfH;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height);
-  };
-
-  const setViewHeight = (height: number) => {
-    viewHeight = Math.min(MAX_VIEW_HEIGHT, Math.max(MIN_VIEW_HEIGHT, height));
-    resize();
   };
 
   // 三个光源角色：天空补光决定暗部可读性，主光决定形体与投影，冷补光把轮廓从背景剥开
@@ -93,8 +81,6 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     renderer,
     scene,
     camera,
-    setViewHeight,
-    getViewHeight: () => viewHeight,
     resize,
     dispose,
   };

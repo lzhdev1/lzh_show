@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { createView } from "../scene/view";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createView, CAMERA_HOME, CAMERA_TARGET } from "../scene/view";
 import { createWorld } from "../scene/world";
 import { createPlots, disposePlots, plotPosition, updatePlots, PLOT_SIZE } from "../scene/plots";
 import { Player } from "../scene/player";
@@ -21,13 +22,26 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const player = new Player(useGame.getState().avatarId);
   view.scene.add(player.root);
 
-  // 视角固定为等距方向，因此屏幕右/上方向的世界向量只需算一次
+  // 视角可自由环绕，因此屏幕方向每帧从相机现算，WASD 永远跟着当前画面走
+  const WORLD_UP = new THREE.Vector3(0, 1, 0);
   const forward = new THREE.Vector3();
-  view.camera.getWorldDirection(forward);
-  const screenRight = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-  const screenUp = new THREE.Vector3().crossVectors(screenRight, forward).normalize();
-  screenUp.y = 0;
-  screenUp.normalize();
+  const screenRight = new THREE.Vector3();
+  const screenUp = new THREE.Vector3();
+
+  // 60° 自由环绕：方位不设限，但极角与距离都限位，保证任何角度都是成立的构图，
+  // 不会转到地面以下、也不会把主体挤出画面
+  const controls = new OrbitControls(view.camera, canvas);
+  controls.target.copy(CAMERA_TARGET);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.55;
+  controls.zoomSpeed = 0.7;
+  controls.enablePan = false;
+  controls.minDistance = 9;
+  controls.maxDistance = 34;
+  controls.minPolarAngle = 0.5;
+  controls.maxPolarAngle = 1.2;
+  controls.update();
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -40,9 +54,20 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
   };
 
+  // 回正到初始等距构图；键盘 R 与双击画面共用同一个动作
+  const resetView = () => {
+    view.camera.position.copy(CAMERA_HOME);
+    controls.target.copy(CAMERA_TARGET);
+    controls.update();
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (isTyping(e.target)) return;
     const key = e.key.toLowerCase();
+    if (key === "r") {
+      resetView();
+      return;
+    }
     if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       e.preventDefault();
       keys.add(key);
@@ -116,15 +141,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (moved < 8 && performance.now() - downAt < 700) handleClick(e);
   };
 
-  const onWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    view.setViewHeight(view.getViewHeight() + Math.sign(e.deltaY) * 0.9);
-  };
-
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointercancel", onPointerUp);
-  canvas.addEventListener("wheel", onWheel, { passive: false });
+  canvas.addEventListener("dblclick", resetView);
 
   // —— 存档里的形象变化同步到 3D ——
   let lastAvatar = useGame.getState().avatarId;
@@ -152,6 +172,13 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     elapsed += dt;
 
     inputDir.set(0, 0, 0);
+    view.camera.getWorldDirection(forward);
+    forward.y = 0;
+    if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1);
+    forward.normalize();
+    screenRight.crossVectors(forward, WORLD_UP).normalize();
+    screenUp.crossVectors(screenRight, forward).normalize();
+
     if (keys.has("w") || keys.has("arrowup")) inputDir.add(screenUp);
     if (keys.has("s") || keys.has("arrowdown")) inputDir.sub(screenUp);
     if (keys.has("d") || keys.has("arrowright")) inputDir.add(screenRight);
@@ -167,6 +194,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       tickClock();
     }
 
+    controls.update();
     view.renderer.render(view.scene, view.camera);
   };
   raf = requestAnimationFrame(frame);
@@ -179,8 +207,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointerup", onPointerUp);
     canvas.removeEventListener("pointercancel", onPointerUp);
-    canvas.removeEventListener("wheel", onWheel);
-    unsubAvatar();
+    canvas.removeEventListener("dblclick", resetView);
+    controls.dispose();unsubAvatar();
     disposePlots(plots);
     view.dispose();
   };
