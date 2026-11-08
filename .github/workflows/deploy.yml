@@ -3,6 +3,11 @@ name: Deploy lzh_show to Server
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -17,7 +22,39 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 20m
           script: |
+            set -euo pipefail
             cd /root/lzh_show || exit 1
-            git pull origin main
+
+            # 服务器到 github.com 的链路偶发超时，重试三次再放弃
+            ok=0
+            for i in 1 2 3; do
+              if git fetch --prune origin main; then ok=1; break; fi
+              echo "git fetch failed (attempt $i), retrying in 10s..."
+              sleep 10
+            done
+            if [ "$ok" != "1" ]; then
+              echo "::error::server cannot reach github.com, deploy aborted"
+              exit 1
+            fi
+
+            # 只跟随远端 main，不合并、不产生冲突
+            git reset --hard origin/main
+
             docker compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f >/dev/null 2>&1 || true
+
+            echo "deployed commit: $(git rev-parse --short HEAD)"
+
+      - name: Verify site responds
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://lzhshow.top/ttfarm/ || true)
+            echo "attempt $i: HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 6
+          done
+          echo "site did not return 200 after deploy"
+          exit 1
