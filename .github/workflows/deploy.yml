@@ -50,8 +50,9 @@ jobs:
       - name: Verify site responds
         run: |
           set -euo pipefail
+          # /ttfarm/ 会 308 跳到 /ttfarm，必须跟随跳转，否则会把 308 当失败
           for i in 1 2 3 4 5; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://lzhshow.top/ttfarm/ || true)
+            code=$(curl -sL -o /dev/null -w '%{http_code}' https://lzhshow.top/ttfarm || true)
             echo "attempt $i: HTTP $code"
             if [ "$code" = "200" ]; then exit 0; fi
             sleep 6
