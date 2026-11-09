@@ -11,6 +11,7 @@
     "sync-to-site": "vite build && node scripts/sync-to-site.mjs"
   },
   "dependencies": {
+    "@pixiv/three-vrm": "^3.5.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.187.0",

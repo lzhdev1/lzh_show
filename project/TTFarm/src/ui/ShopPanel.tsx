@@ -1,6 +1,6 @@
 import { CROP_LIST, levelFromXp } from "../game/crops";
-import { LAND_PRICES, START_UNLOCKED, useGame } from "../game/state";
-import { CloseIcon, CoinIcon, CropIcon, LandIcon } from "./icons";
+import { useGame } from "../game/state";
+import { CloseIcon, CoinIcon, CropIcon } from "./icons";
 
 function formatGrow(ms: number): string {
   const total = Math.round(ms / 1000);
@@ -15,15 +15,11 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
   const seeds = useGame((s) => s.seeds);
   const harvest = useGame((s) => s.harvest);
   const xp = useGame((s) => s.xp);
-  const plots = useGame((s) => s.plots);
   const buySeed = useGame((s) => s.buySeed);
   const sellAll = useGame((s) => s.sellAll);
-  const expand = useGame((s) => s.expand);
 
   const level = levelFromXp(xp);
   const total = CROP_LIST.reduce((sum, crop) => sum + harvest[crop.id] * crop.sellPrice, 0);
-  const nextLocked = plots.find((p) => !p.unlocked);
-  const landPrice = nextLocked ? LAND_PRICES[nextLocked.id - START_UNLOCKED] ?? 720 : null;
   const hasHarvest = CROP_LIST.some((crop) => harvest[crop.id] > 0);
 
   return (
@@ -33,13 +29,13 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
           <h2>农场商店</h2>
           <div className="coin-pill">
             <CoinIcon />
-            <b>{coins}</b>
+            <b>{coins.toLocaleString('zh-CN')}</b>
           </div>
           <button className="icon-btn ghost" onClick={onClose} aria-label="关闭">
             <CloseIcon />
           </button>
         </div>
-        <p className="modal-sub">买种子、卖收成、开垦新地，都在这里</p>
+        <p className="modal-sub">买种子、卖收成，扩建地块去「农场」</p>
 
         <h3 className="section-title">种子</h3>
         <ul className="list">
@@ -97,25 +93,6 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
             卖出全部
           </button>
         </div>
-
-        <h3 className="section-title">土地</h3>
-        {nextLocked && landPrice !== null ? (
-          <div className="land-row">
-            <span className="row-icon">
-              <LandIcon />
-            </span>
-            <div className="row-main">
-              <strong>开垦第 {nextLocked.id + 1} 号地</strong>
-              <span className="muted small">还剩 {plots.filter((p) => !p.unlocked).length} 块未开垦</span>
-            </div>
-            <span className="owned">{landPrice} 金币</span>
-            <button className="btn mini" disabled={coins < landPrice} onClick={() => expand()}>
-              开垦
-            </button>
-          </div>
-        ) : (
-          <p className="empty-tip">所有地块都开垦完了，可以专心种菜</p>
-        )}
       </div>
     </div>
   );

@@ -1,9 +1,11 @@
 # ===== lzh_show 服务器生产部署编排 =====
 # 用途：服务器生产模式运行（Next.js standalone），仅前端（静态作品集站点，无后端依赖）
+# 游戏 project/TTFarm 在同一个镜像里构建，产物落在 public/ttfarm，随主站一起发布
 services:
   frontend:
     build:
-      context: ./blog_front
+      context: .
+      dockerfile: blog_front/Dockerfile
       target: runner
     container_name: lzh_show_frontend_prod
     ports:

@@ -1,216 +1,47 @@
 import * as THREE from "three";
 import type { AvatarId } from "../game/state";
-import { buildGirlRig, type AvatarRig } from "./character";
+import type { AvatarRig } from "./rig";
+import { builtinModelUrl, getCustomModel, onCustomModelChange } from "./avatarModel";
 
-interface Palette {
-  skin: number;
-  shirt: number;
-  torso: number;
-  pants: number;
-  hair: number;
-  accent: number;
-}
+(window as unknown as { __ttfarmPlayerModule?: string }).__ttfarmPlayerModule = "v4";
 
-const PALETTES: Record<AvatarId, Palette> = {
-  ahae: { skin: 0xf1c6a0, shirt: 0xece3cc, torso: 0x4f8f3f, pants: 0x3f7440, hair: 0x6b4a2f, accent: 0x4f8f3f },
-  xiaosui: { skin: 0xf5cda9, shirt: 0x86bcdd, torso: 0x86bcdd, pants: 0x5f7f9c, hair: 0x6b4a2f, accent: 0xe8863c },
-  heshu: { skin: 0xe8b389, shirt: 0xe3ddc9, torso: 0x2f577f, pants: 0x3f6fa8, hair: 0x4a3423, accent: 0x2f577f },
-  xiaodou: { skin: 0xf3c9a4, shirt: 0x7a5bbd, torso: 0x7a5bbd, pants: 0x3a3a4a, hair: 0x22222a, accent: 0x5b3f96 },
-};
-
-function capsule(radius: number, length: number, color: number): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.CapsuleGeometry(radius, length, 4, 10),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, flatShading: true })
-  );
-  mesh.castShadow = true;
-  return mesh;
-}
-
-function buildRig(avatarId: AvatarId): AvatarRig {
-  // 「小穗」用贴图少女模型，其余三套先沿用程序化低模
-  return avatarId === "xiaosui" ? buildGirlRig() : buildAvatar(avatarId);
-}
-
-function buildAvatar(avatarId: AvatarId): AvatarRig {
-  const palette = PALETTES[avatarId];
+/**
+ * VRM 模型到位之前的占位骨架：只保留一团接触阴影，避免角色加载期间
+ * 地上空无一物、也避免闪出一个和最终形象完全不同的低模小人。
+ */
+function buildPlaceholderRig(): AvatarRig {
   const visual = new THREE.Group();
-  const owned: Array<THREE.BufferGeometry | THREE.Material> = [];
-
-  const track = (mesh: THREE.Mesh) => {
-    owned.push(mesh.geometry);
-    if (mesh.material instanceof THREE.Material) owned.push(mesh.material);
-    return mesh;
-  };
-
-  const body = track(capsule(0.25, 0.36, palette.torso));
-  body.position.y = 0.86;
+  const body = new THREE.Group();
   visual.add(body);
 
-  const head = track(
-    new THREE.Mesh(
-      new THREE.SphereGeometry(0.23, 16, 14),
-      new THREE.MeshStandardMaterial({ color: palette.skin, roughness: 0.9, metalness: 0 })
-    )
-  );
-  head.position.y = 1.44;
-  visual.add(head);
-
-  // 头发
-  const hair = track(
-    new THREE.Mesh(
-      new THREE.SphereGeometry(0.245, 14, 12),
-      new THREE.MeshStandardMaterial({ color: palette.hair, roughness: 0.95, metalness: 0, flatShading: true })
-    )
-  );
-  hair.position.set(0, 1.5, -0.01);
-  hair.scale.set(1, 0.72, 1);
-  visual.add(hair);
-
-  // 眼睛与嘴
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x2c2620, roughness: 0.5 });
-  owned.push(eyeMat);
-  [-0.085, 0.085].forEach((x) => {
-    const eye = track(new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), eyeMat));
-    eye.position.set(x, 1.47, 0.195);
-    visual.add(eye);
-  });
-  const mouth = track(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.022, 0.03), eyeMat));
-  mouth.position.set(0, 1.37, 0.21);
-  visual.add(mouth);
-
-  const legs: THREE.Mesh[] = [];
-  [-0.12, 0.12].forEach((x) => {
-    const leg = track(capsule(0.1, 0.22, palette.pants));
-    leg.position.set(x, 0.22, 0);
-    visual.add(leg);
-    legs.push(leg);
-  });
-
-  const arms: THREE.Mesh[] = [];
-  [-0.31, 0.31].forEach((x) => {
-    const arm = track(capsule(0.075, 0.28, palette.shirt));
-    arm.position.set(x, 0.98, 0);
-    arm.rotation.z = x > 0 ? -0.16 : 0.16;
-    visual.add(arm);
-    arms.push(arm);
-  });
-
-  // 形象差异：草帽 / 头巾 / 猫耳兜帽 / 围裙
-  if (avatarId === "ahae" || avatarId === "heshu") {
-    const straw = 0xd7b171;
-    const brim = track(
-      new THREE.Mesh(
-        new THREE.CylinderGeometry(0.44, 0.46, 0.045, 14),
-        new THREE.MeshStandardMaterial({ color: straw, roughness: 0.95, metalness: 0, flatShading: true })
-      )
-    );
-    brim.position.y = 1.63;
-    visual.add(brim);
-    const crown = track(
-      new THREE.Mesh(
-        new THREE.ConeGeometry(0.26, 0.3, 10),
-        new THREE.MeshStandardMaterial({ color: straw, roughness: 0.95, metalness: 0, flatShading: true })
-      )
-    );
-    crown.position.y = 1.79;
-    visual.add(crown);
-  }
-
-  if (avatarId === "xiaosui") {
-    const scarf = track(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(0.248, 14, 10),
-        new THREE.MeshStandardMaterial({ color: palette.accent, roughness: 0.9, metalness: 0, flatShading: true })
-      )
-    );
-    scarf.position.set(0, 1.56, -0.01);
-    scarf.scale.set(1.06, 0.62, 1.06);
-    visual.add(scarf);
-
-    [-0.26, 0.26].forEach((x) => {
-      const tail = track(capsule(0.075, 0.24, palette.hair));
-      tail.position.set(x, 1.3, -0.06);
-      tail.rotation.z = x > 0 ? 0.24 : -0.24;
-      visual.add(tail);
-    });
-
-    const apron = track(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.5, 0.04),
-        new THREE.MeshStandardMaterial({ color: 0xf2e7d3, roughness: 0.9, metalness: 0 })
-      )
-    );
-    apron.position.set(0, 0.78, 0.24);
-    visual.add(apron);
-  }
-
-  if (avatarId === "xiaodou") {
-    const hood = track(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(0.26, 14, 12),
-        new THREE.MeshStandardMaterial({ color: palette.accent, roughness: 0.9, metalness: 0, flatShading: true })
-      )
-    );
-    hood.position.set(0, 1.52, -0.02);
-    hood.scale.set(1.02, 0.78, 1.04);
-    visual.add(hood);
-
-    [-0.18, 0.18].forEach((x) => {
-      const ear = track(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.2, 4), hood.material as THREE.Material));
-      ear.position.set(x, 1.74, 0.01);
-      ear.rotation.z = x > 0 ? -0.3 : 0.3;
-      visual.add(ear);
-    });
-  }
-
-  if (avatarId === "ahae") {
-    const bib = track(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(0.36, 0.32, 0.05),
-        new THREE.MeshStandardMaterial({ color: 0x5f9c47, roughness: 0.9, metalness: 0 })
-      )
-    );
-    bib.position.set(0, 0.9, 0.23);
-    visual.add(bib);
-  }
-
-  if (avatarId === "heshu") {
-    const beard = track(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 12, 10),
-        new THREE.MeshStandardMaterial({ color: 0x4a3423, roughness: 0.95, metalness: 0, flatShading: true })
-      )
-    );
-    beard.position.set(0, 1.3, 0.12);
-    beard.scale.set(1, 0.78, 0.7);
-    visual.add(beard);
-  }
-
-  // 脚下接触阴影：让角色不飘
   const blob = new THREE.Mesh(
-    new THREE.CircleGeometry(0.4, 24),
-    new THREE.MeshBasicMaterial({ color: 0x2c2a22, transparent: true, opacity: 0.22, depthWrite: false })
+    new THREE.CircleGeometry(0.36, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0x2c2a22,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false,
+    })
   );
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.012;
   visual.add(blob);
-  owned.push(blob.geometry, blob.material as THREE.Material);
+
+  const empty = () => new THREE.Object3D();
 
   const dispose = () => {
-    owned.forEach((item) => item.dispose());
+    blob.geometry.dispose();
+    (blob.material as THREE.Material).dispose();
   };
-
-  visual.scale.setScalar(1.12);
 
   return {
     visual,
     body,
-    head,
-    leftLeg: legs[0],
-    rightLeg: legs[1],
-    leftArm: arms[0],
-    rightArm: arms[1],
+    head: empty(),
+    leftLeg: empty(),
+    rightLeg: empty(),
+    leftArm: empty(),
+    rightArm: empty(),
     dispose,
   };
 }
@@ -225,13 +56,25 @@ export class Player {
   private facing = Math.PI;
   private walkPhase = 0;
   private moving = false;
+  /** 脚下地面高度：田埂草台和地块都是抬起来的，人物要跟着抬起来 */
+  private groundY = 0;
+  private groundTarget = 0;
+  /** 异步加载模型的令牌：换形象/导入新模型时旧请求作废 */
+  private modelToken = 0;
+  private offCustomModel: () => void;
 
   constructor(avatarId: AvatarId) {
     this.avatarId = avatarId;
-    this.rig = buildRig(avatarId);
+    this.rig = buildPlaceholderRig();
     this.root.add(this.rig.visual);
     this.root.position.copy(this.position);
     this.root.rotation.y = this.facing;
+
+    // 资料面板导入本地 VRM 时，立即替换当前形象
+    this.offCustomModel = onCustomModelChange(() => {
+      void this.loadModelFor(this.avatarId);
+    });
+    void this.loadModelFor(avatarId);
   }
 
   get positionRef(): THREE.Vector3 {
@@ -244,11 +87,52 @@ export class Player {
 
   setAvatar(avatarId: AvatarId): void {
     if (avatarId === this.avatarId) return;
+    this.avatarId = avatarId;
+    void this.loadModelFor(avatarId);
+  }
+
+  /** 换上一套新骨架，并释放旧的那套 */
+  private applyRig(rig: AvatarRig): void {
     this.root.remove(this.rig.visual);
     this.rig.dispose();
-    this.avatarId = avatarId;
-    this.rig = buildRig(avatarId);
-    this.root.add(this.rig.visual);
+    this.rig = rig;
+    this.root.add(rig.visual);
+  }
+
+  /**
+   * 优先用本地导入的 VRM，其次用内置形象配置的 VRM 文件。
+   * 加载失败时保留占位骨架，不打断游戏。
+   */
+  private async loadModelFor(avatarId: AvatarId): Promise<void> {
+    const token = ++this.modelToken;
+    const custom = getCustomModel().url;
+    const url = custom ?? builtinModelUrl(avatarId);
+    if (!url) return;
+    try {
+      // VRM 运行库单独成块：不用 VRM 形象时不下载这 ~220KB
+      (window as unknown as { __ttfarmVrmState?: string }).__ttfarmVrmState = `loading ${url}`;
+      const { loadVrmRig } = await import("./vrmAvatar");
+      const rig = await loadVrmRig(url);
+      if (token !== this.modelToken) {
+        rig.dispose();
+        return;
+      }
+      this.applyRig(rig);
+      // 便于排查"到底用的哪套模型"，不影响游戏逻辑
+      (window as unknown as { __ttfarmAvatar?: string }).__ttfarmAvatar = "vrm";
+      document.body.dataset.avatarModel = "vrm";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      (window as unknown as { __ttfarmVrmState?: string }).__ttfarmVrmState = `failed: ${message}`;
+      document.body.dataset.avatarModel = `failed: ${message}`;
+      console.warn("[avatar] VRM 加载失败，保留占位骨架：", url, err);
+    }
+  }
+
+  dispose(): void {
+    this.offCustomModel();
+    this.root.remove(this.rig.visual);
+    this.rig.dispose();
   }
 
   moveTo(point: THREE.Vector3, onArrive?: () => void): void {
@@ -271,8 +155,13 @@ export class Player {
   }
 
   private clampPosition(): void {
+    // 正面围栏留了门：只有站在门口这条走廊里，z 才允许越过围栏走到外面
+    const nearGate = Math.abs(this.position.x) <= 1.2;
     this.position.x = THREE.MathUtils.clamp(this.position.x, -5.8, 5.8);
-    this.position.z = THREE.MathUtils.clamp(this.position.z, -7.4, 7.4);
+    this.position.z = THREE.MathUtils.clamp(this.position.z, -7.4, nearGate ? 16 : 7.2);
+    if (this.position.z > 7.2) {
+      this.position.x = THREE.MathUtils.clamp(this.position.x, -1.15, 1.15);
+    }
   }
 
   update(dt: number, t: number, inputDir: THREE.Vector3 | null): void {
@@ -317,17 +206,27 @@ export class Player {
     }
 
     const swing = this.moving ? Math.sin(this.walkPhase) * 0.5 : 0;
-    this.rig.leftLeg.rotation.x = swing;
-    this.rig.rightLeg.rotation.x = -swing;
-    this.rig.leftArm.rotation.x = -swing * 0.7;
-    this.rig.rightArm.rotation.x = swing * 0.7;
+    if (!this.rig.selfAnimated) {
+      this.rig.leftLeg.rotation.x = swing;
+      this.rig.rightLeg.rotation.x = -swing;
+      this.rig.leftArm.rotation.x = -swing * 0.7;
+      this.rig.rightArm.rotation.x = swing * 0.7;
+    }
     this.rig.visual.position.y = this.moving
       ? Math.abs(Math.sin(this.walkPhase)) * 0.04
       : Math.sin(t * 1.6) * 0.012;
     this.rig.body.rotation.z = this.moving ? Math.sin(this.walkPhase) * 0.03 : 0;
     this.rig.animate?.(dt, t, this.moving, this.walkPhase);
 
-    this.root.position.set(this.position.x, 0, this.position.z);
+    // 上下台阶：往目标高度插值，避免走到地块上时整个人瞬移
+    this.groundY = THREE.MathUtils.damp(this.groundY, this.groundTarget, 12, dt);
+
+    this.root.position.set(this.position.x, this.groundY, this.position.z);
     this.root.rotation.y = this.facing;
+  }
+
+  /** 由场景每帧告诉人物脚下多高，人物平滑抬到地面高度 */
+  setGroundTarget(y: number): void {
+    this.groundTarget = y;
   }
 }

@@ -37,14 +37,22 @@ TTFarm/
 
 ## 本地开发与发布
 
+不再在宿主机装 Node / pnpm，游戏和主站一起跑在 `lzh_show_frontend` 这个容器里：
+
 ```bash
-pnpm install
-pnpm dev            # 终端会打印实际地址，默认 http://localhost:5173/ttfarm/（端口占用时顺延）
-pnpm typecheck      # tsc --noEmit
-pnpm sync-to-site   # 构建并同步到 ../../blog_front/public/ttfarm
+# 在仓库根目录执行（首次构建较慢）
+docker compose up -d frontend
+
+# 游戏开发地址 http://localhost:5174/ttfarm/ （Vite，改源码自动热更新）
+# 主站地址     http://localhost:3100
+docker logs -f lzh_show_frontend    # 两个进程的日志都在这里
 ```
 
-发布链路：`pnpm sync-to-site` → 提交 `blog_front/public/ttfarm/` → 主站照常 `git pull` + `docker compose -f docker-compose.prod.yml up -d --build`。
-游戏是主站的一次静态发布，**同域名、同端口，无独立容器**；`blog_front/src/proxy.ts` 负责把 `/ttfarm`、`/ttfarm/` 改写到 `/ttfarm/index.html`（该路径不参与 next-intl 语言路由）。
+- 依赖只存在容器内（`/ttfarm/node_modules`、`/app/node_modules` 是匿名卷），宿主机不留 `node_modules`
+- 镜像重建（重装依赖）：`docker compose build frontend` 后 `docker compose up -d frontend`
+- 发布：产物由镜像的 builder 阶段自己构建（`vite build` → `public/ttfarm`），随主站镜像一起发布，**不需要本地构建、也不需要 `sync-to-site`**
+- `scripts/sync-to-site.mjs` 仅作为手动同步的备用手段保留（需要本机有 Node 才能跑）
+
+发布链路：提交源码 → GitHub Actions SSH 进服务器 → `git reset --hard origin/main` → `docker compose -f docker-compose.prod.yml up -d --build`。游戏是主站的一次静态发布，**同域名、同端口、同容器**；`blog_front/src/proxy.ts` 负责把 `/ttfarm`、`/ttfarm/` 改写到 `/ttfarm/index.html`（该路径不参与 next-intl 语言路由）。
 
 `vite.config.ts` 里 `base: "/ttfarm/"`，所有资源路径自带子路径前缀，因此主站不需要任何 nginx 额外配置。

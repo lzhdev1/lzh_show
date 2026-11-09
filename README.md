@@ -34,16 +34,19 @@ lzh_show/
 ## Docker 使用
 
 ```bash
-# 启动前端开发容器（首次构建较慢）
+# 启动容器（首次构建较慢）
 docker compose up -d frontend
 
-# 查看日志
+# 查看两个服务（主站 + 游戏）的日志
 docker logs -f lzh_show_frontend
 ```
 
-- 前端访问：`http://localhost:3100`（注：本机 3000 被 rag-web 容器占用，临时映射 3100；rag-web 停止后可改回 3000）
-- 源码热更新：修改 `blog_front/` 下文件即自动刷新
-- 计划编排服务：前端、后端（待定）、数据库（待定）
+- 主站访问：`http://localhost:3100`（注：本机 3000 被 rag-web 容器占用，临时映射 3100；rag-web 停止后可改回 3000）
+- 游戏访问：`http://localhost:5174/ttfarm/`（Vite 开发服务器，同样跑在 `lzh_show_frontend` 这个容器里）
+- 源码热更新：修改 `blog_front/` 或 `project/TTFarm/` 下文件即自动刷新（两边都开了文件轮询，适配 Windows 挂载卷）
+- **本机不需要装 Node / pnpm**：依赖只存在容器内（`/app/node_modules`、`/ttfarm/node_modules` 是匿名卷）
+- 重新装依赖：`docker compose build frontend` 后 `docker compose up -d frontend`
+- 生产镜像会把 `project/TTFarm` 构建进 `public/ttfarm`，随主站一起发布，不需要本地执行任何构建
 
 ## 待确认决策点
 

@@ -9,23 +9,38 @@ export const PLOT_COUNT = PLOT_COLS * PLOT_ROWS;
 /** 初始已开垦的地块数量（前两排） */
 export const START_UNLOCKED = PLOT_COLS * 2;
 export const LAND_PRICES = [150, 220, 300, 420, 560, 720];
+/** 测试期金币：先给一大笔，方便试扩建和买东西 */
+export const TEST_COINS = 99_999_999;
 
-export type AvatarId = "ahae" | "xiaosui" | "heshu" | "xiaodou";
+/** 第 id 块地的扩建价（超出价目表后按最后一条算） */
+export function landPriceOf(id: number): number {
+  return LAND_PRICES[id - START_UNLOCKED] ?? LAND_PRICES[LAND_PRICES.length - 1];
+}
+
+export type AvatarId = "xiaosui";
 
 export interface AvatarOption {
   id: AvatarId;
   name: string;
   tagline: string;
   portrait: string;
+  /** 对应的 VRM 模型文件名（放在 public/avatars/vrm/ 下） */
+  model?: string;
 }
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}avatars/${file}`;
 
+/** 目前只有这一个日系少女形象，其余占位角色已全部移除 */
 export const AVATARS: AvatarOption[] = [
-  { id: "ahae", name: "阿禾", tagline: "刚接手农场的新手", portrait: asset("ahae.jpg") },
-  { id: "xiaosui", name: "小穗", tagline: "爱把菜畦排整齐", portrait: asset("xiaosui.jpg") },
-  { id: "heshu", name: "禾叔", tagline: "种了三十年地的老把式", portrait: asset("heshu.jpg") },
-  { id: "xiaodou", name: "小豆", tagline: "戴猫耳帽的打工少年", portrait: asset("xiaodou.jpg") },
+  {
+    id: "xiaosui",
+    name: "小穗",
+    tagline: "爱把菜畦排整齐",
+    portrait: asset("xiaosui.jpg"),
+    // 放 public/avatars/vrm/ 下的文件名；换成 VRoid Studio 导出的少女模型后改这里
+    // （或在游戏内的资料面板直接导入 .vrm）
+    model: "xiaosui.vrm",
+  },
 ];
 
 export interface ToastItem {
@@ -54,6 +69,8 @@ interface GameActions {
   harvestPlot: (plotId: number) => void;
   sellAll: () => void;
   expand: () => void;
+  /** 一次扩建 count 块地（金币不够或没有空地时返回失败原因） */
+  expandBy: (count: number) => boolean;
   setProfile: (nickname: string, avatarId: AvatarId) => void;
   resetSave: () => void;
   notify: (text: string, tone?: "ok" | "warn") => void;
@@ -85,13 +102,13 @@ function makePlots(): PlotState[] {
 
 export function initialData(): GameData {
   return {
-    coins: 120,
+    coins: TEST_COINS,
     xp: 0,
     plots: makePlots(),
     seeds: { ...emptyRecord(0), radish: 3, cabbage: 2 },
     harvest: emptyRecord(0),
     nickname: "农场主",
-    avatarId: "ahae",
+    avatarId: "xiaosui",
     selectedSeed: "radish",
   };
 }
@@ -253,6 +270,28 @@ export const useGame = create<GameStore>()(
         get().notify(`开垦了一块新地，-${price} 金币`);
       },
 
+      expandBy: (count) => {
+        const targets = get()
+          .plots.filter((p) => !p.unlocked)
+          .slice(0, Math.max(0, count));
+        if (targets.length === 0) {
+          get().notify("没有可扩建的地了", "warn");
+          return false;
+        }
+        const cost = targets.reduce((sum, p) => sum + landPriceOf(p.id), 0);
+        if (get().coins < cost) {
+          get().notify(`还差 ${cost - get().coins} 金币`, "warn");
+          return false;
+        }
+        const ids = new Set(targets.map((p) => p.id));
+        set((s) => ({
+          coins: s.coins - cost,
+          plots: s.plots.map((p) => (ids.has(p.id) ? { ...p, unlocked: true } : p)),
+        }));
+        get().notify(`扩建了 ${targets.length} 块地，-${cost} 金币`);
+        return true;
+      },
+
       setProfile: (nickname, avatarId) => {
         const trimmed = nickname.trim().slice(0, 12) || "农场主";
         set({ nickname: trimmed, avatarId });
@@ -290,6 +329,10 @@ export const useGame = create<GameStore>()(
           ...current,
           ...base,
           ...saved,
+          // 测试期：旧存档里的金币也统一抬到测试额度，否则会被本地存档覆盖回 120
+          coins: TEST_COINS,
+          // 旧存档里可能存着已删掉的形象 id，统一收回唯一的少女形象
+          avatarId: "xiaosui",
           plots,
           seeds: { ...base.seeds, ...saved.seeds },
           harvest: { ...base.harvest, ...saved.harvest },

@@ -1,22 +1,29 @@
 # ===== lzh_show 容器编排 =====
 # 服务规划：
-#   frontend — 前端（Next.js，开发模式热更新 / 生产模式 standalone）
+#   frontend — 前端（Next.js 主站 + TTFarm 游戏，同一个容器；开发模式热更新 / 生产模式 standalone）
 #   backend  — 后端服务（技术栈待确认后补充）
 #   db       — 数据库服务（选型待确认后补充）
 
 services:
   frontend:
     build:
-      context: ./blog_front
+      # 上下文是仓库根：镜像里同时带主站 blog_front 和游戏 project/TTFarm
+      context: .
+      dockerfile: blog_front/Dockerfile
       target: dev
     container_name: lzh_show_frontend
     ports:
       # 注：本机 3000 被 rag-web 容器占用，临时映射到 3100（rag-web 停止后可改回 3000）
       - "3100:3000"
+      # 游戏 Vite 开发服务器（容器内 5174，和主站同一个容器）
+      - "5174:5174"
     volumes:
       # 源码挂载实现热更新；匿名卷防止 Windows 的 node_modules 覆盖容器内 Linux 依赖
       - ./blog_front:/app
+      - ./project/TTFarm:/ttfarm
       - /app/node_modules
+      - /app/.next
+      - /ttfarm/node_modules
     environment:
       # 容器内文件监听轮询，保证 Windows 挂载卷下热更新可靠
       - WATCHPACK_POLLING=true

@@ -5,6 +5,8 @@
 .env.local
 
 # --- 前端 (blog_front) ---
+# 游戏产物由容器构建生成，不入库
+blog_front/public/ttfarm/
 node_modules/
 .next/
 out/

@@ -1,0 +1,10 @@
+# 构建上下文是仓库根，这里排掉不需要进镜像的东西
+.git
+.gitignore
+.creative-design
+blog_backend
+**/node_modules
+**/dist
+**/.next
+**/*.log
+**/*.tsbuildinfo

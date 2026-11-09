@@ -188,6 +188,17 @@ button {
   transform: scale(0.96);
 }
 
+/* 带文字的按钮（顶部「农场」） */
+.icon-btn.labeled {
+  width: auto;
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3f6b25;
+}
+
 .icon-btn.ghost {
   width: 36px;
   height: 36px;
@@ -660,6 +671,79 @@ button {
   background: #fff9ec;
 }
 
+/* ---------- 农场面板 ---------- */
+
+.expand-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid #efe3c9;
+  background: #fff9ec;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid #e6d8ba;
+  background: #fffdf5;
+}
+
+.stepper-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: #f3e9d2;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  min-width: 26px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.plot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plot-chip {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px dashed #d9cfb6;
+  background: #f7f1e1;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plot-chip.on {
+  border: 1px solid #cfe3b6;
+  background: #eaf6d8;
+  color: var(--leaf-deep);
+  font-weight: 600;
+}
+
 /* ---------- 资料 ---------- */
 
 .field {
@@ -735,6 +819,37 @@ button {
   border-color: #8fbb6b;
   background: #f0f7e4;
   box-shadow: 0 0 0 2px rgba(107, 168, 76, 0.18);
+}
+
+/* 只剩一个形象时：单张卡按固定宽度展示，不撑满整行 */
+.avatar-grid.single {
+  grid-template-columns: 108px;
+}
+
+.avatar-card.static {
+  cursor: default;
+}
+
+/* 导入本地 VRM：一个朴素的说明块 + 两个平铺按钮 */
+.avatar-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed #e3d4b4;
+  background: #fffdf6;
+}
+
+.avatar-import p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .modal-actions {

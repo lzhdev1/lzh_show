@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
-import { CoinIcon, CropIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
+import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
 import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
+import { FarmPanel } from "./FarmPanel";
 
 export function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [farmOpen, setFarmOpen] = useState(false);
 
   const nickname = useGame((s) => s.nickname);
   const avatarId = useGame((s) => s.avatarId);
@@ -45,8 +47,12 @@ export function App() {
         <div className="top-right">
           <div className="coin-pill" aria-label={`金币 ${coins}`}>
             <CoinIcon />
-            <b>{coins}</b>
+            <b>{coins.toLocaleString("zh-CN")}</b>
           </div>
+          <button className="icon-btn labeled" onClick={() => setFarmOpen(true)} aria-label="打开农场">
+            <LandIcon />
+            <span>农场</span>
+          </button>
           <button className="icon-btn solid" onClick={() => setShopOpen(true)} aria-label="打开商店">
             <ShopIcon />
           </button>
@@ -93,6 +99,7 @@ export function App() {
       <PlotSheet onOpenShop={() => setShopOpen(true)} />
       {shopOpen && <ShopPanel onClose={() => setShopOpen(false)} />}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
+      {farmOpen && <FarmPanel onClose={() => setFarmOpen(false)} />}
 
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (
