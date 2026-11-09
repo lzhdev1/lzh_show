@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
+import { useAccount } from "../game/account";
+import { LoginPage } from "./LoginPage";
 import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
 import { ShopPanel } from "./ShopPanel";
@@ -8,9 +10,15 @@ import { ProfilePanel } from "./ProfilePanel";
 import { FarmPanel } from "./FarmPanel";
 
 export function App() {
+  const token = useAccount((s) => s.token);
   const [shopOpen, setShopOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [farmOpen, setFarmOpen] = useState(false);
+
+  // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
+  useEffect(() => {
+    void useAccount.getState().refresh();
+  }, []);
 
   const nickname = useGame((s) => s.nickname);
   const avatarId = useGame((s) => s.avatarId);
@@ -27,6 +35,9 @@ export function App() {
   const prevXp = LEVEL_XP[level - 1] ?? 0;
   const pct = nextXp ? Math.min(100, Math.max(0, ((xp - prevXp) / (nextXp - prevXp)) * 100)) : 100;
   const avatar = AVATARS.find((item) => item.id === avatarId) ?? AVATARS[0];
+
+  // 没登录就先只给登录页：3D 场景照样在背后转，登录完直接就是农场
+  if (!token) return <LoginPage />;
 
   return (
     <div className="hud">

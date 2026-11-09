@@ -197,6 +197,50 @@ export function createPlots(): Plots {
     meshes.push(soil);
   }
 
+  // —— 石埂：只围整片田的最外圈，把 30 块地当成一整块田围起来 ——
+  // 外缘 = 最外列/行的地块边缘：x ±7.8、z ±6.5
+  const RIM_STEP = 0.62;
+  const rimGeo = lumpy(0.24, 1, 0.28);
+  const rimMat = clay(PALETTE.stone, { roughness: 0.95, flatShading: true });
+  const edgeX = (PLOT_COLS / 2) * PLOT_SPACING;
+  const edgeZ = (PLOT_ROWS / 2) * PLOT_SPACING;
+  const perX = Math.round((edgeX * 2) / RIM_STEP);
+  const perZ = Math.round((edgeZ * 2) / RIM_STEP);
+  const rim = new THREE.InstancedMesh(rimGeo, rimMat, (perX + 1) * 2 + (perZ + 1) * 2);
+  rim.receiveShadow = true;
+  const dummy = new THREE.Object3D();
+  const stoneTintA = new THREE.Color(PALETTE.stone);
+  const stoneTintB = new THREE.Color(0xc2baa9);
+  const tint = new THREE.Color();
+  let rimIndex = 0;
+
+  for (let side = 0; side < 4; side += 1) {
+    // 0/1 是前后两条长边，2/3 是左右两条短边
+    const count = side < 2 ? perX : perZ;
+    const half = side < 2 ? edgeX : edgeZ;
+    for (let k = 0; k <= count; k += 1) {
+      const t = (k / count - 0.5) * 2 * half;
+      const dx = side < 2 ? t : side === 2 ? -edgeX : edgeX;
+      const dz = side === 0 ? -edgeZ : side === 1 ? edgeZ : t;
+      dummy.position.set(
+        dx + between(-0.03, 0.03),
+        0.12 + between(-0.014, 0.014),
+        dz + between(-0.03, 0.03)
+      );
+      dummy.rotation.set(0, between(0, Math.PI * 2), 0);
+      dummy.scale.set(between(1.0, 1.26), between(0.5, 0.62), between(0.94, 1.2));
+      dummy.updateMatrix();
+      rim.setMatrixAt(rimIndex, dummy.matrix);
+      tint.copy(between(0, 1) > 0.5 ? stoneTintA : stoneTintB).offsetHSL(0, 0, between(-0.05, 0.05));
+      rim.setColorAt(rimIndex, tint);
+      rimIndex += 1;
+    }
+  }
+  rim.count = rimIndex;
+  rim.instanceMatrix.needsUpdate = true;
+  if (rim.instanceColor) rim.instanceColor.needsUpdate = true;
+  group.add(rim);
+
   return { group, visuals, meshes };
 }
 

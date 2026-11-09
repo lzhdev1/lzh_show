@@ -5,6 +5,8 @@ export interface SceneView {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  /** 主光：阴影跟人走，所以 loop 每帧要把它搬到人物附近 */
+  keyLight: THREE.DirectionalLight;
   resize: () => void;
   dispose: () => void;
 }
@@ -49,7 +51,9 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   const skyTex = new THREE.CanvasTexture(skyCanvas);
   skyTex.colorSpace = THREE.SRGBColorSpace;
   scene.background = skyTex;
-  scene.fog = new THREE.Fog(0xdaf1fb, 34, 96);
+  // 雾：方形地图边长 300 米，雾线必须推到山外，否则走到地图边上远山就糊成白墙
+  // 雾只吃远景：草原一滴雾都不要，草地一发白整张图就塌了
+  scene.fog = new THREE.Fog(0xdaf1fb, 210, 620);
 
   // 程序化环境光（RoomEnvironment）：不下载任何 HDR 文件，给材质一层柔和反射，
   // 卡通材质上只取一点点，避免画面被反射洗白
@@ -62,7 +66,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   pmrem.dispose();
 
   // 透视相机：构图的自由度交给 OrbitControls，这里只给一个成立的初始机位
-  const camera = new THREE.PerspectiveCamera(FIELD_FOV, 1, 0.1, 300);
+  const camera = new THREE.PerspectiveCamera(FIELD_FOV, 1, 0.1, 1400);
   camera.position.copy(CAMERA_HOME);
   camera.lookAt(CAMERA_TARGET);
 
@@ -81,15 +85,17 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   scene.add(hemi);
 
   const keyLight = new THREE.DirectionalLight(0xfff3d6, 2.5);
-  keyLight.position.set(7.5, 13, 5.5);
+  keyLight.position.set(9.5, 15, 7.5);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(2048, 2048);
-  keyLight.shadow.camera.left = -12;
-  keyLight.shadow.camera.right = 12;
-  keyLight.shadow.camera.top = 12;
-  keyLight.shadow.camera.bottom = -12;
+  // 地图边长 300 米，一张 2048 贴图铺不下全场：阴影相机只罩人物周围 68×68，
+  // loop 每帧把主光和人一起搬，走到哪阴影跟到哪
+  keyLight.shadow.camera.left = -34;
+  keyLight.shadow.camera.right = 34;
+  keyLight.shadow.camera.top = 34;
+  keyLight.shadow.camera.bottom = -34;
   keyLight.shadow.camera.near = 1;
-  keyLight.shadow.camera.far = 42;
+  keyLight.shadow.camera.far = 70;
   keyLight.shadow.bias = -0.0006;
   keyLight.shadow.radius = 3;
   scene.add(keyLight);
@@ -122,6 +128,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     renderer,
     scene,
     camera,
+    keyLight,
     resize,
     dispose,
   };

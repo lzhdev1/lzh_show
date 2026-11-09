@@ -25,6 +25,9 @@ export const PALETTE = {
   leafDark: 0x5aa63d,
   flowerPink: 0xff9db8,
   flowerYellow: 0xffd34d,
+  // 远山：比草地深一号的青绿，尖顶 + flatShading 的棱面才立得住
+  mountain: 0x5da56a,
+  mountainDark: 0x3f8050,
 } as const;
 
 export interface ClayOptions {

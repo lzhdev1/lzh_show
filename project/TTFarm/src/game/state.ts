@@ -3,12 +3,16 @@ import { persist } from "zustand/middleware";
 import { CROPS, CROP_LIST, type CropId, levelFromXp } from "./crops";
 import { MAX_WATER, isReady, type PlotState } from "./growth";
 
-export const PLOT_COLS = 3;
-export const PLOT_ROWS = 4;
+export const PLOT_COLS = 6;
+export const PLOT_ROWS = 5;
 export const PLOT_COUNT = PLOT_COLS * PLOT_ROWS;
-/** 初始已开垦的地块数量（前两排） */
-export const START_UNLOCKED = PLOT_COLS * 2;
-export const LAND_PRICES = [150, 220, 300, 420, 560, 720];
+/** 初始已开垦的地块数量（最靠前的一排） */
+export const START_UNLOCKED = PLOT_COLS;
+/** 扩建价目：从第 7 块到最后一块，越往后越贵 */
+export const LAND_PRICES = [
+  150, 220, 300, 420, 560, 720, 900, 1100, 1320, 1580, 1860, 2180, 2520, 2900,
+  3300, 3740, 4200, 4700, 5200, 5800, 6400, 7000, 7700, 8400,
+];
 /** 测试期金币：先给一大笔，方便试扩建和买东西 */
 export const TEST_COINS = 99_999_999;
 

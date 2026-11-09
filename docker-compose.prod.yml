@@ -11,4 +11,16 @@ services:
     ports:
       # 本机 8090 被 blog-agent-l 占用，lzh_show 使用 8100
       - "8100:3000"
+    environment:
+      # 游戏账号与存档：和 RAG / Blog 共用服务器上的 shared-postgres，游戏单独一个库
+      - TTFARM_DATABASE_URL=postgres://ttfarm:ttfarm@shared-postgres:5432/ttfarm
+      - TTFARM_TOKEN_SECRET=lzhshow-ttfarm-token-2026
+    networks:
+      # 外部网络 shared-db 由统一数据库那套 compose 创建，加入后才能用容器名连库
+      - default
+      - shared-db
     restart: unless-stopped
+
+networks:
+  shared-db:
+    external: true

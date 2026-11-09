@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { levelFromXp } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
 import { getCustomModel, setCustomModel } from "../scene/avatarModel";
+import { useAccount } from "../game/account";
 import { CloseIcon } from "./icons";
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
@@ -10,6 +11,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const setProfile = useGame((s) => s.setProfile);
   const resetSave = useGame((s) => s.resetSave);
   const notify = useGame((s) => s.notify);
+  const user = useAccount((s) => s.user);
 
   const [draftName, setDraftName] = useState(nickname);
   const [modelLabel, setModelLabel] = useState(getCustomModel().label);
@@ -102,6 +104,15 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
           </div>
           {modelLabel && <p className="small">当前模型：{modelLabel}</p>}
           <input ref={fileRef} type="file" accept=".vrm" hidden onChange={pickModel} />
+        </div>
+
+        <h3 className="section-title">账号</h3>
+        <div className="account-row">
+          <span className="account-name">{user?.nickname ?? "未登录"}</span>
+          <span className="muted small">进度已存在数据库里</span>
+          <button className="btn plain" onClick={() => useAccount.getState().signOut()}>
+            退出登录
+          </button>
         </div>
 
         <div className="modal-actions">

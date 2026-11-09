@@ -27,6 +27,13 @@ services:
     environment:
       # 容器内文件监听轮询，保证 Windows 挂载卷下热更新可靠
       - WATCHPACK_POLLING=true
+      # 游戏存档库：和 RAG / Blog / quantlab 共用 shared-postgres 实例，游戏单独一个库
+      - TTFARM_DATABASE_URL=postgres://ttfarm:ttfarm@shared-postgres:5432/ttfarm
+      - TTFARM_TOKEN_SECRET=ttfarm-dev-token-secret
+    networks:
+      # 外部网络 shared-db 是统一数据库实例所在的网络，加入后才能用容器名连库
+      - default
+      - shared-db
     restart: unless-stopped
 
   # backend:
@@ -51,3 +58,8 @@ services:
 
 # volumes:
 #   db_data:
+
+networks:
+  # 统一数据库实例（shared-postgres）在它自己的 compose 里创建了这个网络
+  shared-db:
+    external: true

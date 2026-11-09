@@ -2,8 +2,7 @@ import * as THREE from "three";
 import type { AvatarId } from "../game/state";
 import type { AvatarRig } from "./rig";
 import { builtinModelUrl, getCustomModel, onCustomModelChange } from "./avatarModel";
-
-(window as unknown as { __ttfarmPlayerModule?: string }).__ttfarmPlayerModule = "v4";
+import { BRIDGE, RIVER_HALF_WIDTH, WORLD_HALF, onBridge, riverInfo } from "./layout";
 
 /**
  * VRM 模型到位之前的占位骨架：只保留一团接触阴影，避免角色加载期间
@@ -50,7 +49,11 @@ export class Player {
   readonly root = new THREE.Group();
   private rig: AvatarRig;
   private avatarId: AvatarId;
-  private position = new THREE.Vector3(0, 0, 6.1);
+  // 出生点在草台最前排田外的那条走道上，正对整片田，第一排地块不会被挡住
+  private position = new THREE.Vector3(0, 0, 6.9);
+  /** 上一帧的位置：用来判断人是围栏里还是围栏外，避免斜着走穿过栅栏和河岸 */
+  private prevZ = 6.9;
+  private prevX = 0;
   private target: THREE.Vector3 | null = null;
   private onArrive: (() => void) | null = null;
   private facing = Math.PI;
@@ -110,7 +113,6 @@ export class Player {
     if (!url) return;
     try {
       // VRM 运行库单独成块：不用 VRM 形象时不下载这 ~220KB
-      (window as unknown as { __ttfarmVrmState?: string }).__ttfarmVrmState = `loading ${url}`;
       const { loadVrmRig } = await import("./vrmAvatar");
       const rig = await loadVrmRig(url);
       if (token !== this.modelToken) {
@@ -118,14 +120,9 @@ export class Player {
         return;
       }
       this.applyRig(rig);
-      // 便于排查"到底用的哪套模型"，不影响游戏逻辑
-      (window as unknown as { __ttfarmAvatar?: string }).__ttfarmAvatar = "vrm";
-      document.body.dataset.avatarModel = "vrm";
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      (window as unknown as { __ttfarmVrmState?: string }).__ttfarmVrmState = `failed: ${message}`;
-      document.body.dataset.avatarModel = `failed: ${message}`;
-      console.warn("[avatar] VRM 加载失败，保留占位骨架：", url, err);
+      console.warn("[avatar] VRM 加载失败，保留占位骨架：", url, message);
     }
   }
 
@@ -155,13 +152,63 @@ export class Player {
   }
 
   private clampPosition(): void {
-    // 正面围栏留了门：只有站在门口这条走廊里，z 才允许越过围栏走到外面
-    const nearGate = Math.abs(this.position.x) <= 1.2;
-    this.position.x = THREE.MathUtils.clamp(this.position.x, -5.8, 5.8);
-    this.position.z = THREE.MathUtils.clamp(this.position.z, -7.4, nearGate ? 16 : 7.2);
-    if (this.position.z > 7.2) {
-      this.position.x = THREE.MathUtils.clamp(this.position.x, -1.15, 1.15);
+    const GATE_X = 1.35; // 门口走廊半宽，比门柱（±1.7）窄一点留出人物半径
+    const FENCE_OUT = 9.3; // 围栏外沿
+    const YARD_X = 11.1; // 院墙内沿 x
+    const YARD_Z = 8.2; // 院墙内沿 z
+
+    // 1. 方形地图边界：山脚以内整片方形草原都能走
+    this.position.x = THREE.MathUtils.clamp(this.position.x, -WORLD_HALF, WORLD_HALF);
+    this.position.z = THREE.MathUtils.clamp(this.position.z, -WORLD_HALF, WORLD_HALF);
+
+    const bx = Math.abs(this.position.x);
+    const bz = Math.abs(this.position.z);
+    const atGate = Math.abs(this.position.x) <= GATE_X;
+    const sign = (v: number) => (v >= 0 ? 1 : -1);
+
+    // 2. 农场围栏：矩形环。前后两道门（|x| 落在门口走廊里）能穿过去，
+    //    左右两面是实墙；走到围栏带里但不是门口，就停回原来那一侧。
+    if (bz > YARD_Z && bz < FENCE_OUT && bx <= FENCE_OUT && !atGate) {
+      this.position.z = Math.abs(this.prevZ) <= YARD_Z
+        ? sign(this.position.z) * YARD_Z
+        : sign(this.position.z) * FENCE_OUT;
     }
+    const bzAfter = Math.abs(this.position.z);
+    if (bx > YARD_X && bx < FENCE_OUT && bzAfter <= FENCE_OUT) {
+      this.position.x = Math.abs(this.prevX) <= YARD_X
+        ? sign(this.position.x) * YARD_X
+        : sign(this.position.x) * FENCE_OUT;
+    }
+
+    // 3. 河：踩进水里就沿最近点推到岸边，只有桥面能过去
+    if (!onBridge(this.position.x, this.position.z, 0.4)) {
+      const info = riverInfo(this.position.x, this.position.z);
+      if (info.dist < RIVER_HALF_WIDTH + 0.45) {
+        if (onBridge(this.prevX, this.prevZ, 0.4)) {
+          // 上一帧还在桥上：侧向滑出去是被栏杆挡住，不是掉水里，
+          // 把人拉回桥面，别让他横着一步跨过整条河
+          const dx = this.position.x - BRIDGE.x;
+          const dz = this.position.z - BRIDGE.z;
+          const along = dx * BRIDGE.nx + dz * BRIDGE.nz;
+          const across = -dx * BRIDGE.nz + dz * BRIDGE.nx;
+          const clampAlong = THREE.MathUtils.clamp(along, -BRIDGE.halfLength, BRIDGE.halfLength);
+          const clampAcross = THREE.MathUtils.clamp(
+            across,
+            -BRIDGE.halfWidth + 0.35,
+            BRIDGE.halfWidth - 0.35
+          );
+          this.position.x = BRIDGE.x + BRIDGE.nx * clampAlong - BRIDGE.nz * clampAcross;
+          this.position.z = BRIDGE.z + BRIDGE.nz * clampAlong + BRIDGE.nx * clampAcross;
+        } else {
+          const r = RIVER_HALF_WIDTH + 0.5;
+          this.position.x = info.cx + info.nx * r;
+          this.position.z = info.cz + info.nz * r;
+        }
+      }
+    }
+
+    this.prevX = this.position.x;
+    this.prevZ = this.position.z;
   }
 
   update(dt: number, t: number, inputDir: THREE.Vector3 | null): void {

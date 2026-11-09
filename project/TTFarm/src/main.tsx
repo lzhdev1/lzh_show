@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./ui/App";
 import { startGame } from "./game/loop";
 import { useGame } from "./game/state";
+import { startAutoSave } from "./game/account";
 import "./styles.css";
 
 const canvas = document.getElementById("scene") as HTMLCanvasElement | null;
@@ -12,6 +13,9 @@ if (!canvas || !uiRoot) {
 }
 
 createRoot(uiRoot).render(<App />);
+
+// 登录后每次存盘变动都会自动同步到数据库
+startAutoSave();
 
 try {
   startGame(canvas);

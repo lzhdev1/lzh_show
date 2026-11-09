@@ -306,6 +306,58 @@ export function buildWell(): THREE.Group {
 
 /* ---------------- 树 ---------------- */
 
+/** 一个山头：多段锥体，顶点按正弦噪声挤歪，山脚外撑、山尖收住 */
+function makePeak(radius: number, height: number, segments: number, variant: number): THREE.Mesh {
+  const geo = new THREE.ConeGeometry(radius, height, segments, 4, false);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 1) {
+    v.fromBufferAttribute(pos, i);
+    const t = (v.y + height / 2) / height; // 0 山脚 → 1 山顶
+    const wobble = 1 + Math.sin(v.x * 0.42 + v.z * 0.35 + variant * 2.1) * 0.24 * (1 - t * 0.55);
+    v.x *= wobble;
+    v.z *= wobble;
+    v.y += Math.sin(t * 6.2 + variant * 1.7) * height * 0.04;
+    // 山顶削平一小截：低模山的顶尖太薄太尖，削成小平台更像山，也不扎眼
+    const flat = height / 2 - height * 0.08;
+    if (v.y > flat) v.y = flat;
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  // 山体走柔光，不做大三角棱面：一圈山排开时棱面会碎成一排纸片
+  return new THREE.Mesh(geo, clay(PALETTE.mountain, { roughness: 0.96 }));
+}
+
+/** 远山：主峰 + 两座侧峰 + 山脚矮丘，一座就是一小段山脊 */
+export function buildMountain(radius: number, height: number, variant: number): THREE.Group {
+  const group = new THREE.Group();
+
+  const main = makePeak(radius, height, 9 + (variant % 4), variant);
+  main.position.y = height / 2 - 1.4; // 山脚压进草地，不露锥底
+  group.add(main);
+
+  // 侧峰错开高度与方位，山脊有起伏才不像一排三角形路障
+  for (let s = 0; s < 2; s += 1) {
+    const ang = variant * 1.7 + s * 2.4;
+    const r2 = radius * (0.48 + 0.1 * s);
+    const h2 = height * (0.5 + 0.12 * s);
+    const side = makePeak(r2, h2, 8, variant + s * 3);
+    side.position.set(Math.cos(ang) * radius * 0.66, h2 / 2 - 1.4, Math.sin(ang) * radius * 0.66);
+    group.add(side);
+  }
+
+  // 山脚一圈矮丘，把山体和草地的接缝盖住
+  const foot = new THREE.Mesh(
+    lumpy(radius * 0.46, 1, 0.22),
+    clay(PALETTE.mountainDark, { roughness: 0.96, flatShading: true })
+  );
+  foot.scale.set(1.5, 0.3, 1.45);
+  foot.position.y = 0.1;
+  group.add(foot);
+
+  return group;
+}
+
 export function buildTree(scale: number, variant: number): THREE.Group {
   const group = new THREE.Group();
 

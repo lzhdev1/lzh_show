@@ -12,7 +12,7 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
 
   const unlocked = plots.filter((p) => p.unlocked).length;
   const locked = plots.filter((p) => !p.unlocked);
-  const maxCount = Math.min(locked.length, 6);
+  const maxCount = Math.min(locked.length, 10);
   const [count, setCount] = useState(locked.length > 0 ? 1 : 0);
 
   const chosen = locked.slice(0, Math.max(count, 0));
