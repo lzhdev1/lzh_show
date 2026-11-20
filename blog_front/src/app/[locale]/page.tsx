@@ -1,14 +1,15 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowDown, ArrowRight } from "lucide-react";
+import { Suspense } from "react";
 import { Link } from "@/i18n/navigation";
-import { ProjectCard } from "@/components/project-card";
+import { ProjectCover } from "@/components/project-cover";
 import { HeroBackground } from "@/components/hero-background";
 import { HeroActions } from "@/components/hero-actions";
-import { ScrollReveal } from "@/components/scroll-reveal";
-import { Carousel3D } from "@/components/carousel-3d";
+import { FeaturedCarousel } from "@/components/featured-carousel";
 import { SectionPager } from "@/components/section-pager";
 import { NotesWall } from "@/components/notes-wall";
-import { getFeaturedProjects } from "@/lib/projects";
+import { getFeaturedProjects, type Locale } from "@/lib/projects";
+import "./featured-projects.css";
 
 export default async function HomePage({
   params,
@@ -19,7 +20,9 @@ export default async function HomePage({
   setRequestLocale(locale);
   const hero = await getTranslations("Hero");
   const home = await getTranslations("Home");
+  const projectLabels = await getTranslations("Projects");
   const featured = getFeaturedProjects();
+  const language = locale as Locale;
 
   return (
     <SectionPager className="w-full">
@@ -68,52 +71,45 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* 板块 2：精选作品（进入视口时上滑淡入） */}
       <section
         id="featured-projects"
-        className="relative scroll-mt-16 min-h-[calc(100vh-4rem)] px-4 py-16 sm:px-6"
+        aria-labelledby="featured-title"
+        className="featured-section scroll-mt-16"
       >
-        {/* 背景：七彩水墨涂鸦，cover 放大平铺板块不失真 */}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage: "url('/featured-bg.jpg')",
-            backgroundSize: "150%",
-            backgroundPosition: "center",
-          }}
-        />
-        {/* 模糊玻璃层：雾化背景涂鸦，透明度高（亮色白10%/暗色黑30%），文字与卡片可读 */}
-        <div aria-hidden className="absolute inset-0 backdrop-blur-md bg-white/10 dark:bg-black/30" />
-        <div className="relative">
-        <ScrollReveal>
-          <div className="mb-8 flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">{home("featuredTitle")}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {home("featuredSubtitle")}
-              </p>
-            </div>
-            <Link
-              href="/projects"
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
+        <div className="featured-inner">
+          <div className="featured-heading">
+            <h2 id="featured-title">{home("featuredTitle")}</h2>
+            <Link href="/projects" className="featured-all">
               {home("viewAll")}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight size={16} aria-hidden />
             </Link>
           </div>
-        </ScrollReveal>
-        <ScrollReveal delay={120}>
-          <Carousel3D
-            items={featured.map((project) => (
-              <ProjectCard key={project.slug} project={project} />
-            ))}
-          />
-        </ScrollReveal>
+          {featured.length > 0 ? (
+            <FeaturedCarousel items={featured.map((project) => ({
+              slug: project.slug,
+              title: project.title[language],
+              content: (
+                <Link href={`/projects/${project.slug}`} className="featured-project" aria-label={project.title[language]}>
+                  <div className={`featured-media ${project.coverGradient}`}>
+                    <ProjectCover project={project} className="featured-cover" />
+                  </div>
+                  <div className="featured-copy">
+                    <time dateTime={project.date} className="featured-date">{project.date.replace("-", ".")}</time>
+                    <h3>{project.title[language]}</h3>
+                    <p className="featured-summary">{project.summary[language]}</p>
+                    <ul className="featured-tech">
+                      {project.techStack.slice(0, 4).map((tech) => <li key={tech}>{tech}</li>)}
+                    </ul>
+                    <span className="featured-detail">{projectLabels("viewDetail")}<ArrowRight size={17} aria-hidden /></span>
+                  </div>
+                </Link>
+              ),
+            }))} />
+          ) : <p>{projectLabels("empty")}</p>}
         </div>
       </section>
 
-      {/* 板块 3：最新文章（便签墙，随机展示几篇，点击进入文章页） */}
+      {/* 板块 3：最新发布的开发记录 */}
       <section className="relative flex min-h-[calc(100vh-4rem)] scroll-mt-16 flex-col justify-center px-4 py-14 sm:px-6">
         {/* 背景：极光渐变，压得很淡，衬托便签纸面 */}
         <div
@@ -136,7 +132,9 @@ export default async function HomePage({
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <NotesWall />
+          <Suspense fallback={<div className="min-h-40" aria-hidden />}>
+            <NotesWall locale={language} />
+          </Suspense>
         </div>
       </section>
     </SectionPager>

@@ -8,6 +8,16 @@ import {
   type ReactNode,
 } from "react";
 
+// A short viewport can leave part of a section below the fold. Let the
+// visitor reach its footer (or scroll back to its heading) before paging.
+function hasRoomToScroll(section: HTMLElement, direction: number, startY = window.scrollY) {
+  const rect = section.getBoundingClientRect();
+  const margin = Number.parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
+  if (rect.height <= window.innerHeight - margin + 2) return false;
+  const top = rect.top + window.scrollY - startY;
+  return direction > 0 ? top + rect.height > window.innerHeight + 2 : top < margin - 2;
+}
+
 /**
  * 全屏板块翻页容器：将 children 视为多个"板块"，每个板块一屏，
  * 支持滚轮 / 鼠标按住拖动 / 手指滑动双向翻页（上一板块 / 下一板块）。
@@ -29,13 +39,16 @@ export function SectionPager({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const lockRef = useRef(false);
+  const dragged = useRef(false);
   const dragRef = useRef<{
     id: number;
+    startX: number;
     startY: number;
     startScrollY: number;
     startIndex: number;
     moved: boolean;
     pointerType: string;
+    horizontalTrack: boolean;
   } | null>(null);
 
   const sections = () =>
@@ -63,23 +76,17 @@ export function SectionPager({
     }, 900);
   };
 
-  const suppressNextClick = () => {
-    const suppress = (ev: MouseEvent) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      window.removeEventListener("click", suppress, true);
-    };
-    window.addEventListener("click", suppress, true);
-  };
-
   // 滚轮双向翻页；越界时不拦截（保留滚动到页脚/顶部）
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (lockRef.current) return;
+      if (e.ctrlKey || (e.target instanceof Element && e.target.closest("[data-horizontal-scroll]") &&
+          (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)))) return;
       const list = sections();
       const idx = currentIndex();
+      if (list[idx] && hasRoomToScroll(list[idx], e.deltaY)) return;
       let target = -1;
       if (e.deltaY > 0) target = idx + 1;
       else if (e.deltaY < 0) target = idx - 1;
@@ -94,14 +101,17 @@ export function SectionPager({
   }, []);
 
   const onPointerDown = (e: ReactPointerEvent) => {
+    dragged.current = false;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     dragRef.current = {
       id: e.pointerId,
+      startX: e.clientX,
       startY: e.clientY,
       startScrollY: window.scrollY,
       startIndex: currentIndex(),
       moved: false,
       pointerType: e.pointerType,
+      horizontalTrack: e.target instanceof Element && !!e.target.closest("[data-horizontal-scroll]"),
     };
     // 不在按下时就 capture：捕获会把后续 click 的目标重定向到本容器，
     // 导致板块内的链接/按钮点不动。等真正开始拖动后再捕获。
@@ -111,6 +121,11 @@ export function SectionPager({
     const d = dragRef.current;
     if (!d || d.id !== e.pointerId) return;
     const dy = e.clientY - d.startY;
+    const dx = e.clientX - d.startX;
+    if (d.horizontalTrack && !d.moved && Math.abs(dx) >= 7 && Math.abs(dx) >= Math.abs(dy)) {
+      dragRef.current = null;
+      return;
+    }
     if (!d.moved && Math.abs(dy) > 6) {
       d.moved = true;
       document.body.style.userSelect = "none";
@@ -135,8 +150,10 @@ export function SectionPager({
     document.body.style.cursor = "";
     if (!d.moved) return;
 
-    suppressNextClick();
+    dragged.current = true;
     const dy = e.clientY - d.startY;
+    const section = sections()[d.startIndex];
+    if (section && hasRoomToScroll(section, -dy, d.startScrollY)) return;
     if (dy <= -60) {
       goTo(d.startIndex + 1);
     } else if (dy >= 60) {
@@ -165,7 +182,13 @@ export function SectionPager({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      style={{ touchAction: "pan-y" }}
+      onClickCapture={e => {
+        if (dragged.current && e.detail > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          dragged.current = false;
+        }
+      }}
     >
       {Children.map(children, (child, i) => (
         <div

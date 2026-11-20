@@ -8,6 +8,7 @@ services:
       dockerfile: blog_front/Dockerfile
       target: runner
     container_name: lzh_show_frontend_prod
+    env_file: ./blog_front/db/articles/.env
     ports:
       # 本机 8090 被 blog-agent-l 占用，lzh_show 使用 8100
       - "8100:3000"

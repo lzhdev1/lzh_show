@@ -1,0 +1,320 @@
+[
+  {
+    "slug": "rag-when-a-chinese-query-misses-an-english-paper",
+    "projectSlug": "rag-assistant",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "RAG",
+      "Rerank",
+      "RAGAS"
+    ],
+    "zh": {
+      "title": "论文里明明有答案，为什么 RAG 找不到？",
+      "summary": "一个关于行人重识别的中文问题，把排查范围从最终回答缩小到一段始终没被召回的英文原文。",
+      "sections": [
+        {
+          "heading": "先找到本该被检索到的那一段",
+          "paragraphs": [
+            "评测集第 5 题问的是开放世界行人重识别面临的五类挑战。英文综述把它们列在同一段里，包括异构数据、噪声标注和开放集识别。知识库里也能找到这一段，但第七版系统在这道题上的上下文召回得分是 0。",
+            "排查从这段原文入手。它究竟在哪一步消失了？关键词、向量和假设文档三路检索分别取前 10、20、30 条，最大窗口合并出的 68 个候选里仍然没有它。重排器只能给传进来的段落打分，问题已经缩小到召回阶段。"
+          ]
+        },
+        {
+          "heading": "用同一道题做一次语言对照",
+          "paragraphs": [
+            "保留原来的文档和向量库，把问题译成英文后单独做向量查询。目标段落第一次出现在前十名，排第十。此前试过的三种中文或中英混合改写都漏掉了它。这个对照让修改有了依据。查英文论文时，可以让英文表述也参与召回。",
+            "第八版保留原有三路，增加一路英文翻译查询，取十个向量候选参与融合。翻译失败就用原问题继续。最后仍用用户的原问题给候选打分，这样译文中的措辞不会直接决定交给回答模型的材料。"
+          ]
+        },
+        {
+          "heading": "把收益和额外开销一起记下来",
+          "paragraphs": [
+            "在同一组 30 道题上，归档评测的上下文召回均值从 0.9000 到 0.9667，第 5 题从 0 到 1。这是这批题的对照结果。对以中文资料为主的知识库，还需要另外抽题，检查新一路带进来多少无关段落。",
+            "这条路每次查询多一次翻译调用。复查类似改动时，我会同时保留原问题、目标段落、各路候选排名和最终入选段落。只留最终回答，很难分清下一次漏答发生在检索、重排还是生成。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "When the answer is in the paper, but retrieval misses it",
+      "summary": "A Chinese question about person re-identification exposed a missing English passage before the answer ever reached the language model.",
+      "sections": [
+        {
+          "heading": "Follow one passage through the pipeline",
+          "paragraphs": [
+            "Question 5 in the evaluation asks for five challenges in open-world person re-identification. The English survey lists them together, including heterogeneous data, noisy annotations and open-set recognition. The paragraph was in the index, yet version 7 scored zero for context recall on this question.",
+            "The diagnostic tracked that paragraph through keyword search, vector search and retrieval using a hypothetical answer. Each branch was tried with 10, 20 and 30 results. Even the largest run produced 68 distinct candidates without the target. At that point the reranker had no opportunity to recover it."
+          ]
+        },
+        {
+          "heading": "Change the query language and keep the index fixed",
+          "paragraphs": [
+            "An English translation of the same question put the passage at rank ten in a plain vector search. Three Chinese or mixed-language rewrites had missed it. That experiment gave us a reason to add a retrieval branch for English papers.",
+            "Version 8 keeps the three existing branches and blends in ten vector candidates from the translated question. A failed translation falls back to the original wording. The final reranker still scores candidates against the user's question, so a translation choice has no direct say in the final ordering."
+          ]
+        },
+        {
+          "heading": "Read the result alongside its cost",
+          "paragraphs": [
+            "On the same 30 archived questions, mean context recall rose from 0.9000 to 0.9667. Question 5 went from zero to one. A collection dominated by Chinese documents would need its own sample to measure how much noise the English branch introduces.",
+            "The extra branch costs a translation call per question. For the next retrieval change I would keep the original question, an expected passage, its rank in each branch and the final context. An answer by itself gives little indication of where a passage disappeared."
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "slug": "blog-author-private-article-404",
+    "projectSlug": "blog-agent-platform",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "FastAPI",
+      "HTTP",
+      "SQLAlchemy"
+    ],
+    "zh": {
+      "title": "从「我的作品」打开自己的文章，为什么会遇到 404？",
+      "summary": "稿间的一篇成稿可以留在个人作品里，也可以出现在广场。两个入口曾经共用了只看公开文章的查询。",
+      "sections": [
+        {
+          "heading": "同一篇稿子有两个可见范围",
+          "paragraphs": [
+            "作者生成了正文，暂时没有公开。它能出现在「我的作品」里，点进详情却看到「文章不存在」。广场中的公开稿可以正常打开。两条路径最终都按同一个任务编号读取详情，区别在于读者身份和稿件状态。",
+            "沿着旧版详情接口往下看，第一步调用的是查公开作品的函数。私有成稿在这一步已经被过滤掉。后面虽然计算了当前用户是不是作者，却根本没有机会执行到那里。"
+          ]
+        },
+        {
+          "heading": "把作者判断提到返回正文之前",
+          "paragraphs": [
+            "修复保留了成稿状态检查。任务需要已经产出正文或已经完成，接下来再看是否为演示稿、是否公开，以及当前登录用户是否拥有它。三条可见条件满足任意一条，详情接口就可以返回内容。作者身份取自登录会话，并与稿件记录的归属比对。",
+            "广场有另一条查询，它继续只收录已产出正文的公开稿和演示稿。这样作者可以预览刚完成的文章，又能自己决定什么时候公开。其他人访问一篇私有稿时仍然得到 404。"
+          ]
+        },
+        {
+          "heading": "用同一编号复查两种身份",
+          "paragraphs": [
+            "验证时固定稿件编号和成稿状态。先让作者查看私有成稿，再切换到另一个账号和未登录窗口。应当只有作者读得到。把同一篇稿件设为公开后，再从广场进入。这样一次只改变身份或公开状态，异常落在哪个条件上会很清楚。",
+            "还要留一个只有标题、没有正文的任务。它应继续停留在创作流程里。作者可以预览私有成稿，这个修复并没有把创作中的任务当作可阅读文章。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "Why an author’s own article returned a 404",
+      "summary": "The writing studio and the public gallery share an article detail view. An early lookup discarded a private manuscript before the view could identify its author.",
+      "sections": [
+        {
+          "heading": "Compare the two entry points",
+          "paragraphs": [
+            "A finished manuscript could appear under My Work and still open an “article does not exist” page. A public piece opened normally. Both links requested an article by task ID. Publication state and reader identity were the meaningful differences.",
+            "The old detail handler started with a helper that fetched public work. That helper rejected the private manuscript before execution reached the code that calculated whether the viewer owned it."
+          ]
+        },
+        {
+          "heading": "Evaluate ownership while the manuscript is still available",
+          "paragraphs": [
+            "The fix keeps the requirement that the task has produced its body or finished. It then accepts a demonstration piece, a published piece or a piece owned by the signed-in reader. Ownership is determined from the authenticated account and the author recorded on the task.",
+            "The gallery uses its own query for finished public and demonstration pieces. An author can now preview a finished private article and choose when to publish it. Other readers still receive a 404 for that private manuscript."
+          ]
+        },
+        {
+          "heading": "Keep the article ID fixed while testing",
+          "paragraphs": [
+            "Start with one finished private article. Open it as its author, as a second account and in a signed-out window. Only the author should see it. Publish the same piece and open it again from the gallery. Changing one condition at a time makes a failing branch easy to locate.",
+            "Include a task that only has a title. It belongs in the creation workflow until a body exists. That case checks a separate rule that a successful author preview would otherwise leave untested."
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "slug": "ttfarm-move-and-orbit-with-two-fingers",
+    "projectSlug": "ttfarm",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "Three.js",
+      "Pointer Events"
+    ],
+    "zh": {
+      "title": "一只手推摇杆，另一只手怎么转镜头？",
+      "summary": "TT 农场里，两个手指落在不同地方可能代表移动加转向，也可能是捏合缩放。区分它们的线索在第一下按在哪里。",
+      "sections": [
+        {
+          "heading": "同样按住两根手指，玩家想做的事不同",
+          "paragraphs": [
+            "在手机上走向河边，左拇指一直推着摇杆，右手划过画面，是想边走边看木桥。把两根手指都放到场景里往外拉，才是在调整镜头远近。若只统计屏幕上有几根手指，两种操作看起来完全一样。",
+            "这个项目还支持点地行走。轻点一块田，角色会走过去。右手在地块上结束一次转向时，也会产生抬起事件。只要把抬手直接当成点击，就可能在玩家调整镜头时替他选中地块。"
+          ]
+        },
+        {
+          "heading": "起点决定谁处理这根手指",
+          "paragraphs": [
+            "摇杆按下时记住自己的 pointerId 并捕获它。之后即使拇指滑出摇杆边缘，摇杆仍按这个编号更新方向和力度。场景画布单独记录从画布上按下的指针。它只看到一个场景触点时转镜头，同时看到两个时，按两指距离的变化缩放。",
+            "地块点选要等到手指抬起才能确定。一次候选点击需要在 650 毫秒内结束、位移小于 6 个像素，期间也不能进入摇杆操控。转动镜头或增加第二个场景触点，都会取消这次候选。这样右手从菜地上抬起，角色仍然按照左手的方向走。"
+          ]
+        },
+        {
+          "heading": "交换抬手的顺序",
+          "paragraphs": [
+            "复查时在河岸选一个辨认方向的参照物。按住摇杆，另一指左右转镜头，先抬右手，角色应该继续移动。再试先抬左手，移动应该停止。然后松开摇杆，在画布上用两指缩放，最后单点一块田。四步分别覆盖移动、转向、缩放和点选。",
+            "再试一次按着摇杆切到别的应用。系统可能只通知触点取消或窗口失去焦点。摇杆在这些事件里归零，相机清空仍在跟踪的指针，回到游戏时就能从一次新的操作开始。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "Walking with one thumb and turning the camera with the other",
+      "summary": "Two fingers on TT Farm can mean walking while looking around, or pinching to zoom. The first contact location distinguishes the gestures.",
+      "sections": [
+        {
+          "heading": "Two fingers can express different intentions",
+          "paragraphs": [
+            "Walking towards the river, a player holds the stick with the left thumb and drags across the scene to look for the bridge. Placing both fingers on the scene and spreading them changes the camera distance. A global touch count gives the same answer for both gestures.",
+            "A tap on a plot also tells the character to walk there. When a camera drag ends over a crop, the browser delivers a release event over the field. Treating every release as a tap would give the character an unintended destination."
+          ]
+        },
+        {
+          "heading": "Give each contact to the surface where it began",
+          "paragraphs": [
+            "On press, the stick records and captures its own pointer ID. It keeps reading the thumb’s direction and its distance from the centre even when the thumb moves beyond the control. The canvas keeps a separate map of contacts that began on the scene. One scene contact orbits the camera. Two change the zoom by the ratio of their previous and current distances.",
+            "A plot tap is only confirmed on release. It must take less than 650 milliseconds, travel less than six pixels and survive checks for active stick input. Starting an orbit or adding a second scene contact cancels the pending tap. The player can then lift the camera finger above a crop and keep walking."
+          ]
+        },
+        {
+          "heading": "Test both release orders",
+          "paragraphs": [
+            "Pick a visible landmark on the riverbank. Hold the stick, turn the camera and lift the camera finger first. The player should keep moving. Repeat and release the stick first, then check a two-finger pinch on the canvas and a single tap on a plot. Each step exercises a different route through the input code.",
+            "Finally, leave the app with the stick held. A device may report a cancelled pointer or a window losing focus before it ever reports a normal release. The stick clears its input in those cases, and the camera drops the contacts it was tracking."
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "slug": "aftercare-one-ticket-for-repeated-confirmations",
+    "projectSlug": "aftercare-agent",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "PostgreSQL",
+      "FastAPI"
+    ],
+    "zh": {
+      "title": "同一张换货草稿确认三次，库存应该扣几件？",
+      "summary": "售后工单 Agent 用两个不同的点击编号和一次请求重放，检验同一份换货草稿能否只产生一张工单。",
+      "sections": [
+        {
+          "heading": "确认按钮背后有两种重复",
+          "paragraphs": [
+            "访客选好订单后，助手先出示换货草稿，库存此时应保持原样。真正改变库存的是「确认并建单」。假设服务端已建好工单，但手机在看到响应之前断线，重发时会带上原来的请求编号。用户再点一下按钮，则可能带来一个新编号。两种情况指的仍是同一份草稿。",
+            "只按请求编号去重能够处理网络重发。要识别第二次独立点击，还得让服务端记住这份草稿已经生成了哪张工单。浏览器按钮变灰可以减少手滑，却没有足够的信息来判断第一次操作是否已经落库。"
+          ]
+        },
+        {
+          "heading": "让工单、草稿和库存一起提交",
+          "paragraphs": [
+            "确认接口在数据库事务中锁住当前会话，比对请求编号与操作内容，再按会话和草稿编号查已有工单。已经办过的请求可以直接返回当前结果。处理新草稿时会重新核验订单资格和库存，草稿生成时看到的数量不能替代此刻的检查。",
+            "扣库存的更新带上「剩余数量大于零」的条件，然后在同一事务插入工单、清掉当前草稿。表上还约束了同一会话内的草稿编号唯一。这样写工单中途出错时，前面的扣减也随事务回滚。"
+          ]
+        },
+        {
+          "heading": "验收看数据库结果，也看每个请求拿到了什么",
+          "paragraphs": [
+            "业务回归脚本对同一份草稿并发发起三次确认。第一次和第三次共用一个请求编号，第二次使用新编号。脚本核对三份响应里的工单相同，最终只有一张工单，目标订单的模拟库存恰好减少一件。只数响应里出现过几个「成功」看不出这个区别。",
+            "同一脚本还让访客取消草稿后再次确认，并让另一个浏览器会话尝试确认那份草稿。两个用例都检查库存和工单。这也覆盖了草稿已经失效或属于另一位访客的情况。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "Three confirmations, one exchange ticket",
+      "summary": "The aftercare demo uses two distinct click IDs and one replay to check how a single exchange proposal affects stock.",
+      "sections": [
+        {
+          "heading": "A retry and a second click have different identities",
+          "paragraphs": [
+            "The assistant prepares a proposal after the visitor chooses an order. Stock stays unchanged until confirmation. If a phone loses its connection after the server creates a ticket, a retry can carry the first request ID. A fresh click can have a different ID. Both refer to the same proposal.",
+            "Request deduplication covers the replay. Recognising the fresh click requires a record linking the proposal to its ticket. Disabling a button helps with accidental clicks, but the browser cannot tell whether a lost response followed a successful commit."
+          ]
+        },
+        {
+          "heading": "Commit the ticket, proposal and inventory together",
+          "paragraphs": [
+            "The confirmation handler locks the current session inside a database transaction, matches the request ID to the operation and checks for a ticket for that session and proposal. A repeat can return the existing result. A new confirmation checks eligibility and stock again, because the draft records an earlier point in time.",
+            "The stock update requires a positive remaining quantity. The same transaction creates the ticket and clears the proposal. A uniqueness constraint also covers the pair of session and proposal IDs. An error while writing the ticket rolls back the earlier inventory change."
+          ]
+        },
+        {
+          "heading": "Compare every response with the final state",
+          "paragraphs": [
+            "The business regression script sends three confirmations concurrently. The first and third use the same request ID, and the second has a fresh one. It checks that every response contains the same ticket and that the final simulated stock falls by exactly one unit for the chosen order.",
+            "The script also tries a cancelled proposal and an attempt from another browser session. It checks stock and tickets in both cases. Those tests also cover stale proposals and proposals belonging to another visitor."
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "slug": "portfolio-horizontal-swipe-and-page-scroll",
+    "projectSlug": "portfolio",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "React",
+      "CSS Scroll Snap",
+      "Pointer Events"
+    ],
+    "zh": {
+      "title": "横滑精选作品时，为什么整个首页都翻走了？",
+      "summary": "触控板向右滑很少是一条水平直线。首页的整屏翻页和作品轮播都在读取同一次手势，几像素的纵向偏移就暴露了冲突。",
+      "sections": [
+        {
+          "heading": "把鼠标放在卡片上，稍微斜着滑",
+          "paragraphs": [
+            "首页每个板块都可以用滚轮切换，精选作品又有一条横向轨道。旧版只根据纵向滚动量的正负决定是否翻页。触控板明明主要往右划，只要同时产生少量向下的偏移，外层也会把它识别成「下一屏」。",
+            "复查时分别观察两个位置，页面离顶部的距离和轨道向右滚过的距离。若前者突然增加一整屏，继续调卡片的动画时长不会改变结果，应该先看谁处理了这次滚动。"
+          ]
+        },
+        {
+          "heading": "等手势有方向，再决定谁接手",
+          "paragraphs": [
+            "现在事件来自作品轨道且水平位移占主导时，外层将手势交给浏览器的横向滚动。轨道通过 CSS Scroll Snap 把卡片吸附到位。明确向下滑时仍能浏览下面的文章，在矮屏上则先允许读者看完卡片和下方控件。",
+            "鼠标按下时卡片仍然是一个可点击的链接。只有移动达到 7 个像素、且以水平方向为主时，轨道才捕获指针并开始拖动。松手时抑制这次拖动派生出来的点击，下次单独点击就能照常进入详情。"
+          ]
+        },
+        {
+          "heading": "用同一张卡片验收四种操作",
+          "paragraphs": [
+            "先在触控板上有意做一次略斜的横滑，看是否能换作品且页面留在原位。再慢慢向下滚，确认能进入下一屏。接着用鼠标拖动一张带链接的卡片，松手后应停在轮播里。最后正常单击当前卡片，检查打开的是当前作品。",
+            "在 320 × 568 的竖屏和 844 × 390 的横屏，还要从卡片内部上滑，把底部按钮带入视野，再继续去下一屏。高度足够时能一眼看到整张卡片，只有在短屏上才能发现整页把未读内容翻过去的问题。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "Why a sideways swipe skipped an entire homepage section",
+      "summary": "A trackpad rarely moves in a perfect horizontal line. A few pixels of vertical movement exposed a conflict between the project carousel and the page around it.",
+      "sections": [
+        {
+          "heading": "Start with a slightly diagonal swipe over a card",
+          "paragraphs": [
+            "The homepage can page through full-height sections. It also has a horizontal track inside Featured Projects. The old section handler checked the sign of the vertical wheel delta. A mostly horizontal gesture with a small downward component could therefore advance the entire page.",
+            "Watch the page’s vertical scroll position and the track’s horizontal offset during a reproduction. If the first jumps by a viewport, adjusting a card’s animation duration will leave the problem intact. The first question is which handler took the gesture."
+          ]
+        },
+        {
+          "heading": "Decide once a direction has emerged",
+          "paragraphs": [
+            "When an event comes from the project track and horizontal movement dominates, the section handler leaves it to native horizontal scrolling. CSS Scroll Snap settles the card in place. A deliberate downward scroll still reaches the articles below. Short viewports allow enough scrolling to read the card and reach its controls first.",
+            "A mouse press leaves the card link usable. The track waits for at least seven pixels of predominantly horizontal motion before capturing the pointer. On release it suppresses the click generated by that drag. A subsequent, independent click can open the project as usual."
+          ]
+        },
+        {
+          "heading": "Run four checks on the same card",
+          "paragraphs": [
+            "Swipe sideways at a slight angle and check that the project changes while the page holds its position. Scroll down to reach the next section. Drag a linked card with the mouse and release it without navigating, then click the visible card and check its destination.",
+            "Repeat in a 320 × 568 portrait viewport and an 844 × 390 landscape viewport. Scroll from inside the card until the controls are visible, then continue to the next section. This catches the case where paging works on a large display but skips unread content on a shorter one."
+          ]
+        }
+      ]
+    }
+  }
+]

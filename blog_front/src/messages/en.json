@@ -12,18 +12,23 @@
   "Hero": {
     "greeting": "Hi, I'm Zonghan Li",
     "subtitle": "AI Application Developer",
-    "intro": "M.S. student in Artificial Intelligence at Jianghan University, focused on AI application development and person re-identification research. I love turning ideas into working products.",
+    "intro": "M.S. student in Artificial Intelligence at Jianghan University. I love turning ideas into working products.",
     "ctaProjects": "View Projects",
     "ctaAbout": "About Me",
     "scroll": "Scroll"
   },
   "Home": {
     "featuredTitle": "Featured Projects",
-    "featuredSubtitle": "Some projects I'm proud of",
+    "previousProject": "Previous project",
+    "nextProject": "Next project",
+    "goToProject": "Show {title}",
+    "projectPosition": "Project {current} of {total}",
     "viewAll": "View all",
     "skillsTitle": "Tech Stack",
     "latestPostsTitle": "Latest Posts",
-    "latestPostsSubtitle": "Engineering notes, loosely organised by topic"
+    "latestPostsSubtitle": "Problems I ran into while building these projects and how I worked through them.",
+    "noPosts": "No articles have been published yet.",
+    "postsUnavailable": "Articles are temporarily unavailable."
   },
   "Projects": {
     "title": "Projects",
@@ -67,12 +72,21 @@
     "timelinePlaceholder": "Detailed experience to be added"
   },
   "Posts": {
-    "title": "Posts",
-    "subtitle": "Technical notes and thoughts, loosely organised",
-    "count": "{count} posts",
-    "searchPlaceholder": "Search posts…",
-    "empty": "No matching posts",
-    "updated": "Updated"
+    "title": "Engineering notes",
+    "subtitle": "Problems I ran into, how I tracked them down, and what I changed.",
+    "count": "{count, plural, one {# article} other {# articles}}",
+    "searchPlaceholder": "Search articles or keywords",
+    "search": "Search",
+    "read": "Read article",
+    "more": "More notes",
+    "results": "Search results",
+    "clear": "Clear search",
+    "empty": "No articles matched. Try a project name or a shorter keyword.",
+    "unpublished": "No articles have been published yet.",
+    "back": "Back to engineering notes",
+    "tags": "Article tags",
+    "contents": "On this page",
+    "related": "Related project"
   },
   "Footer": {
     "tagline": "Building ideas with code",

@@ -12,6 +12,9 @@ services:
       dockerfile: blog_front/Dockerfile
       target: dev
     container_name: lzh_show_frontend
+    env_file:
+      - path: ./blog_front/db/articles/.env
+        required: false
     ports:
       # 注：本机 3000 被 rag-web 容器占用，临时映射到 3100（rag-web 停止后可改回 3000）
       - "3100:3000"

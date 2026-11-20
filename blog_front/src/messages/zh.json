@@ -12,18 +12,23 @@
   "Hero": {
     "greeting": "你好，我是李宗翰",
     "subtitle": "AI 应用开发工程师",
-    "intro": "江汉大学人工智能硕士，专注 AI 应用开发与行人重识别研究。热爱把想法变成可运行的产品。",
+    "intro": "江汉大学人工智能硕士。热爱把想法变成可运行的产品。",
     "ctaProjects": "查看作品",
     "ctaAbout": "关于我",
     "scroll": "向下滑动"
   },
   "Home": {
     "featuredTitle": "精选作品",
-    "featuredSubtitle": "一些让我自豪的项目",
+    "previousProject": "上一个作品",
+    "nextProject": "下一个作品",
+    "goToProject": "切换到《{title}》",
+    "projectPosition": "第 {current} 个作品，共 {total} 个",
     "viewAll": "查看全部",
     "skillsTitle": "技术栈",
     "latestPostsTitle": "最新文章",
-    "latestPostsSubtitle": "随手记录的工程笔记，按主题整理"
+    "latestPostsSubtitle": "项目里遇到的问题，以及把它们查清、修好的过程。",
+    "noPosts": "还没有发布文章。",
+    "postsUnavailable": "文章暂时无法加载。"
   },
   "Projects": {
     "title": "作品集",
@@ -67,12 +72,21 @@
     "timelinePlaceholder": "详细经历待补充"
   },
   "Posts": {
-    "title": "文章",
-    "subtitle": "技术笔记与思考，随手记录、按主题整理",
+    "title": "开发手记",
+    "subtitle": "记录项目里的具体问题、排查过程和修复方法。",
     "count": "共 {count} 篇",
-    "searchPlaceholder": "搜索文章…",
-    "empty": "没有匹配的文章",
-    "updated": "更新于"
+    "searchPlaceholder": "搜索文章或技术关键词",
+    "search": "搜索",
+    "read": "阅读全文",
+    "more": "更多手记",
+    "results": "搜索结果",
+    "clear": "清除搜索",
+    "empty": "没有找到匹配的文章，试试项目名或更短的关键词。",
+    "unpublished": "还没有发布的文章。",
+    "back": "返回开发手记",
+    "tags": "文章标签",
+    "contents": "本文目录",
+    "related": "相关项目"
   },
   "Footer": {
     "tagline": "用代码构建想法",

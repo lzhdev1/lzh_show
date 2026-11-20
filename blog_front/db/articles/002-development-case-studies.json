@@ -1,0 +1,770 @@
+[
+  {
+    "slug": "rag-when-a-chinese-query-misses-an-english-paper",
+    "projectSlug": "rag-assistant",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "RAG",
+      "Rerank",
+      "RAGAS"
+    ],
+    "zh": {
+      "title": "论文问五类挑战，RAG 却答到了评估指标",
+      "summary": "旧版回答提到了异构数据和开放集，也把评估指标凑进了答案。把论文原段、三路候选和两版评测对上以后，才知道改动该落在检索链的哪一步。",
+      "sections": [
+        {
+          "heading": "答满了五条，究竟错在哪里？",
+          "paragraphs": [
+            "评测集第 5 题问的是《Deep Learning for Person Re-identification: A Survey and Outlook》怎样划分开放世界行人重识别的挑战。读者要的是作者的分类，答出五条领域常识也交不了卷。v7 把异构数据、噪声和开放集列了进去，又补上组重识别、动态多摄像头网络、mINP 指标和 AGW 基线。看上去很像一则做过功课的文献笔记，论文列出的「从原始图像或视频开始识别」和「标注缺失或有限」却不见了。",
+            "打开 eval_results_v7.json，这一题的 faithfulness 是 1，context recall 却是 0。前者问回答是否能从交给模型的片段得到支持，后者问这些片段是否覆盖参考答案。一段讲 mINP 的原文足以给关于 mINP 的说法作证，但读者问的是另一段话。这两项一高一低，让排查有了起点。先找应该出现的段落，再看模型读到了哪些材料。"
+          ]
+        },
+        {
+          "heading": "给正确段落做记号，沿候选集倒查",
+          "paragraphs": [
+            "当时的诊断脚本 diag_q5_recall.py 按 PDF 来源从 Chroma 取出已入库的片段，用 Heterogeneous、Raw Images、Noisy Annotation 等原文词组定位枚举段，再拿文本开头比对候选。能在这个索引里直接找到它，说明至少这道题不需要重新解析 PDF。后来系统才迁移到 pgvector。用今天的数据库结构倒推当时的故障会找错地方。",
+            "接下来保留中文问题，分别让 BM25、普通向量检索、HyDE 各取 10、20、30 条再合并。HyDE 先生成一段假想答案，再按这段话寻找相似原文。三种深度都漏掉目标。最大一轮去重后已有 68 个候选。把中文表述换三种再查，仍然没找到。即使把这些候选全部送去重排，丢在上一步的段落也不会回来。"
+          ]
+        },
+        {
+          "heading": "英文对照能证明哪一步",
+          "paragraphs": [
+            "诊断脚本另设了一条英文题面，保留同一份资料与索引，再观察目标段有没有出现在候选里。英文对照找到了它，复盘保留的重排分是 0.680。阅读这份日志时，我留意到脚本打印的位置从 0 开始，三路候选经过合并，重排后还有限长。日志里的位置和分数能说明段落进入了可比较的范围，不能单凭它们断定生成模型最后看见的是第几段。",
+            "11 月 4 日的提交 6e5208f 在 qa_chain.py 加入 EnglishQueryRetriever，翻译学术检索问题，用译文向原向量库取十条。融合时 BM25、原问题向量、HyDE、英文向量的权重分别是 0.35、0.25、0.25、0.15。新一路只负责补候选，重排仍用用户的原问题。如果翻译返回空串或调用失败，就回退原问题。开销是一次翻译调用和可能增加的待打分片段，索引无需重建。"
+          ]
+        },
+        {
+          "heading": "重排阈值为什么还要留着",
+          "paragraphs": [
+            "v7 已经动过一次重排。此前固定给回答模型前三段，遇到答案分布在多页的文档，第四段即使相关也进不了上下文。30 道题的分数探针记下 1,217 个候选，同样是第一名，分数从 0.62 到 0.98。沿用一条绝对分数线会在不同题目上得到很不一样的截断。于是每题以最高分的 0.6 倍为门槛，最多保留六段。重排服务失败时退回候选的前三段。",
+            "第 5 题恰好说明这套设计的适用范围。阈值解决的是「在一批已有的材料里带走哪些」，英文检索解决的是「这批材料里有没有那句话」。如果在增加英文候选的同时再放宽阈值，就很难说清究竟是哪一步让五项归类恢复。v8 保留了前一版的截断规则。"
+          ]
+        },
+        {
+          "heading": "把均值拆回到题号",
+          "paragraphs": [
+            "逐项核对 backend 下的 eval_results_v7.json 和 eval_results_v8.json，第 5 题新版答案列出了异构数据、原始图像或视频、缺失或有限标注、噪声标注和开放集。整套 30 题里，只有第 5 和第 15 题的召回分发生变化，都是从 0 变为 1，第 28 题仍为 0。复盘里第 28 题的片段已经写明两个 2,048 维特征拼成 4,096 维。遇到这种分数，要先人工核对证据，再决定是否继续调检索。",
+            "下表是归档对照，两次使用同一套问题。它能回答这批英文论文有没有改善，不能给中文课件的检索质量、线上响应时间或翻译费用作保证。下次换语料，我会先留一组已知答案段，再分别记录它是否入候选、是否入最终上下文、回答有没有用到它。"
+          ],
+          "table": {
+            "columns": [
+              "归档评测项",
+              "v7",
+              "v8"
+            ],
+            "rows": [
+              [
+                "第 5 题上下文召回",
+                "0",
+                "1"
+              ],
+              [
+                "第 5 题上下文精确度",
+                "0",
+                "0.8333"
+              ],
+              [
+                "30 题平均上下文召回",
+                "0.9000",
+                "0.9667"
+              ],
+              [
+                "30 题平均上下文精确度",
+                "0.8885",
+                "0.9075"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "en": {
+      "title": "Why a RAG answer about five research challenges drifted into evaluation metrics",
+      "summary": "An answer about open-world person re-identification sounded convincing, right down to the evaluation metric. Comparing the paper, the retrieval candidates and two saved evaluations located the missing evidence.",
+      "sections": [
+        {
+          "heading": "Five plausible bullets, two missing ideas",
+          "paragraphs": [
+            "Question 5 asks how the authors of Deep Learning for Person Re-identification: A Survey and Outlook classify the challenges of open-world person re-identification. The wording matters. A reader taking literature notes needs the paper’s categories. Version 7 mentioned heterogeneous data, noise and open-set recognition, then brought in group re-identification, dynamic camera networks, the mINP evaluation metric and the AGW baseline. Starting from raw images or video, and working with limited or unavailable labels, disappeared from the list.",
+            "The saved evaluation gave this answer a faithfulness score of 1 and a context recall score of 0. Faithfulness measures support in the passages the model received. Context recall asks whether those passages cover the reference answer. An excerpt about mINP can support a perfectly accurate sentence about mINP while being the wrong evidence for this question. That combination of scores made it worth finding the source passage before changing how the model answered."
+          ]
+        },
+        {
+          "heading": "Mark the passage and follow it through retrieval",
+          "paragraphs": [
+            "The diagnostic script, diag_q5_recall.py, selected chunks from the indexed PDF in Chroma. Phrases such as Heterogeneous, Raw Images and Noisy Annotation located the enumeration. The script then compared the beginnings of candidate passages with the target text. Its presence in the index ruled out a missing PDF import for this case. The later migration to pgvector took place after this investigation.",
+            "With the Chinese question unchanged, the probe ran three retrieval branches at depths of 10, 20 and 30 per branch. BM25 searched for terms, the vector branch searched for the question, and HyDE searched using a hypothetical answer as its query. At the largest depth they produced 68 distinct candidates and still missed the target. Three rewrites also missed it. Even a reranker that examined every candidate would never have scored the passage."
+          ]
+        },
+        {
+          "heading": "What the English control actually demonstrated",
+          "paragraphs": [
+            "Another run used an English rendering of the same question against the same collection. The passage appeared among the candidates, with a recorded rerank score of 0.680. One detail matters when reading the diagnostic output. Positions are zero-based, the candidate set is merged, and the production reranker caps the final excerpts. The probe shows the target reached scoring. A position and a score alone cannot establish where it appeared in the final generation prompt.",
+            "Commit 6e5208f on November 4 added EnglishQueryRetriever in qa_chain.py. It translates the question for academic search and retrieves ten vector candidates from the existing index. BM25, the original vector query, HyDE and the English vector query get fusion weights of 0.35, 0.25, 0.25 and 0.15. The reranker still scores against the user's original question. An empty translation or a failed translation call falls back to the original text. The cost is an additional model call and potentially more candidates to score, with no index rebuild."
+          ]
+        },
+        {
+          "heading": "Why the cutoff stayed in place",
+          "paragraphs": [
+            "The reranker had already changed in version 7. An earlier fixed top three could truncate evidence spread across several pages. A probe recorded 1,217 candidates across 30 questions, with the top score ranging from 0.62 to 0.98. The same absolute cutoff would behave quite differently across questions. Version 7 kept passages scoring at least 0.6 times the best score for that question, capped the list at six and fell back to the first three candidates if the reranking service failed.",
+            "Question 5 exposed a different failure stage. A cutoff decides which available passages enter the context. An English query changes which passages are available in the first place. Keeping the cutoff during the version 8 comparison made it possible to examine the effect of changing retrieval without also loosening passage selection."
+          ]
+        },
+        {
+          "heading": "Read the questions behind the average",
+          "paragraphs": [
+            "In backend/eval_results_v8.json the answer names heterogeneous data, raw images or videos, unavailable or limited labels, noisy annotation and open-set recognition. Comparing the saved versions question by question shows that recall changed only for questions 5 and 15. Both moved from 0 to 1. Question 28 remained at 0. The analysis notes that its passage already describes concatenating two 2,048-dimensional features into a 4,096-dimensional descriptor. A low grade deserves a look at the actual evidence before another retrieval change.",
+            "Both columns below summarize archived runs on the same question set. They describe this English-paper collection. They contain no latency measurement, translation invoice or comparable evaluation on Chinese slides. For the next collection I would keep a few known answer passages and record, for each one, whether it entered the candidate pool, survived into the final context and was used in the answer. Each observation points to a different next step."
+          ],
+          "table": {
+            "columns": [
+              "Archived evaluation",
+              "v7",
+              "v8"
+            ],
+            "rows": [
+              [
+                "Question 5 context recall",
+                "0",
+                "1"
+              ],
+              [
+                "Question 5 context precision",
+                "0",
+                "0.8333"
+              ],
+              [
+                "Mean context recall, 30 questions",
+                "0.9000",
+                "0.9667"
+              ],
+              [
+                "Mean context precision, 30 questions",
+                "0.8885",
+                "0.9075"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "slug": "blog-author-private-article-404",
+    "projectSlug": "blog-agent-platform",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "FastAPI",
+      "HTTP",
+      "SQLAlchemy"
+    ],
+    "zh": {
+      "title": "稿间的私有成稿能打开，为什么详情请求还会报 404？",
+      "summary": "一篇稿子已经生成正文，作者还没决定公开。旧前端能靠备用请求把文章拼出来，也把详情接口里的一条错误判断藏在了正常页面背后。",
+      "sections": [
+        {
+          "heading": "先把「生成了」和「发表了」分开",
+          "paragraphs": [
+            "稿间把选题、标题、大纲、正文和排版都记在同一条写作任务上。对作者来说，点进「我的作品」可能是继续改大纲，也可能是审阅已经写好的文章。对逛文章广场的人来说，一条写作任务变成可发现的文章，还要等作者决定公开。系统需要允许作者先读完自己的稿子，再决定发不发。把这两个动作绑在一起，会逼作者为了预览就提前发表。",
+            "客户端现在用 taskWorkflow.js 分配入口。旧任务停在 content_generated，新任务完成排版后是 completed，这两个状态都进入作品阅读页。标题和大纲阶段各自回到编辑界面。后台另有 is_public 和 is_demo 记录可见范围。只看状态，会把私有成稿也带进广场。只看是否公开，又会把作者自己的成稿挡在阅读页外。"
+          ]
+        },
+        {
+          "heading": "页面显示出来，也可能走了错误分支",
+          "paragraphs": [
+            "9 月 25 日的两次提交留下了线索。先看 ed4db1f。当时 BlogDetailView.vue 打开作品会先调 getArticle，取用于阅读的标题、正文和作者标记。读者是作者时，再取 getBlogDetail 补上调研、审稿和大纲配置。第一次请求失败时，页面还会尝试作者专用的任务详情。这个备用请求如果成功，正文照样能显示。仅靠截图很难发现第一跳其实返回了 404。",
+            "问题藏在两份响应的差异里。备用分支把 formatted_content 或 content 填进阅读区，另外在浏览器里手工拼了一份文章信息，点赞数写成 0，收藏和购买状态写成 false，昵称留空。这里的 0 只是前端默认值，没有从互动记录里读过。两次请求都失败，页面才真正显示文章不存在。要判断修复有没有生效，先看第一份详情响应，再看作者信息是否按需加载。能够读到一段正文还不够。"
+          ]
+        },
+        {
+          "heading": "错误发生在比较作者之前",
+          "paragraphs": [
+            "翻到旧的 articles.py，详情函数第一行先调 _get_public_task。这个函数拿任务编号查记录，确认已有成稿，紧接着要求 is_demo 或 is_public 成立。对私有成稿来说，状态检查能过，公开检查直接返回 404。函数后面原本有根据登录用户算 is_owner 的代码，但运行不到那里。广场正常、私稿异常，差别正好落在这两个判断之间。",
+            "同一天的 dfda198 把读取顺序改了。先按编号取任务并检查成稿状态，再从当前登录会话取用户编号，与库里任务的 user_id 比较。作者、公开稿和演示稿分别是进入阅读页的有效条件。匿名请求没有用户编号，即便演示稿也没有作者，两边都是空值也不能认作同一人。当前版本用 _get_readable_task 复用了这个判断，详情响应的 is_owner 仍由服务端计算。",
+            "公开广场继续单独筛「已有正文」并且「公开或演示」。这次调整没有把作者的私稿加入推荐，也不需要改已有文章的可见设置。旧稿还有一项兼容需求。正文优先展示 formatted_content，没有排版结果就用 content。放开作者阅读时，两种成稿各自都有能读的内容。"
+          ]
+        },
+        {
+          "heading": "用同一组样稿同时核对列表和详情",
+          "paragraphs": [
+            "为这篇记录重新核对时，在本地 Blog 后端容器里用现有的 ProductAccessFixture 起了 FastAPI 测试客户端，使用内存 SQLite。样稿事先建好，模型不参与，使用的是专门创建的测试作者和测试读者。下面是三个阅读身份、五种稿件组合实际得到的详情响应。公开成稿即使三列都是 200，也只有作者那一列的 is_owner 为真。无署名演示稿三列都为假。",
+            "再检查入口返回的任务编号。作者的「我创建的」列出了大纲、旧成稿、排版成稿和已公开稿四条，广场只有公开稿和演示稿两条。私有旧成稿返回原始正文，私有排版稿即使同时保存原始正文，也优先返回排版后的文本。这四个观察把列表归属、能否阅读和读到哪个版本接了起来。它们来自本地接口验证，不包含生产访问量或浏览器端耗时。"
+          ],
+          "table": {
+            "columns": [
+              "测试稿件",
+              "作者会话",
+              "另一位读者",
+              "未登录"
+            ],
+            "rows": [
+              [
+                "仅有大纲的私有稿",
+                "404",
+                "404",
+                "404"
+              ],
+              [
+                "私有成稿，尚无排版版本",
+                "200",
+                "404",
+                "404"
+              ],
+              [
+                "私有成稿，已有排版版本",
+                "200",
+                "404",
+                "404"
+              ],
+              [
+                "作者已公开的成稿",
+                "200",
+                "200",
+                "200"
+              ],
+              [
+                "已成稿的无署名演示稿",
+                "200",
+                "200",
+                "200"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "验收要看作者能否安心按下发布",
+          "paragraphs": [
+            "沿着现在的阅读页走一遍，作者先看到正文，再取创作过程记录。如果后一个请求失败，BlogDetailView.vue 仍保留已经读到的文章。只有当前用户确实是作者，页面才去取那些编辑信息。公开设置另走保存动作，阅读本身不会写回 is_public。把一次阅读变成只读动作，作者才能放心从「我的作品」进入审稿。",
+            "这个修复给后续迭代留了一组很便宜的回归样本。改卡片路由时留下一个未成稿任务，检查它还能继续写。改详情接口时留下私有旧成稿，检查作者第一跳就能读。改广场查询时留下私有排版稿，检查它不会被列出来。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "The author could open a private manuscript. Why was its detail request returning 404?",
+      "summary": "In the Blog writing studio, generating an article and publishing it are separate decisions. An old fallback could put the text on screen even when the normal reading request had rejected its author.",
+      "sections": [
+        {
+          "heading": "A generated manuscript still needs a publication decision",
+          "paragraphs": [
+            "The studio tracks the topic, title, outline, body and typesetting on one writing task. Opening My Works might mean editing an outline or proofreading a finished article. A visitor browsing the public feed expects to find finished articles whose authors have chosen to share them. An author needs to read a piece while that decision is still open. Requiring publication to preview it would reverse the editorial workflow.",
+            "Today taskWorkflow.js sends two states to the reading view. Older tasks can end at content_generated, whereas formatted tasks reach completed. Title and outline tasks return to their respective editors. The service separately stores is_public and is_demo. Completion alone would admit private works to the public feed. Publication alone would lock the author out of a finished manuscript."
+          ]
+        },
+        {
+          "heading": "A page that renders can still take the wrong path",
+          "paragraphs": [
+            "Two commits from September 25 document what happened. At ed4db1f, BlogDetailView.vue first requested getArticle for the title, body and ownership flag. If the response identified the viewer as the author, the page then requested getBlogDetail for research, review notes and outline settings. If the initial read failed, the client fell back to the author's task-detail request. When that succeeded, the page could display the manuscript despite the original 404.",
+            "The fallback produced a subtly different page. It placed formatted_content or content in the reading pane and constructed article metadata in the browser. It set likes to zero, favorites and purchases to false, and the author's display name to an empty string. The zero came from a client-side default. This branch never read the interaction count. Only when the fallback also failed did the old view display its missing-article state. Inspecting the first response and the follow-up for editorial data tells us more than a screenshot of readable text."
+          ]
+        },
+        {
+          "heading": "The request returned before it compared owners",
+          "paragraphs": [
+            "In the old articles.py, the detail handler called _get_public_task first. That function loaded the task, checked for a finished state and then required is_demo or is_public. A private manuscript passed the state check and immediately returned 404 on the publication check. There was already code further down the handler to compute is_owner from the signed-in user. Execution never reached it for the manuscript that most needed that flag.",
+            "Commit dfda198 changed the order. The handler retrieves the task and verifies the finished state, takes the user identity from the current session and compares it with the stored task owner. The author may read their own finished work. Public and demo manuscripts are independently readable. An anonymous session has no user ID, and two missing IDs must not establish ownership of an unsigned demo. The current _get_readable_task helper preserves that rule. The server also determines the ownership flag it returns to the reading view.",
+            "The public feed keeps its own filter for finished public or demo material. The author exception on the detail page required no publication changes to existing rows. The handler also chooses the edition to display. It prefers formatted_content and falls back to content for older manuscripts. Both generations of finished tasks remain readable."
+          ]
+        },
+        {
+          "heading": "Cross-check the lists and the detail response with the same fixtures",
+          "paragraphs": [
+            "For this write-up I ran the current backend in its local Blog container, using ProductAccessFixture, FastAPI's test client and an in-memory SQLite database. An author, a second reader and five synthetic manuscripts were sufficient. No text generation was involved. The table gives the actual detail responses. For the published manuscript, all three requests returned 200 but only the author received is_owner=true. For the unsigned demo all three received false.",
+            "My Works returned four task IDs for the author, covering the outline, the older private article, the formatted private article and the published article. The feed contained only the published article and the demo. Opening the older private article returned its original body. For the private article with both bodies, the response contained the formatted text. These checks cover discoverability, permission to read and edition selection. They do not measure production traffic or browser latency."
+          ],
+          "table": {
+            "columns": [
+              "Fixture",
+              "Author session",
+              "Other reader",
+              "Signed out"
+            ],
+            "rows": [
+              [
+                "Private outline only",
+                "404",
+                "404",
+                "404"
+              ],
+              [
+                "Private, body generated",
+                "200",
+                "404",
+                "404"
+              ],
+              [
+                "Private, formatting complete",
+                "200",
+                "404",
+                "404"
+              ],
+              [
+                "Published, complete",
+                "200",
+                "200",
+                "200"
+              ],
+              [
+                "Unsigned demo, complete",
+                "200",
+                "200",
+                "200"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "What an author needs before pressing Publish",
+          "paragraphs": [
+            "In the current reading flow the body arrives first. Only an author triggers the follow-up for editorial notes, and BlogDetailView.vue keeps the body visible if that second request fails. Publishing is a separate save action. Reading a piece never changes is_public. That separation lets an author proofread in My Works without committing to put a draft in front of readers.",
+            "Three small fixtures are worth keeping around. When changing card navigation, an unfinished outline tests whether the author can resume writing. When changing article details, a private legacy manuscript tests whether the first reading request succeeds. When changing the feed, a formatted private manuscript tests whether a finished but unpublished piece stays off the list."
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "slug": "ttfarm-move-and-orbit-with-two-fingers",
+    "projectSlug": "ttfarm",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "Three.js",
+      "Pointer Events"
+    ],
+    "zh": {
+      "title": "TT 农场里，为什么一边走路一边转镜头这么难？",
+      "summary": "从田垄走向木桥时，左手要维持方向，右手要找桥头。同一张画布还要接受点地行走和双指缩放。沿着一次触摸从按下追到抬起，可以找出镜头突然拉近、角色意外改道的两种来源。",
+      "sections": [
+        {
+          "heading": "从田垄走到桥头，要给玩家留出一只手",
+          "paragraphs": [
+            "玩家的反馈是「人物移动的时候无法调整视角」。在桌面上，按住 W 再拖鼠标，移动和转向分别有自己的输入设备。换到手机上，可以点远处的地面让角色自己走，但想在河岸边修正方向，还要看清桥从哪里上，就需要持续的移动输入。要求玩家先停下、转好镜头、再点桥头，已经改变了这段路的玩法。",
+            "还有一个容易漏掉的后果。画布上的一次点击会发出射线，优先查有没有点中田块。距离田块中心不足 2.2 个场景单位时会直接选中，离得远就先走到田边，到达后再选中。如果玩家只是想回头看一眼，右手在菜地上松开却被算成点击，角色可能突然改道，或弹出田块面板。即便镜头确实转了，这次操作仍然算失败。"
+          ]
+        },
+        {
+          "heading": "旧版处理松手时，已经分不清是哪根手指",
+          "paragraphs": [
+            "翻到提交 ba1da0a，game/loop.ts 里可以看到两段各自成立的代码。OrbitControls 根据画布上的拖动调整相机。游戏另在同一张画布上监听按下和抬起，用 downX、downY、downAt 三个变量判断是否点地。松手位置距起点小于 8 像素，按住不到 700 毫秒，就进入场景拾取。",
+            "在单个鼠标上，后一次按下通常要等前一次抬起。两指操作没有这层保证。指 A 按住、指 B 落下时，B 就覆盖了 A 的起点和时间。系统发来 pointercancel 时，旧版还会调用和 pointerup 相同的函数，取消也有机会通过点选判断。旧版的跟随代码确实每帧都在移动相机的注视点。光改跟随速度解决不了缺少触点编号的问题。"
+          ]
+        },
+        {
+          "heading": "按下的位置决定谁接手，松手的顺序不能改变归属",
+          "paragraphs": [
+            "提交 34e08ad 加入屏幕摇杆和 createFarmCamera。左拇指按在摇杆上，TouchControls 记住 pointerId、捕获这个指针，并持续把方向和力度写进 farmInput。拇指滑出圆盘，浏览器仍把后续位移交给摇杆。摇杆中心还有一圈空程，占有效半径的 10%。手指轻轻搭在中心时，steering 已为真，移动量仍为零。这里需要区分「有人正在操控」和「角色此刻有速度」。",
+            "相机只给从画布按下的触点建记录。左指在摇杆、右指在田地上时，相机只收到一根场景手指，用它的水平位移改方位角。两指都从画布按下时，相机才按两点的间距变化缩放。还有一种倒过来的顺序。右指先停在田块上，左指随后按摇杆。窗口捕获阶段会撤销前一次候选点击，即使先松开左手，右手也不会重新获得点选资格。"
+          ]
+        },
+        {
+          "heading": "转过身以后，摇杆上的「前」在哪里",
+          "paragraphs": [
+            "有了两路输入，还需保证它们对方向的理解一致。game/loop.ts 在每一帧先取相机当前的视线，把竖直分量清零并归一化，得到地面上的前方，再算出屏幕右方。角色要走的世界方向，是这两个方向分别乘以摇杆的前后、左右分量再相加。持续朝上推摇杆并环绕镜头时，行进方向会随着画面转变。Player.update 收到有效的手动移动后，也会取消原先的点地目的地。",
+            "角色位置更新完，才更新这一帧的跟随镜头。拖动写入目标角度，镜头按帧间隔逐渐追向目标，跟随高度以脚下地形为基准，跳一下不会把完整的起跳高度传给镜头。拾取则一直等到真正的 pointerup，要求仍是候选点击、位移小于 6 像素、用时小于 650 毫秒，且没有摇杆操控或面板拦截。发生取消或丢失指针捕获时只结束跟踪。"
+          ]
+        },
+        {
+          "heading": "用相机位置和点选次数复查",
+          "paragraphs": [
+            "本次在本地 Chromium 的 800 × 450 触屏视口中，单独挂载游戏实际使用的 TouchControls 和相机控制器，把拾取回调接到计数器。固定角色位置，记录相机相对注视点的方位和半径，每段手势结束都让镜头阻尼收敛后再读数。这样能区分「画面动了」究竟是旋转还是缩放，也能抓住一次没有明显视觉反馈的误点。",
+            "这组回放覆盖浏览器送出的多点事件、摇杆输出和相机计算。计数器只看有没有发起拾取，种菜和面板交互还要进完整游戏验收。真机复查可以从田边走上木桥，分别先松左手、先松右手，再切一次应用回来，观察角色是否按预期停步、是否改道，以及桥头还能否被单点选中。"
+          ],
+          "table": {
+            "columns": [
+              "送入浏览器的操作",
+              "实际读数"
+            ],
+            "rows": [
+              [
+                "摇杆持续前推，画布向右拖 96 像素，再抬右手",
+                "镜头转过 57.6°，半径保持 10.946。右手抬起后前进输入仍为 0.875，抬左手才归零，点选 0 次。"
+              ],
+              [
+                "两指都在画布，间距从 100 拉到 150 像素",
+                "镜头半径从 10.946 降到 7.297，约为原来的三分之二，点选 0 次。"
+              ],
+              [
+                "先按画布再按摇杆，先松摇杆再松画布",
+                "点选 0 次。另测单指取消、正常短点和按住 730 毫秒，三者分别触发 0、1、0 次。"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "en": {
+      "title": "Walking to the bridge while turning the camera in TT Farm",
+      "summary": "On the way from a vegetable bed to the bridge, one thumb needs to keep the player moving while the other looks for the entrance. The same canvas accepts taps to walk and pinches to zoom. Following each contact from press to release exposes where those actions interfere.",
+      "sections": [
+        {
+          "heading": "The walk from a vegetable bed to the bridge",
+          "paragraphs": [
+            "The player’s report was that they could not adjust the view while moving. A desktop player can hold W with one hand and drag a mouse with the other. On a phone, tapping distant ground gives the character a destination, but near the river you may want to adjust your course and look for the bridge entrance at the same time. Having to stop, turn, then pick another destination changes how that crossing plays.",
+            "There is another observable failure even if the camera turns successfully. A scene tap casts a ray and checks the vegetable beds first. Within 2.2 scene units of the bed’s centre it selects the plot immediately. Farther away, it walks the character to the edge and selects it on arrival. Lifting the camera finger over a bed could therefore open its panel or send the character off course. An acceptance check has to watch both the view and the destination."
+          ]
+        },
+        {
+          "heading": "The old release handler had lost the identity of the finger",
+          "paragraphs": [
+            "At commit ba1da0a, game/loop.ts put two independent consumers on one canvas. OrbitControls handled camera drags. The game also listened for presses and releases, using downX, downY and downAt to recognize taps. A release within eight pixels of the start and under 700 milliseconds triggered scene picking.",
+            "With a single mouse, the next press normally follows the release. With two contacts, finger B can land while A is still down. B then overwrites the coordinates and timestamp that belonged to A. The old code also sent pointercancel through the same handler as pointerup, so a cancellation could pass the tap test. The follow code did update the camera target every frame. Tuning its speed would still leave the picker without a way to tell the contacts apart."
+          ]
+        },
+        {
+          "heading": "Assign the contact at the place where it starts",
+          "paragraphs": [
+            "Commit 34e08ad added the on-screen stick and createFarmCamera. When the left thumb lands on the stick, TouchControls remembers its pointerId, captures it and writes its direction and strength into farmInput. Capture keeps subsequent events on the stick even after the finger slides outside the circle. The inner ten percent of its effective radius is a dead zone. Rest a thumb there and steering is already true while movement is zero. The camera needs to know the stick is occupied even when the character is stationary.",
+            "The camera tracks only contacts that started on the canvas. A thumb on the stick plus a finger on a bed leaves the camera with one contact, whose horizontal movement changes the azimuth. Zoom begins when both contacts originate on the canvas and their separation changes. The opposite press order matters too. If the right finger lands on a bed first and the left then touches the stick, a window capture listener revokes the pending tap. Releasing the stick first does not give the remaining finger permission to select the bed."
+          ]
+        },
+        {
+          "heading": "What does pushing forward mean after the view turns?",
+          "paragraphs": [
+            "Each frame, game/loop.ts takes the camera’s current viewing direction, drops the vertical component and normalizes it. That gives a forward vector on the ground and a perpendicular screen-right vector. Adding those two vectors weighted by the stick axes gives the movement direction in world coordinates. Hold the stick forward and orbit the view, and the requested direction turns with the screen. Player.update also cancels a previous tap-to-walk target as soon as it sees meaningful manual movement.",
+            "The loop updates the character before the follow camera. A drag changes the target angles, and the camera approaches those angles using the frame interval. Its vertical reference comes from the terrain beneath the player, so a jump does not pass its full height to the view. Picking waits for an actual pointerup. The contact must still be a tap candidate, under six pixels and 650 milliseconds, with no active stick or blocking panel. Cancellation and loss of capture end tracking without picking."
+          ]
+        },
+        {
+          "heading": "Measure rotation, zoom and picks separately",
+          "paragraphs": [
+            "For this review I mounted the game’s actual TouchControls and camera controller in a local Chromium touch viewport at 800 × 450. I held the player position fixed, counted calls to the pick callback, and measured the camera’s azimuth and distance from its focus after damping had settled. This distinguishes a rotation from a zoom even though both move the image, and catches a stray pick even when it has no immediate visual effect.",
+            "This replay exercises browser multi-touch events, stick output and camera calculations. The callback counts pick attempts. Planting crops and opening a panel still need a pass through the complete game. A separate device check is to walk from a field onto the bridge, try lifting either hand first, then switch apps and return. That exercises stopping, staying on course and issuing a fresh tap on the bridge."
+          ],
+          "table": {
+            "columns": [
+              "Touch input",
+              "Observed result"
+            ],
+            "rows": [
+              [
+                "Hold the stick forward, drag the canvas right by 96 pixels, lift the right finger",
+                "The view turned 57.6°. Distance stayed at 10.946. Forward input stayed at 0.875 after lifting the right finger and reached zero only on lifting the left. No picks."
+              ],
+              [
+                "Start both contacts on the canvas and spread them from 100 to 150 pixels",
+                "Distance fell from 10.946 to 7.297, about two thirds of its initial value. No picks."
+              ],
+              [
+                "Press the canvas before the stick, then release the stick before the canvas",
+                "No picks. Separate single-finger tests for cancellation, a short tap and a 730 ms hold produced zero, one and zero picks respectively."
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "slug": "aftercare-one-ticket-for-repeated-confirmations",
+    "projectSlug": "aftercare-agent",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "PostgreSQL",
+      "FastAPI"
+    ],
+    "zh": {
+      "title": "一张换货草稿确认三次，库存怎么只扣一件？",
+      "summary": "用一副库存只有两件的雾白耳机做实验。让两个点击和一次网络重试赶在一起，再故意中断数据库写入，看顾客该拿到哪个工单号、服务端又该留下什么。",
+      "sections": [
+        {
+          "heading": "先分清顾客要换哪副耳机",
+          "paragraphs": [
+            "在售后工单演示里输入「帮我换一下耳机，还是同款」，助手会追问订单号或颜色。AC-1001 和 AC-1002 都是 AirLoop 无线耳机，一副曜石黑，一副雾白。两个规格各自记库存，黑色还有 3 件，白色只有 2 件。若助手从搜索结果里取第一笔，后面的扣减即使做得完全正确，也是在给另一副耳机办换货。",
+            "这次选 AC-1002。演示业务日固定在 11 月 20 日，订单于 11 月 7 日下单、9 日签收。下单日决定适用新版 15 天规则，签收日才用来算已经过了几天。11 月 20 日是签收后第 11 天，雾白有货，可以生成草稿。此时刷新页面，仍能看到同一份待确认草稿，库存应当还是 2。顾客在这里改主意，只要取消草稿就行。"
+          ]
+        },
+        {
+          "heading": "一次重试和又点一次，带来的编号不同",
+          "paragraphs": [
+            "假设点下「确认并建单」后手机断网。光看界面无法区分请求还没送到，还是工单已经建好、回包丢在路上。前端会暂时禁用确认按钮，出错后重新读取会话。如果这笔订单已经有工单，就显示服务端的结果。选择重试时，页面重新发送刚才保存的请求对象，沿用原来的 request_id。",
+            "另一个已经打开同一草稿的页面也能点确认。这次点击会生成新的 request_id，却带着相同的 proposal_id。前者用来判断服务端是否处理过这次提交，后者用来查这份草稿是否已经办成了工单。只按请求号判断，第二个页面会被当成一笔新业务。只检查屏幕上还有没有草稿，又会把一次已经办成的重试误报为「草稿已失效」。"
+          ]
+        },
+        {
+          "heading": "从确认接口跟到库存表的那一行",
+          "paragraphs": [
+            "app.py 里的 confirm 先在一个数据库事务内锁住当前会话行。对同一位访客同时到达的请求，后一个要等前一个提交后再读状态。服务端把操作名和草稿编号一起算成指纹，和 request_id 记在 aftercare_requests。同一编号、同一内容再次到达，直接读取现有结果。同一编号换了操作内容，则返回 409。遇到新的请求号，还会按会话和 proposal_id 查已有工单。这个查询特意排在检查待确认草稿之前，因为成功建单就会清掉草稿。",
+            "第一次办理才继续核对当前草稿，并重新读取订单资格和可用库存。store.py 的 add_ticket 在更新库存时带上 quantity > 0，只有目标规格的那一行成功减 1，才会写工单。工单表的主键是「会话、订单」，对应每笔订单最多办一次。另一个唯一约束是「会话、草稿」，供重复确认找回办理结果。请求记录、库存、工单和草稿状态都在同一事务提交。到这一步，助手已经交付草稿，持锁期间只需读取和更新数据库。"
+          ]
+        },
+        {
+          "heading": "让 A、B、A 同时到达，再对账",
+          "paragraphs": [
+            "这次复盘把当前服务连到临时 PostgreSQL 16，关闭模型调用，用两个独立会话跑 eval_flow.py，11 项检查全部通过。随后单独开一份雾白耳机草稿，用三个线程等在同一起点。A 和 B 代表两次点击，第三个请求复用 A，模拟网络重发。线程到达顺序没有预设，判断成功也不依赖哪一个先抢到锁。",
+            "三个调用都拿到同一个工单号。再用另一条数据库连接核对记录，能找到 A、B 两条确认请求记录、AC-1002 的一张工单，雾白库存从 2 变成 1。两条确认记录在这里恰恰是正确结果，它们说明两个不同编号都得到了处理。再查询工单能取回同一编号，再次申请这笔订单时也不会产生新草稿。"
+          ]
+        },
+        {
+          "heading": "工单写到一半失败，原来的确认还能不能用",
+          "paragraphs": [
+            "并发通过以后，我换了一个干净会话，在确认函数调用 store.save 时人为抛出异常。这个位置很靠后，前面已经执行了减库存和插入工单，只差把清掉草稿的会话状态保存下来。异常退出事务后重新查询，雾白库存仍为 2，工单和 A 的确认记录都是 0，原草稿仍可打开。用同一个 A 再确认才得到一张工单。若请求记录提前单独提交，这次真正需要办理的重试就可能被吞掉。",
+            "最后再换一份草稿，在隔离库里把雾白库存从 2 改到 0，模拟顾客查看草稿期间缺货。确认接口照常返回 HTTP 200，回复说明重新核验后缺货，工具轨迹只有 check_eligibility，工单表是空的。因此验收得同时看订单号、库存和工单号，光数成功的 HTTP 响应会把这笔拒绝也算成建单。这些结果来自每个访客独享模拟库存的演示库。商家多渠道共用的仓库还需单独验证跨订单竞争。"
+          ],
+          "table": {
+            "columns": [
+              "隔离实验中的观测点",
+              "雾白库存",
+              "工单数",
+              "确认编号数"
+            ],
+            "rows": [
+              [
+                "刚生成草稿",
+                "2",
+                "0",
+                "0"
+              ],
+              [
+                "同一草稿并发 A、B、A 后",
+                "1",
+                "1",
+                "2"
+              ],
+              [
+                "新会话，保存状态抛错后",
+                "2",
+                "0",
+                "0"
+              ],
+              [
+                "保留上一步草稿，用 A 重试",
+                "1",
+                "1",
+                "1"
+              ],
+              [
+                "另一会话，确认前改为缺货",
+                "0",
+                "0",
+                "1"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "en": {
+      "title": "Three confirmations for one exchange. How much stock should be left?",
+      "summary": "I started with two white headsets, sent two clicks and a retry against one exchange draft, then interrupted a database write. The ticket number shown to the customer and the rows left in PostgreSQL tell different parts of the story.",
+      "sections": [
+        {
+          "heading": "Which pair of headphones is coming back?",
+          "paragraphs": [
+            "Ask the aftercare demo to exchange a pair of headphones for the same model and it asks for a colour or order number. AC-1001 and AC-1002 are both AirLoop headsets. One is black with three replacements available. The other is white with two. Picking the first search result would give the wrong customer-facing outcome even if every database write succeeded.",
+            "I used the white pair, AC-1002. The demo freezes its business date at 20 November. The order was placed on the 7th and delivered on the 9th. The purchase date selects the 15-day policy, and the delivery date determines how many days have elapsed. On the 20th this order is eleven days past delivery and still eligible. Creating a draft and refreshing the page should bring back the same draft with two white headsets in stock. At this stage the customer can still cancel."
+          ]
+        },
+        {
+          "heading": "A retry and a second click carry different IDs",
+          "paragraphs": [
+            "Suppose a customer taps Confirm and immediately loses the connection. From the screen alone, a request that never reached the server looks much like a committed ticket whose response was lost. The UI disables the button while the request is pending. After an error it reads the session again. If it finds a ticket for that order, it displays the result. Manually retrying reuses the saved request object, including its original request_id.",
+            "A second tab that already has the draft open can also submit a confirmation. This click gets a fresh request_id and carries the same proposal_id. The server needs to answer two questions. Has it handled this submission? Has it fulfilled this draft? Looking only at the request ID would make the click in the second tab look like new business. Looking only for an open draft could tell a customer that their draft had expired just after their exchange went through."
+          ]
+        },
+        {
+          "heading": "Follow a confirmation down to the stock row",
+          "paragraphs": [
+            "The confirm handler in app.py takes a row lock on the visitor’s session inside a database transaction. A second confirmation for the same session waits for the first to commit before reading its state. The handler records the request_id and a fingerprint of the action and draft ID in aftercare_requests. Repeating the ID with the same content returns the current result. Reusing the ID for a different operation yields HTTP 409. For a fresh request ID, the handler also looks for a ticket belonging to that session and proposal_id. This lookup has to precede the open-draft check because a successful confirmation clears the draft.",
+            "On the first confirmation the service checks that the draft is current and reads eligibility and stock again. In store.py, add_ticket decrements the exact stock row with a quantity > 0 condition and checks that a row was updated before inserting the ticket. A primary key on session and order enforces one exchange per order. A separate unique constraint on session and proposal identifies the ticket created for the draft. The request record, stock decrement, ticket and updated session commit together. No model call is needed while this lock is held."
+          ]
+        },
+        {
+          "heading": "Release A, B and A together, then count what happened",
+          "paragraphs": [
+            "I ran the current service against a temporary PostgreSQL 16 instance with model calls disabled. All eleven checks in eval_flow.py passed using independent browser sessions. I then prepared a fresh white-headset draft and put three threads behind one barrier. A and B represented separate clicks, and the third submission reused A to represent a retry. Their scheduling order was deliberately left open.",
+            "All three responses contained the same ticket ID. A separate database connection found two confirmation request records, A and B, one ticket for AC-1002, and one white headset left. Two request records are the expected result here because the service saw two distinct IDs. The flow test also looked up the ticket afterwards and tried applying again for the same order. The lookup returned the existing ticket ID and the second application produced no new draft."
+          ]
+        },
+        {
+          "heading": "Can the original request recover from a failed write?",
+          "paragraphs": [
+            "In a fresh session I made store.save raise an exception inside the confirmation handler. This is late in the transaction. The stock update and ticket insert have executed, but the application is about to save the session with the draft cleared. After the exception, a separate read found two white headsets, zero tickets and no record of confirmation A. The original draft was still open. Resubmitting A created one ticket. Committing the request record ahead of the other writes could have discarded precisely the retry the customer needed.",
+            "For one final check I set stock to zero in the isolated database after creating a fresh draft. The HTTP response to confirmation was 200. Its message explained that stock had run out, its tool trace stopped at check_eligibility, and the ticket table was empty. Counting successful HTTP calls would count this refusal as a completed exchange. The checks therefore compare the order ID, ticket ID and stock together. This demo gives each visitor private simulated inventory. Contention between different orders against a shared retail warehouse would need its own test."
+          ],
+          "table": {
+            "columns": [
+              "Observation in the isolated run",
+              "White stock",
+              "Tickets",
+              "Confirmation IDs"
+            ],
+            "rows": [
+              [
+                "Draft just created",
+                "2",
+                "0",
+                "0"
+              ],
+              [
+                "Same draft after concurrent A, B, A",
+                "1",
+                "1",
+                "2"
+              ],
+              [
+                "Fresh session after save failed",
+                "2",
+                "0",
+                "0"
+              ],
+              [
+                "Same draft retried using A",
+                "1",
+                "1",
+                "1"
+              ],
+              [
+                "Separate session, stock exhausted before confirmation",
+                "0",
+                "0",
+                "1"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "slug": "portfolio-horizontal-swipe-and-page-scroll",
+    "projectSlug": "portfolio",
+    "publishedAt": "2026-11-21",
+    "tags": [
+      "React",
+      "CSS Scroll Snap",
+      "Pointer Events"
+    ],
+    "zh": {
+      "title": "触控板横滑 180 像素，首页却向下翻了 756 像素",
+      "summary": "浏览作品、打开详情和继续往下读，用的是同一块卡片。一次带 5 像素纵向偏移的横滑，把问题定位到了首页的翻页监听器。",
+      "sections": [
+        {
+          "heading": "想看第二个作品，却先看到了文章",
+          "paragraphs": [
+            "在首页往下翻一屏，第一张是售后工单 Agent，第二张是 Blog。访客在这里有三个很自然的动作。他可以横滑比较两个项目，点进感兴趣的那个，或者继续往下看文章。它们的起点都可能在同一张项目截图上。旧版用透视和透明度把其他卡片叠在两侧，让人想往右滑。可手指刚动，作品有时就从屏幕里消失了。",
+            "先把鼠标留在第一张卡片上，固定窗口为 1344 × 820，用 Chrome 的输入接口送入一次滚轮事件。水平增量是 180 像素，垂直增量只有 5 像素。等动画停下来再读 window.scrollY，页面比之前向下移动了 756 像素。这个数正好是一屏减去 64 像素导航栏的高度。5 像素被当成了翻一整屏的指令，已经足以解释为什么调卡片的转角或缓动时长看不出改善。"
+          ]
+        },
+        {
+          "heading": "内层卡片和外层页面收到的是两种事件",
+          "paragraphs": [
+            "旧的 Carousel3D 会跟踪按下、移动和松开指针时的位置，再按拖动距离算出焦点卡。用鼠标按住拖动，会走这条路径。用触控板两指滑动，浏览器送过来的却是 wheel。截住卡片的指针事件，管不到另一个监听器收到的滚轮事件。",
+            "在 SectionPager 的 onWheel 里能看到那 756 像素的来历。旧实现只读 deltaY 的正负，一旦下一板块存在，就先 preventDefault，再对它调用 scrollIntoView。水平量完全没参与判断。所以把鼠标移到卡片外再向下滚，本来是符合预期的翻页。把鼠标移回卡片，带着一点下偏的横滑，也触发了完全相同的分支。若在卡片上吞掉所有 wheel，又会把本来想往下读文章的人困在原地。"
+          ]
+        },
+        {
+          "heading": "用页面和轨道两个位置验收横滑",
+          "paragraphs": [
+            "改动只在事件从作品轨道冒上来时区分方向。水平增量的绝对值大于垂直增量，外层就放行。换成明确的上下滚动，仍由页面处理。卡片本身放进可横向滚动的容器，用 CSS Scroll Snap 对齐。这样可以保留触控板划到一半又松手的动作，不必把每一笔滚轮增量都硬译成「下一张」。",
+            "下表是改后在同一窗口用 Chrome 重跑的结果。每项从第一张独立开始，页面位置是 window.scrollY，轨道读数是 scrollLeft。卡片起点之间约隔 1170 像素。短滑回到第一张也算通过，因为访客可以放弃这次换页，页面依旧停在作品区。"
+          ],
+          "table": {
+            "columns": [
+              "输入",
+              "轨道停点",
+              "页面位置"
+            ],
+            "rows": [
+              [
+                "单次横向 180、纵向 5 像素",
+                "0 像素，第一张",
+                "757 → 757 像素"
+              ],
+              [
+                "连续横滑 850 像素，带 4 像素纵向偏移",
+                "1170 像素，第二张",
+                "757 → 757 像素"
+              ],
+              [
+                "相隔约 40 毫秒点两次“下一个作品”",
+                "2339 像素，第三张",
+                "757 → 757 像素"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "拖完不要打开链接，下一次单击要能打开",
+          "paragraphs": [
+            "鼠标没有触控板的原生横滑。卡片又是一整个链接，按下就捕获指针会影响普通点击，等松开才判断方向又来不及做跟手拖动。现在按下时先记起点，移过 7 个 CSS 像素、且横向位移占主导，才由轨道捕获指针。拖动期间临时关闭吸附，让截图跟着指针走。松手时恢复吸附，拦住这一次拖动产生的 click。下一次按下就清除这条拦截。",
+            "这里单测「成功换到第二张」还漏了半个业务路径。我从第一张向左拖了 95 像素再松开，轨道停在 1170，地址仍是首页。在当前卡片上再单击一次，才进入 /projects/blog-agent-platform。相反，如果滑动后每次点击都被吃掉，作品展示看起来修好了，项目的入口实际上坏了。",
+            "快速点箭头又是另一件事。平滑滚动时，屏幕中央经过的那一张和按钮要去的那一张可能不同。代码用 destination 记住已请求的目标，第二次点击在目标上加一，抵达后再与实际轨道位置对齐。表里第三行专门覆盖这个间隙。"
+          ]
+        },
+        {
+          "heading": "短屏还要检查作品区的最后一行",
+          "paragraphs": [
+            "在 320 × 568 的竖屏和 844 × 390 的横屏上，英文长标题会把下方的切换按钮推到屏幕外。这时手指在卡片里往上划，是希望先露出按钮。若继续沿用「竖向移动就翻下一板块」，访客能读到标题，却没机会按到按钮。现在整页翻动前先比较当前板块的下边缘与可视窗口。底下还有内容，就先让页面自然滚动。回头往上翻时，也要先能看到该板块的标题。",
+            "验收时先固定卡片起点，同时记录页面位置和轨道位置。页面多滚了一屏，就去看外层翻页分支。轨道停对了而分页数字不对，再看目标索引。只有松手后地址变了，才回到点击处理去查。上表记录的是这次桌面 Chromium 的结果。短屏检查用的是模拟触摸视口，触控板的惯性和真机浏览器的手感仍需分别判断。"
+          ]
+        }
+      ]
+    },
+    "en": {
+      "title": "A 180-pixel horizontal gesture sent the home page 756 pixels down",
+      "summary": "The same project card has to support comparing projects, opening a detail page and scrolling on to the journal. A five-pixel vertical component in a sideways gesture exposed the listener that confused them.",
+      "sections": [
+        {
+          "heading": "Looking for the second project and landing in the journal",
+          "paragraphs": [
+            "One screen down from the home-page hero, the first project is the after-sales agent and the second is the writing platform. A visitor might swipe from one to the other, click the current screenshot for details, or carry on down to the journal. All three actions can start over exactly the same image. The old gallery tilted and faded the other cards to suggest sideways movement, but using the trackpad could take the visitor straight out of the gallery.",
+            "I held the viewport at 1344 × 820, placed the pointer over the first card and sent one wheel event through Chrome’s input interface. It requested 180 pixels horizontally and just five vertically. Once the animation settled, window.scrollY had increased by 756 pixels, precisely the viewport height minus the 64-pixel navigation bar. A five-pixel input had issued a whole-section navigation command. Changing the angle or easing of the cards could have no bearing on that result."
+          ]
+        },
+        {
+          "heading": "The card and the page were listening to different events",
+          "paragraphs": [
+            "The old Carousel3D followed pointer presses, moves and releases. It calculated a fractional card position while dragging, then settled on a card on release. Holding the mouse button and dragging uses that path. Moving two fingers across a trackpad normally produces wheel events instead. Stopping a pointer event inside the gallery does nothing to the wheel listener on the surrounding page.",
+            "The source of the 756 pixels was SectionPager’s onWheel. It used the sign of deltaY to pick the next or previous section. If that section existed it prevented the browser’s normal scrolling and called scrollIntoView. It never inspected the horizontal component. An intentional downward roll outside the card and an almost horizontal gesture inside it therefore took the same branch. Consuming every wheel event over a card would solve that particular trace but leave the visitor unable to scroll on to the journal from the screenshot."
+          ]
+        },
+        {
+          "heading": "Measuring both the page and the project track",
+          "paragraphs": [
+            "The page now checks direction when an event comes from the project track. If the horizontal component is larger in magnitude, it leaves the event to the browser. Predominantly vertical motion can still move the page. The track scrolls horizontally and uses CSS Scroll Snap to align cards. A visitor can start to move sideways, let go, and stay on the current project without issuing a command to advance.",
+            "I reran the following inputs in Chrome at the same viewport size. Each starts on the first card. Page position comes from window.scrollY and track position from scrollLeft. The measured distance between adjacent card starts was about 1170 pixels. Returning to the first card on a short gesture is legitimate. Leaving the projects section during that gesture was the fault."
+          ],
+          "table": {
+            "columns": [
+              "Input",
+              "Track after settling",
+              "Page position"
+            ],
+            "rows": [
+              [
+                "Single wheel event, 180 px horizontal and 5 px vertical",
+                "0 px, first card",
+                "757 → 757 px"
+              ],
+              [
+                "Continuous 850 px horizontal gesture with 4 px of vertical movement",
+                "1170 px, second card",
+                "757 → 757 px"
+              ],
+              [
+                "Two Next clicks about 40 ms apart",
+                "2339 px, third card",
+                "757 → 757 px"
+              ]
+            ]
+          }
+        },
+        {
+          "heading": "Release a dragged link, then click it again",
+          "paragraphs": [
+            "A mouse needs a drag path of its own. Each card is a single link. Capturing the pointer on the initial press can interfere with an ordinary click. Waiting until release gives no drag feedback. The track remembers the start and takes capture only after movement reaches seven CSS pixels and is predominantly horizontal. It temporarily suspends snapping while the pointer moves, restores it on release, and suppresses the click produced by that drag. The next press clears the suppression.",
+            "Checking only that the second card appeared would miss half of the visitor’s journey. I dragged left by 95 pixels from the first card and released. The track settled at 1170, and the URL still pointed to the home page. A subsequent ordinary click opened /projects/blog-agent-platform. A gallery which changed cards correctly but swallowed that next click would still have lost the project’s entry point.",
+            "Rapid arrow clicks have a different timing problem. During a smooth scroll, the card passing through the middle of the track can differ from the requested destination. The carousel keeps that destination separately and applies the second click relative to it. Once the track arrives, selection follows the actual position again. The third row above exercises that interval between issuing a request and reaching it."
+          ]
+        },
+        {
+          "heading": "A short screen exposes one last navigation error",
+          "paragraphs": [
+            "In a 320 × 568 portrait viewport or an 844 × 390 landscape viewport, a long English title can push the controls below the bottom edge. Swiping up from the card should first reveal those controls. A pager that advances immediately would show a perfectly readable title followed by a button that nobody could reach. Before changing sections the pager checks how much of the current section is still below the viewport; on the way back it also lets the visitor reach the heading before paging up.",
+            "For a regression run I fix the starting card and record both scroll positions. A whole page of unexpected movement sends me back to the outer pager. If the track stops in the right place but the counter disagrees, I look at the target index. A URL change on release points to the click handler. The numbers above come from this desktop Chromium run. The short-screen checks used emulated touch viewports, so neither run measures the feel of momentum on a physical trackpad or phone."
+          ]
+        }
+      ]
+    }
+  }
+]

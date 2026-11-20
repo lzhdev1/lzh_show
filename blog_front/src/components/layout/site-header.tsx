@@ -20,12 +20,15 @@ export function SiteHeader() {
   const t = useTranslations("Nav");
   const pathname = usePathname();
 
-  const linkClass = (href: string) =>
-    `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-      pathname === href
-        ? "bg-muted text-foreground"
-        : "text-muted-foreground hover:text-foreground"
-    }`;
+  function navState(href: string) {
+    const current = pathname === href ? "page" : pathname.startsWith(`${href}/`) ? "location" : undefined;
+    return {
+      "aria-current": current,
+      className: `rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+        current ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+      }`,
+    } as const;
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -38,7 +41,7 @@ export function SiteHeader() {
         {/* 桌面导航 */}
         <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
           {navItems.map((item) => (
-            <Link key={item.key} href={item.href} className={linkClass(item.href)}>
+            <Link key={item.key} href={item.href} {...navState(item.href)}>
               {t(item.key)}
             </Link>
           ))}
@@ -71,7 +74,7 @@ export function SiteHeader() {
         >
           <div className="flex w-full flex-col gap-1 px-4 py-3 sm:px-6">
             {navItems.map((item) => (
-              <Link key={item.key} href={item.href} className={linkClass(item.href)}>
+              <Link key={item.key} href={item.href} {...navState(item.href)}>
                 {t(item.key)}
               </Link>
             ))}
