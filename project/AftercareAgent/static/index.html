@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f6f7f3">
+  <title>Aftercare · 售后工作台</title>
+  <link rel="stylesheet" href="/aftercare/assets/styles.css">
+  <script src="/aftercare/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span>Aftercare<span class="brand-dot">.</span></span></div>
+    <span class="top-divider"></span><span class="top-title">售后工作台</span>
+    <div class="top-status"><span class="status-light"></span><span id="mode">正在连接</span></div>
+  </header>
+  <nav class="mobile-nav" aria-label="工作台视图">
+    <button type="button" data-view="chat" aria-pressed="true">会话</button>
+    <button type="button" data-view="orders" aria-pressed="false">订单</button>
+    <button type="button" data-view="inspector" aria-pressed="false">办理详情</button>
+  </nav>
+  <main class="workspace" data-view="chat">
+    <aside class="orders-pane pane" aria-label="演示订单和常用操作">
+      <section>
+        <div class="section-line"><h2>演示订单</h2><span class="count" id="order-count">—</span></div>
+        <div id="orders" class="orders-list"></div>
+      </section>
+      <section class="shortcuts">
+        <h2>常用操作</h2>
+        <button class="shortcut" data-prompt="查询换货政策"><span class="mini-icon" aria-hidden="true">§</span>查询换货政策<span class="arrow" aria-hidden="true">↗</span></button>
+        <button class="shortcut" data-prompt="查询工单"><span class="mini-icon" aria-hidden="true">≡</span>查看已有工单<span class="arrow" aria-hidden="true">↗</span></button>
+      </section>
+      <div class="order-foot"><span class="paper-mark" aria-hidden="true"></span><div>模拟商店<span id="business-date"></span></div></div>
+    </aside>
+    <section class="chat-pane pane" aria-label="售后会话">
+      <div class="chat-header">
+        <h1>售后会话</h1>
+        <button id="reset" type="button" class="icon-button" title="重置演示" aria-label="重置演示"><span aria-hidden="true">↺</span></button>
+      </div>
+      <div id="job-banner" hidden></div>
+      <div id="sync-notice" role="status" hidden></div>
+      <div id="conversation" role="log" aria-label="会话记录" tabindex="0">
+        <div class="loading-state">正在读取会话…</div>
+      </div>
+      <div class="compose-zone">
+        <div id="proposal"></div>
+        <div id="error" role="alert" hidden></div>
+        <form id="composer">
+          <label class="sr-only" for="input">售后问题</label>
+          <textarea id="input" rows="2" maxlength="1200" placeholder="描述问题，或输入订单号…" required></textarea>
+          <div class="composer-foot"><span class="input-hint"><kbd>Enter</kbd> 发送</span><button id="send" type="submit" aria-label="发送消息"><span>发送</span><b aria-hidden="true">↑</b></button></div>
+        </form>
+      </div>
+    </section>
+    <aside class="inspector-pane pane" aria-label="办理详情">
+      <div class="section-line"><h2>办理详情</h2><span class="detail-mark" aria-hidden="true">⌘</span></div>
+      <div class="stage-card" id="progress" tabindex="-1"><div class="stage-label"><span class="status-light"></span>当前进度</div><strong id="stage">连接中</strong><p id="job-progress" hidden></p></div>
+      <section class="inspector-block"><div class="section-line"><h3>政策依据</h3><span class="count" id="citation-count">0</span></div><div id="citations"></div></section>
+      <section class="inspector-block"><div class="section-line"><h3>执行记录</h3><span class="count" id="trace-count">0</span></div><div id="trace"></div></section>
+      <section class="inspector-block"><div class="section-line"><h3>售后工单</h3><span class="count" id="ticket-count">0</span></div><div id="tickets"></div></section>
+    </aside>
+  </main>
+  <dialog id="reset-dialog" aria-labelledby="dialog-title">
+    <h2 id="dialog-title">重置演示？</h2><p>当前会话和本次演示的工单将被清空。</p>
+    <form method="dialog"><button value="cancel" autofocus>保留会话</button><button class="confirm-button" value="reset">重置演示</button></form>
+  </dialog>
+  <span id="live-status" role="status" aria-live="polite" class="sr-only"></span>
+</body>
+</html>

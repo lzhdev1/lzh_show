@@ -5,6 +5,20 @@
 #   db       — 数据库服务（选型待确认后补充）
 
 services:
+  aftercare:
+    build: ./project/AftercareAgent
+    env_file:
+      - path: ./project/AftercareAgent/.env
+        required: false
+    volumes:
+      - ./project/AftercareAgent:/service
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      default:
+        aliases: [aftercare-app]
+      shared-db: {}
+    restart: unless-stopped
+
   frontend:
     build:
       # 上下文是仓库根：镜像里同时带主站 blog_front 和游戏 project/TTFarm

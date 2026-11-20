@@ -46,6 +46,57 @@ export interface Project {
 
 export const projects: Project[] = [
   {
+    slug: "aftercare-agent",
+    title: { zh: "售后工单 Agent", en: "Aftercare Agent" },
+    summary: {
+      zh: "从一句换货请求到一张可核验的工单。试着给出模糊的商品名，看助手如何追问、核对库存并引用对应版本的售后政策。",
+      en: "Take an exchange request from a customer message to a verifiable ticket. Try an ambiguous order and inspect the tool calls, stock checks and policy clauses.",
+    },
+    techStack: ["Python", "FastAPI", "Tool Calling", "PostgreSQL", "RAG"],
+    featured: true,
+    date: "2026-11",
+    cover: "/covers/aftercare-agent.jpg",
+    coverGradient: "from-teal-700 to-emerald-400",
+    links: { demo: "/aftercare" },
+    content: {
+      zh: "在独立的模拟订单中试办换货，查看每步工具调用与引用的政策条款，确认后生成工单。",
+      en: "Try an exchange on a private set of sample orders, inspect the tools and policy evidence, then confirm the ticket.",
+    },
+    details: [
+      {
+        label: { zh: "多轮办理", en: "Conversation" },
+        value: { zh: "同款有多笔订单时先核对商品。选定订单后检查售后期限与库存，并展示办理方案。", en: "Clarify ambiguous orders, then check the exchange window and inventory before preparing a proposal." },
+      },
+      {
+        label: { zh: "政策与依据", en: "Policy evidence" },
+        value: { zh: "按订单日期匹配政策版本，每条引用都能查看条款原文。", en: "Match policy versions to the purchase date and inspect the text behind each citation." },
+      },
+      {
+        label: { zh: "工单与存储", en: "Ticket storage" },
+        value: { zh: "每位访客有独立的模拟订单、库存和工单。确认后写入 PostgreSQL，重复确认同一方案只生成一张工单。", en: "Each visitor gets isolated orders, stock and tickets. PostgreSQL records the confirmed exchange once, even if the request is retried." },
+      },
+      {
+        label: { zh: "后台任务", en: "Background jobs" },
+        value: { zh: "发送消息后可以刷新页面查看进度，或取消办理。服务重启后会继续处理排队任务；已启动的模型轮次可用本地规则恢复。", en: "Refresh to check progress or cancel a request. Queued jobs survive restarts. Interrupted model turns can finish using local policy rules." },
+      },
+    ],
+    changelog: [{
+      version: "v1.1",
+      date: "2026-11",
+      changes: {
+        zh: ["消息支持后台办理、刷新续接和取消", "增加会话限流、跨进程并发上限及重启恢复"],
+        en: ["Track and cancel background jobs across page reloads", "Added per-session rate limits, shared concurrency limits and restart recovery"],
+      },
+    }, {
+      version: "v1.0",
+      date: "2026-11",
+      changes: {
+        zh: ["支持换货对话、政策引用、工具记录和工单确认", "支持离线演示与兼容 OpenAI 工具调用的模型服务"],
+        en: ["Exchange conversations with policy evidence, tool history and ticket confirmation", "Offline demo and configurable OpenAI-compatible tool-calling models"],
+      },
+    }],
+  },
+  {
     slug: "blog-agent-platform",
     title: {
       zh: "图文 Blog 生成 Agent 平台",

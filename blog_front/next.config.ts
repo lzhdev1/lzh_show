@@ -5,6 +5,14 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [{
+      source: "/aftercare/:path*",
+      destination: "http://aftercare-app:8000/aftercare/:path*",
+    }];
+  },
+  // The aftercare tool loop has a 35-second deadline; allow it to return its fallback.
+  experimental: { proxyTimeout: 60_000 },
   /* config options here */
   // 生产镜像使用 standalone 最小运行时输出
   output: "standalone",

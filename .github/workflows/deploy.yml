@@ -42,6 +42,7 @@ jobs:
             # 只跟随远端 main，不合并、不产生冲突
             git reset --hard origin/main
 
+            python3 project/AftercareAgent/bootstrap_db.py
             docker exec -i shared-postgres psql -v ON_ERROR_STOP=1 -U ttfarm -d ttfarm < project/TTFarm/db/schema.sql
             python3 docker/migrate_articles.py
             docker compose -f docker-compose.prod.yml up -d --build
@@ -60,12 +61,12 @@ jobs:
           for i in 1 2 3 4 5; do
             code=$(curl -sL -o /dev/null -w '%{http_code}' https://lzhshow.top/ttfarm || true)
             echo "attempt $i: HTTP $code"
-            if [ "$code" = "200" ] \
+            if [ "$code" = "200" ] && curl -fsS --max-time 10 https://lzhshow.top/aftercare/health \
               && curl -fsSL --max-time 15 "https://lzhshow.top/posts/$slug" \
                 | python3 -c 'import html,sys; sys.exit(sys.argv[1] not in html.unescape(sys.stdin.read()))' "$title"; then
               exit 0
             fi
             sleep 6
           done
-          echo "site or migrated article verification failed after deploy"
+          echo "site, Aftercare, or migrated article verification failed after deploy"
           exit 1
