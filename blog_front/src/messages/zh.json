@@ -57,19 +57,102 @@
   },
   "About": {
     "title": "关于我",
-    "bioTitle": "个人简介",
-    "bio": "江汉大学人工智能专业硕士研究生（研三），研究方向为行人重识别（ReID）与模型蒸馏。拥有两段全栈开发实习经历，覆盖 Web、安卓与小程序，求职方向为 AI 应用开发工程师。",
-    "educationTitle": "教育背景",
-    "educationPeriod": "2024 – 2027",
-    "researchTitle": "研究方向",
-    "researchDesc": "行人重识别（ReID）与模型蒸馏：集成教师 + 低秩 SVD + 向量距离损失优化，在 Market1501 数据集上压缩模型的同时保持检索精度（mAP）。",
-    "internTitle": "实习经历",
-    "internDesc": "两段全栈开发实习，覆盖 Web、安卓与小程序，独立承担从需求分析、接口设计到部署上线的完整开发流程。",
-    "careerTitle": "求职意向",
-    "career": "AI 应用开发工程师",
-    "careerDesc": "熟悉 Python/FastAPI、Java/Spring Boot、Next.js/React 全栈技术，具备 RAG 应用、Agent 平台等完整项目经验。",
-    "timelineTitle": "经历时间线",
-    "timelinePlaceholder": "详细经历待补充"
+    "name": "李宗翰",
+    "role": "AI 应用与全栈开发",
+    "intro": "我在江汉大学读人工智能硕士，研究行人重识别与模型蒸馏。我喜欢把模型用进具体的工作里，做过让编辑审核后就能发布稿件的工作流，也做过能把提示词变成配音动画的教学工具。",
+    "contactLabel": "给李宗翰发邮件",
+    "projectsLabel": "查看我的作品",
+    "contentsLabel": "本页内容",
+    "educationTitle": "教育经历",
+    "education": [
+      {
+        "school": "江汉大学",
+        "degree": "硕士研究生 · 2027 届",
+        "field": "人工智能"
+      },
+      {
+        "school": "河北环境工程学院",
+        "degree": "本科",
+        "field": "物联网工程"
+      }
+    ],
+    "honorsTitle": "资质与奖项",
+    "honors": [
+      "大学英语四级（CET-4）",
+      "计算机软件著作权 1 项",
+      "全国高校计算机能力挑战赛国赛三等奖"
+    ],
+    "experienceTitle": "实习经历",
+    "productsLabel": "负责产品",
+    "experience": [
+      {
+        "company": "鲸能涌动科技有限责任公司",
+        "location": "北京",
+        "role": "AI 应用全栈开发实习生",
+        "period": "2025.07 – 2026.02",
+        "products": [
+          "布智医疗（微信小程序）",
+          "运势占卜（海外）",
+          "科普视频生成",
+          "RAG 知识库",
+          "新闻平台（海外）"
+        ],
+        "points": [
+          "独立梳理产品需求、设计系统架构，完成前后端开发和部署上线。",
+          "主导网站内容运营工作流的设计和开发。系统定时抓取信息、写入飞书多维表格并生成初稿，编辑审核通过后再进入排版和发布环节。",
+          "开发教学视频生成 Agent。用户输入提示词后，Claude Sonnet 4.5 生成 Python 动画脚本，Manim 渲染画面，ChatGPT TTS 生成与动画同步的旁白。"
+        ]
+      },
+      {
+        "company": "武汉幂思信息科技有限公司",
+        "location": "武汉",
+        "role": "全栈开发实习生",
+        "period": "2025.04 – 2025.07",
+        "products": [],
+        "points": [
+          "参与业务页面开发，与后端联调接口，编写开发文档。",
+          "参与后端业务开发、数据库操作和索引优化，完成测试并排查线上问题。"
+        ]
+      }
+    ],
+    "skillsTitle": "专业技能",
+    "skills": [
+      {
+        "name": "后端服务与部署",
+        "description": "用 Python 和 FastAPI 构建 RESTful 服务，实现 SSE 流式输出、文件上传和异步接口。编写 Dockerfile 将应用打包成 Docker 镜像，通过 Nginx 反向代理部署服务。"
+      },
+      {
+        "name": "数据库设计与优化",
+        "description": "用 MySQL 设计表结构、建立业务状态机和处理事务。通过 SQL 调优与索引优化查询，用数据快照留存历史状态。"
+      },
+      {
+        "name": "智能体开发",
+        "description": "使用 LangGraph、LangChain 独立开发 AI 智能体，把知识检索、工具调用和多 Agent 协作接入业务流程。"
+      },
+      {
+        "name": "RAG 与提示词工程",
+        "description": "基于 pgvector 搭建知识库，完成文档提取、转换与加载（ETL）、向量检索和查询增强，并针对任务设计、优化提示词。"
+      },
+      {
+        "name": "工作流自动化",
+        "description": "熟悉 n8n、Coze 和 Dify，可用可视化工作流串联内容采集、文稿生成、人工审核与发布。"
+      },
+      {
+        "name": "AI 辅助开发与扩展",
+        "description": "使用 Cursor、Claude Code 和 Codex 开发项目，熟悉 Agent Skills 和 MCP Server 的开发与发布。"
+      }
+    ],
+    "personalTitle": "自我评价",
+    "personal": [
+      "我能较快适应新项目，也习惯在几项任务并行时推进开发。做 Android 端开发期间，我还独立负责了一个 Web 项目，从前期调研、立项一直做到产品上线。",
+      "我喜欢动手试新技术。从传统开发到 vibe coding，我一直在探索和编程助手协作的方式，也在研究 Agent 的工作原理，尝试自己开发智能体、在本地部署模型。"
+    ],
+    "interestsLabel": "运动",
+    "interests": [
+      "游泳",
+      "羽毛球",
+      "乒乓球"
+    ]
   },
   "Posts": {
     "title": "开发手记",

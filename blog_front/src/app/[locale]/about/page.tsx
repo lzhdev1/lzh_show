@@ -1,99 +1,136 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-  Briefcase,
-  GraduationCap,
-  FlaskConical,
-  User,
-  Wrench,
-} from "lucide-react";
+import type { Metadata } from "next";
+import { ArrowUpRight, Award, BookOpen, Mail, MapPin } from "lucide-react";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
+import "./about.css";
 
-export default async function AboutPage({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}) {
+const email = "lzh2411829@gmail.com";
+type AboutCopy = (typeof import("@/messages/zh.json"))["About"];
+type Props = { params: Promise<{ locale: string }> };
+
+async function getProfile(locale: string) {
+  const messages = await getMessages({ locale });
+  return messages.About as AboutCopy;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const profile = await getProfile(locale);
+  return { title: `${profile.title} · ${profile.name}`, description: profile.intro };
+}
+
+export default async function AboutPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("About");
-
-  const timeline = [
-    {
-      icon: GraduationCap,
-      title: t("educationTitle"),
-      period: t("educationPeriod"),
-      desc: null,
-    },
-    {
-      icon: FlaskConical,
-      title: t("researchTitle"),
-      period: null,
-      desc: t("researchDesc"),
-    },
-    {
-      icon: Wrench,
-      title: t("internTitle"),
-      period: null,
-      desc: t("internDesc"),
-    },
-    {
-      icon: Briefcase,
-      title: t("careerTitle"),
-      period: null,
-      desc: `${t("career")} —— ${t("careerDesc")}`,
-    },
+  const profile = await getProfile(locale);
+  const contents = [
+    ["education", profile.educationTitle],
+    ["experience", profile.experienceTitle],
+    ["skills", profile.skillsTitle],
+    ["honors", profile.honorsTitle],
+    ["personal", profile.personalTitle],
   ];
 
   return (
-    <div className="w-full px-4 py-12 sm:px-6 sm:py-16">
-      {/* 头部：徽标 + 身份 */}
-      <header className="mb-12 flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:text-left">
-        <div className="relative shrink-0">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500/30 to-violet-500/30 blur-2xl" aria-hidden />
-          <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-violet-600 text-white shadow-lg">
-            <span className="text-xl font-bold tracking-widest">LZH</span>
+    <div className="about-page">
+      <div className="about-frame">
+        <div className="about-intro">
+          <header className="about-identity">
+            <p className="about-label">{profile.title}</p>
+            <h1>{profile.name}</h1>
+            <p className="about-role">{profile.role}</p>
+            <p className="about-bio">{profile.intro}</p>
+            <div className="about-actions">
+              <a className="about-email" href={`mailto:${email}`}>
+                <Mail size={17} aria-hidden="true" /><span className="sr-only">{profile.contactLabel} </span>{email}
+              </a>
+              <Link className="about-project-link" href="/projects">
+                {profile.projectsLabel}<ArrowUpRight size={17} aria-hidden="true" />
+              </Link>
+            </div>
+          </header>
+          <section id="education" className="about-education" aria-labelledby="education-title">
+            <h2 id="education-title"><BookOpen size={18} aria-hidden="true" />{profile.educationTitle}</h2>
+            <ul>
+              {profile.education.map((study) => (
+                <li key={study.school}>
+                  <h3>{study.school}</h3>
+                  <p>{study.field}<span aria-hidden="true"> · </span>{study.degree}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="about-details">
+          <aside>
+            <nav className="about-contents" aria-labelledby="contents-title">
+              <h2 id="contents-title">{profile.contentsLabel}</h2>
+              <ul>{contents.map(([id, label]) => (
+                <li key={id}><Link href={`/about#${id}`}>{label}</Link></li>
+              ))}</ul>
+            </nav>
+          </aside>
+          <div className="about-sections">
+            <section id="experience" aria-labelledby="experience-title">
+              <h2 id="experience-title">{profile.experienceTitle}</h2>
+              <ol className="about-jobs">
+                {profile.experience.map((job) => (
+                  <li key={job.company} className="about-job">
+                    <div className="about-job-meta">
+                      <span className="about-period">{job.period}</span>
+                      <span className="about-place"><MapPin size={13} aria-hidden="true" />{job.location}</span>
+                    </div>
+                    <h3>{job.company}</h3>
+                    <p className="about-job-role">{job.role}</p>
+                    {job.products.length > 0 && (
+                      <div className="about-products">
+                        <span>{profile.productsLabel}</span>
+                        <ul>{job.products.map((product) => <li key={product}>{product}</li>)}</ul>
+                      </div>
+                    )}
+                    <ul className="about-contributions">
+                      {job.points.map((point) => <li key={point}>{point}</li>)}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section id="skills" aria-labelledby="skills-title">
+              <h2 id="skills-title">{profile.skillsTitle}</h2>
+              <dl className="about-skills">
+                {profile.skills.map((skill) => (
+                  <div key={skill.name}>
+                    <dt>{skill.name}</dt>
+                    <dd>{skill.description}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section id="honors" aria-labelledby="honors-title">
+              <h2 id="honors-title">{profile.honorsTitle}</h2>
+              <ul className="about-honors">
+                {profile.honors.map((honor) => (
+                  <li key={honor}><Award size={18} aria-hidden="true" />{honor}</li>
+                ))}
+              </ul>
+            </section>
+
+            <section id="personal" aria-labelledby="personal-title">
+              <h2 id="personal-title">{profile.personalTitle}</h2>
+              <div className="about-personal">
+                {profile.personal.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+              </div>
+              <dl className="about-interests">
+                <dt>{profile.interestsLabel}</dt>
+                <dd><ul>{profile.interests.map((interest) => <li key={interest}>{interest}</li>)}</ul></dd>
+              </dl>
+            </section>
           </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {t("title")}
-          </h1>
-          <p className="mt-2 text-muted-foreground">{t("bio")}</p>
-        </div>
-      </header>
-
-      {/* 经历时间线 */}
-      <section>
-        <h2 className="mb-6 text-xl font-semibold">{t("timelineTitle")}</h2>
-        <ol className="relative space-y-8 border-l pl-6">
-          {timeline.map((item) => {
-            const Icon = item.icon;
-            return (
-              <li key={item.title} className="relative">
-                {/* 时间线节点 */}
-                <span className="absolute -left-[34px] flex h-5 w-5 items-center justify-center rounded-full border bg-background">
-                  <span className="h-2 w-2 rounded-full bg-primary" />
-                </span>
-                <div className="rounded-xl border bg-card p-5 transition-colors hover:border-border/60">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary" />
-                    <h3 className="font-semibold">{item.title}</h3>
-                    {item.period && (
-                      <span className="ml-auto rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
-                        {item.period}
-                      </span>
-                    )}
-                  </div>
-                  {item.desc && (
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {item.desc}
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+      </div>
     </div>
   );
 }
