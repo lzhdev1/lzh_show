@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { buildSky, type SkyWeather } from "./atmosphere";
 
 export interface SceneView {
   renderer: THREE.WebGLRenderer;
@@ -7,6 +7,7 @@ export interface SceneView {
   camera: THREE.PerspectiveCamera;
   /** 主光：阴影跟人走，所以 loop 每帧要把它搬到人物附近 */
   keyLight: THREE.DirectionalLight;
+  updateWeather: (weather: SkyWeather) => void;
   resize: () => void;
   dispose: () => void;
 }
@@ -18,52 +19,24 @@ export const CAMERA_HOME = new THREE.Vector3(14.9, 15.9, 14.9);
 export const CAMERA_TARGET = new THREE.Vector3(0, 0.6, 0.6);
 
 export function createView(canvas: HTMLCanvasElement): SceneView {
+  const compact = window.matchMedia("(pointer: coarse)").matches;
+  const maxRatio = Math.min(window.devicePixelRatio || 1, compact ? 1.35 : 1.75);
+  let ratio = maxRatio;
   const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-    powerPreference: "high-performance",
+    canvas, antialias: !compact || window.devicePixelRatio <= 1.5, alpha: false, powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  // three r187 起 PCFSoftShadowMap 已被移除，柔化交给 light.shadow.radius
   renderer.shadowMap.type = THREE.PCFShadowMap;
-  // 卡通场景要的是干净饱和的色块，ACES 会把中间调和饱和度压灰，改用 Neutral
+  renderer.shadowMap.autoUpdate = false;
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 1.04;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.setClearAlpha(0);
 
   const scene = new THREE.Scene();
-
-  // 天空：一段由浅蓝到近白的竖向渐变，比单色背景更像晴天
-  const skyCanvas = document.createElement("canvas");
-  skyCanvas.width = 4;
-  skyCanvas.height = 256;
-  const skyCtx = skyCanvas.getContext("2d")!;
-  const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 256);
-  skyGrad.addColorStop(0, "#8fd0f5");
-  skyGrad.addColorStop(0.55, "#c9e9fb");
-  skyGrad.addColorStop(1, "#f2fbff");
-  skyCtx.fillStyle = skyGrad;
-  skyCtx.fillRect(0, 0, 4, 256);
-  const skyTex = new THREE.CanvasTexture(skyCanvas);
-  skyTex.colorSpace = THREE.SRGBColorSpace;
-  scene.background = skyTex;
-  // 雾：方形地图边长 300 米，雾线必须推到山外，否则走到地图边上远山就糊成白墙
-  // 雾只吃远景：草原一滴雾都不要，草地一发白整张图就塌了
-  scene.fog = new THREE.Fog(0xdaf1fb, 210, 620);
-
-  // 程序化环境光（RoomEnvironment）：不下载任何 HDR 文件，给材质一层柔和反射，
-  // 卡通材质上只取一点点，避免画面被反射洗白
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const roomEnv = new RoomEnvironment();
-  const envMap = pmrem.fromScene(roomEnv, 0.04).texture;
-  scene.environment = envMap;
-  scene.environmentIntensity = 0.5;
-  roomEnv.dispose();
-  pmrem.dispose();
+  const sky = buildSky();
+  scene.add(sky.sky);
+  const fog = new THREE.Fog(0xdce8da, 48, 310);
+  scene.fog = fog;
 
   // 透视相机：构图的自由度交给 OrbitControls，这里只给一个成立的初始机位
   const camera = new THREE.PerspectiveCamera(FIELD_FOV, 1, 0.1, 1400);
@@ -75,19 +48,20 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     const height = window.innerHeight;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(ratio);
     renderer.setSize(width, height);
   };
 
   // 光效关系：天空补光让暗部仍能读出结构，暖主光给出形体与投影方向，
   // 冷补光从侧后剥开轮廓，最后加一盏低强度暖轮廓光把角色头顶和长发边缘挑亮
-  const hemi = new THREE.HemisphereLight(0xdff2ff, 0x9ad06b, 1.55);
+  const hemi = new THREE.HemisphereLight(0xfff2e4, 0xa0bca3, 1.55);
   scene.add(hemi);
 
   const keyLight = new THREE.DirectionalLight(0xfff3d6, 2.5);
   keyLight.position.set(9.5, 15, 7.5);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(2048, 2048);
+  const shadowSize = compact ? 1024 : 1536;
+  keyLight.shadow.mapSize.set(shadowSize, shadowSize);
   // 地图边长 300 米，一张 2048 贴图铺不下全场：阴影相机只罩人物周围 68×68，
   // loop 每帧把主光和人一起搬，走到哪阴影跟到哪
   keyLight.shadow.camera.left = -34;
@@ -101,7 +75,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   scene.add(keyLight);
   scene.add(keyLight.target);
 
-  const fillLight = new THREE.DirectionalLight(0xcfe6ff, 0.85);
+  const fillLight = new THREE.DirectionalLight(0xdcebf3, 0.72);
   fillLight.position.set(-9, 6, -7);
   scene.add(fillLight);
 
@@ -110,17 +84,53 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   rimLight.position.set(-3.5, 4.2, -11);
   scene.add(rimLight);
 
-  // 地面反光：极弱的一层暖色，避免裙摆与鞋底死黑
-  const bounceLight = new THREE.HemisphereLight(0xffe7bd, 0x6c7c4c, 0.3);
-  scene.add(bounceLight);
-
+  const clearFog = new THREE.Color(0xdce8da);
+  const rainFog = new THREE.Color(0xb3c5cb);
+  const sun = new THREE.Color(0xffebca);
+  const overcast = new THREE.Color(0xd4e3ee);
+  let lastFrame = 0, lastShadow = -1000, sampleTime = 0, samples = 0;
+  let skyLight = 0;
+  const updateWeather = (weather: SkyWeather) => {
+    const now = performance.now();
+    const ms = now - lastFrame;
+    lastFrame = now;
+    const target = weather === "rain" ? 1 : weather === "cloudy" ? 0.56 : 0;
+    skyLight = THREE.MathUtils.damp(skyLight, target, 1.6, Math.min(ms * 0.001, 1));
+    sky.uniforms.weather.value = skyLight;
+    sky.uniforms.t.value = now * 0.001;
+    keyLight.color.lerpColors(sun, overcast, skyLight);
+    keyLight.intensity = 2.15 - skyLight * 1.40;
+    hemi.intensity = 1.65 + skyLight * 0.18;
+    rimLight.intensity = 0.84 - skyLight * 0.50;
+    fog.color.lerpColors(clearFog, rainFog, skyLight);
+    fog.far = 310 - skyLight * 103;
+    if (now - lastShadow >= (compact ? 60 : 32)) {
+      renderer.shadowMap.needsUpdate = true;
+      lastShadow = now;
+    }
+    // Measure wall-clock frame cost, including the GPU, and avoid reacting to a
+    // single shader compile, tab switch or garbage collection pause.
+    if (ms > 0 && ms < 200) { sampleTime += ms; samples++; }
+    if (sampleTime > 2400) {
+      const mean = sampleTime / samples;
+      const floor = Math.min(maxRatio, compact ? 0.75 : 0.85);
+      const next = THREE.MathUtils.clamp(ratio + (mean > 25 ? -0.15 : mean < 17.2 ? 0.075 : 0), floor, maxRatio);
+      if (next !== ratio) {
+        ratio = next;
+        renderer.setPixelRatio(ratio);
+      }
+      sampleTime = 0;
+      samples = 0;
+    }
+  };
 
   resize();
   window.addEventListener("resize", resize);
 
   const dispose = () => {
     window.removeEventListener("resize", resize);
-    envMap.dispose();
+    sky.dispose();
+    keyLight.shadow.dispose();
     renderer.dispose();
   };
 
@@ -129,6 +139,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     scene,
     camera,
     keyLight,
+    updateWeather,
     resize,
     dispose,
   };

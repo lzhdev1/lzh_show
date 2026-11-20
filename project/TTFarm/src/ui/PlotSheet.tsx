@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { CROPS } from "../game/crops";
+import { CROPS, produceName, producePrice } from "../game/crops";
+import { MUTATIONS, WEATHER, weatherAt } from "../game/weather";
 import { formatRemain, growthProgress, isReady, MAX_WATER, remainingMs } from "../game/growth";
 import { LAND_PRICES, START_UNLOCKED, useGame } from "../game/state";
 import { useClock } from "../game/clock";
@@ -23,6 +24,7 @@ export function PlotSheet({ onOpenShop }: { onOpenShop: () => void }) {
 
   const close = () => selectPlot(null);
   const seed = CROPS[selectedSeed];
+  const conditions = WEATHER[weatherAt(now)];
 
   let title = "";
   let subtitle = "";
@@ -60,10 +62,10 @@ export function PlotSheet({ onOpenShop }: { onOpenShop: () => void }) {
     const def = CROPS[plot.crop];
     const ready = isReady(plot, now);
     progress = growthProgress(plot, now);
-    title = `${def.name}${ready ? " · 成熟了" : " · 生长中"}`;
+    title = `${produceName(def, plot.mutation)}${ready ? " · 成熟了" : " · 生长中"}`;
     const remain = remainingMs(plot, now);
     subtitle = ready
-      ? `可以收获 ${def.yields} 份，卖 ${def.sellPrice} 金币/份`
+      ? `可以收获 ${def.yields} 份，卖 ${producePrice(def, plot.mutation)} 金币/份`
       : `还需 ${formatRemain(remain ?? 0)} · 已浇水 ${plot.watered}/${MAX_WATER}`;
 
     action = ready ? (
@@ -106,6 +108,10 @@ export function PlotSheet({ onOpenShop }: { onOpenShop: () => void }) {
         <div className="sheet-meta">
           <strong>{title}</strong>
           <span className="muted small">{subtitle}</span>
+          {plot.unlocked && !plot.crop && (
+            <span className="muted small">{conditions.label}播种有 {Math.round(conditions.chance * 100)}% 概率出现{MUTATIONS[conditions.mutation].label}变异</span>
+          )}
+          {plot.mutation && <span className={`variety-mark ${plot.mutation}`}>{MUTATIONS[plot.mutation].label}变异 · 售价 ×{MUTATIONS[plot.mutation].multiplier}</span>}
           {progress !== null && (
             <div className="bar" aria-hidden>
               <i style={{ width: `${Math.round(progress * 100)}%` }} />

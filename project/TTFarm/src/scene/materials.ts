@@ -6,9 +6,9 @@ import * as THREE from "three";
  * 想换配色只改这里的色值即可，整套场景会跟着变。
  */
 export const PALETTE = {
-  grass: 0x8ed15c,
-  grassLight: 0xa7e072,
-  grassDark: 0x7cc14e,
+  grass: 0x98bc77,
+  grassLight: 0xb4c986,
+  grassDark: 0x87ad72,
   soil: 0xa9744a,
   soilWet: 0x85583a,
   soilGrass: 0x93c466,
@@ -26,8 +26,8 @@ export const PALETTE = {
   flowerPink: 0xff9db8,
   flowerYellow: 0xffd34d,
   // 远山：比草地深一号的青绿，尖顶 + flatShading 的棱面才立得住
-  mountain: 0x5da56a,
-  mountainDark: 0x3f8050,
+  mountain: 0x819a99,
+  mountainDark: 0x6b8e84,
 } as const;
 
 export interface ClayOptions {

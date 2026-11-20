@@ -42,6 +42,7 @@ jobs:
             # 只跟随远端 main，不合并、不产生冲突
             git reset --hard origin/main
 
+            docker exec -i shared-postgres psql -v ON_ERROR_STOP=1 -U ttfarm -d ttfarm < project/TTFarm/db/schema.sql
             docker compose -f docker-compose.prod.yml up -d --build
             docker image prune -f >/dev/null 2>&1 || true
 

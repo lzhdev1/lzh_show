@@ -1,4 +1,5 @@
-import { CROP_LIST, levelFromXp } from "../game/crops";
+import { CROP_LIST, harvestLots, harvestValue, levelFromXp } from "../game/crops";
+import "./varieties.css";
 import { useGame } from "../game/state";
 import { CloseIcon, CoinIcon, CropIcon } from "./icons";
 
@@ -19,8 +20,8 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
   const sellAll = useGame((s) => s.sellAll);
 
   const level = levelFromXp(xp);
-  const total = CROP_LIST.reduce((sum, crop) => sum + harvest[crop.id] * crop.sellPrice, 0);
-  const hasHarvest = CROP_LIST.some((crop) => harvest[crop.id] > 0);
+  const lots = harvestLots(harvest);
+  const total = harvestValue(harvest);
 
   return (
     <div className="modal-scrim" onClick={onClose}>
@@ -63,20 +64,20 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
         </ul>
 
         <h3 className="section-title">收成</h3>
-        {hasHarvest ? (
+        {lots.length > 0 ? (
           <ul className="list">
-            {CROP_LIST.filter((crop) => harvest[crop.id] > 0).map((crop) => (
-              <li key={crop.id} className="row">
+            {lots.map(({ key, crop, name, price, count, mutation }) => (
+              <li key={key} className="row">
                 <span className="row-icon">
                   <CropIcon crop={crop.id} />
                 </span>
                 <div className="row-main">
-                  <strong>{crop.name}</strong>
+                  <strong className={mutation ? `variety-mark ${mutation}` : ""}>{name}</strong>
                   <span className="muted small">
-                    {crop.sellPrice} 金币/份 · 共 {harvest[crop.id] * crop.sellPrice} 金币
+                    {price} 金币/份 · 共 {count * price} 金币
                   </span>
                 </div>
-                <span className="owned">×{harvest[crop.id]}</span>
+                <span className="owned">×{count}</span>
               </li>
             ))}
           </ul>

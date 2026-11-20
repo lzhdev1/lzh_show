@@ -273,12 +273,12 @@ export const projects: Project[] = [
     cover: "/covers/ttfarm.jpg",
     coverGradient: "from-lime-500 to-emerald-600",
     links: {
-      demo: "https://lzhshow.top/ttfarm/",
+      demo: "/ttfarm/",
       source: "https://github.com/lzhdev1",
     },
     content: {
-      zh: "## 项目简介\n\n一个纯静态的网页 3D 农场游戏，打开就能玩，进度存在浏览器里。\n\n- 12 块地、6 种作物，按等级逐步解锁\n- 买种子 → 播种 → 浇水 → 收获 → 卖菜 → 扩地的完整循环\n- 可操控角色：点地块自动寻路，也可以 WASD 自由走\n- 昵称可改、4 套角色形象随时切换\n- 离线期间按时间戳继续生长，刷新不丢进度",
-      en: "## Overview\n\nA static 3D farming game that runs in the browser, with progress saved locally.\n\n- 12 plots and 6 crops, unlocked as you level up\n- Full loop: buy seeds → plant → water → harvest → sell → expand\n- Controllable character: tap a plot to walk there, or move freely with WASD\n- Editable nickname and 4 switchable avatars\n- Crops keep growing while offline via timestamps; refresh-safe saves",
+      zh: "## 项目简介\n\n在山谷农场种植六种作物，跟着天气培育变异品种。账号存档可以跨设备继续。\n\n- 30 块地、6 种作物，按等级逐步解锁\n- 买种子 → 播种 → 浇水 → 收获 → 卖菜 → 扩地的完整循环\n- 点击地块前往，或用键盘、触屏摇杆自由走跑跳\n- 晴天、多云和阵雨各有对应的变异品种\n- 离线期间按时间戳继续生长，刷新不丢进度",
+      en: "## Overview\n\nGrow six crops in a mountain valley, raise weather-dependent varieties and continue on another device with your farm account.\n\n- 30 plots and 6 crops, unlocked as you level up\n- Full loop: buy seeds → plant → water → harvest → sell → expand\n- Tap to walk to plots, or walk, run and jump with keyboard or touch controls\n- Sun, cloud and rain each favor a different crop variety\n- Crops keep growing while offline via timestamps; refresh-safe saves",
     },
     details: [
       {
@@ -291,22 +291,22 @@ export const projects: Project[] = [
       {
         label: { zh: "3D 表现", en: "3D Rendering" },
         value: {
-          zh: "Three.js 透视相机 + 自由环绕视角（低到贴地、拉到俯视、远推 46 单位），程序化低模场景（谷仓、水井、栅栏），每块地 4 株作物、4 个生长阶段；逆光轮廓光 + 地面反射光 + 加法混合的光尘",
-          en: "Three.js perspective camera with a wide free-orbit range (from ground level to top-down, out to 46 units) over a procedural low-poly scene (barn, well, fences); 4 plants per plot across 4 growth stages, lit by a rim light, ground bounce and additive dust motes",
+          zh: "可环绕的山谷农场，有流动的河面、木桥和随天气转动的风车。田里的作物经历四个生长阶段，变异后呈现不同的色泽。",
+          en: "Orbit the valley farm, follow the river across a wooden bridge and watch the windmill turn as the weather changes. Crops have four growth stages and distinct colors for each variety.",
         },
       },
       {
         label: { zh: "角色系统", en: "Character" },
         value: {
-          zh: "点击地块自动寻路到地边并弹出操作卡；主角小穗是贴图化的日系长发少女（卡通着色 + 描边 + 程序化百褶裙与双马尾摆动），昵称与形象改动会同步到 3D 模型",
-          en: "Tap a plot to path to its edge and open the action sheet; the heroine is a textured anime girl — toon shading, outlines, procedural pleated skirt and swaying twin tails — with nickname and avatar changes synced to the model",
+          zh: "小穗使用 VRM 骨骼模型，支持步行、奔跑和跳跃。移动端可以用左手摇杆控制步速，右手同时操作镜头或跳跃。",
+          en: "Walk, run and jump with Xiaosui’s animated VRM avatar. On touchscreens the left stick sets your pace while the other hand can orbit the camera or jump.",
         },
       },
       {
         label: { zh: "存档与部署", en: "Save & Deploy" },
         value: {
-          zh: "localStorage 存档 + 时间戳推导离线生长；构建产物并入作品集主站，同域名同端口，无独立容器",
-          en: "localStorage saves with timestamp-based offline growth; the build ships inside the portfolio site itself — same domain, same port, no extra container",
+          zh: "浏览器缓存和 PostgreSQL 账号存档记录作物与品相。离线期间继续生长，游戏随主站容器发布。",
+          en: "Browser and PostgreSQL account saves retain crops and varieties. Plants grow while offline and the game ships with the portfolio container.",
         },
       },
     ],

@@ -1,4 +1,6 @@
-/** 作物配置表：数值是 demo 用的，后续可整体替换而不影响逻辑 */
+import { MUTATIONS, type Mutation } from "./weather";
+
+/** 作物配置表 */
 export type CropId =
   | "radish"
   | "cabbage"
@@ -104,6 +106,36 @@ export const CROPS: Record<CropId, CropDef> = {
 };
 
 export const CROP_LIST = Object.values(CROPS);
+
+export function harvestKey(id: CropId, mutation: Mutation | null): string {
+  return mutation ? `${id}:${mutation}` : id;
+}
+
+export function produceName(crop: CropDef, mutation: Mutation | null): string {
+  return mutation ? MUTATIONS[mutation].label + crop.name : crop.name;
+}
+
+export function producePrice(crop: CropDef, mutation: Mutation | null): number {
+  return crop.sellPrice * (mutation ? MUTATIONS[mutation].multiplier : 1);
+}
+
+const varieties: (Mutation | null)[] = [null, "amber", "mist", "pearl"];
+const produce = CROP_LIST.flatMap((crop) => varieties.map((mutation) => ({
+  key: harvestKey(crop.id, mutation),
+  crop,
+  mutation,
+  name: produceName(crop, mutation),
+  price: producePrice(crop, mutation),
+})));
+
+export function harvestLots(harvest: Record<string, number>) {
+  return produce.filter((item) => harvest[item.key] > 0)
+    .map((item) => ({ ...item, count: harvest[item.key] }));
+}
+
+export function harvestValue(harvest: Record<string, number>): number {
+  return harvestLots(harvest).reduce((sum, item) => sum + item.price * item.count, 0);
+}
 
 /** 等级阈值：index 即等级 - 1 */
 export const LEVEL_XP = [0, 30, 80, 150, 250, 400];

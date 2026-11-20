@@ -1,8 +1,10 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { PLOT_COLS, PLOT_ROWS } from "../game/state";
 import type { CropId } from "../game/crops";
-import { cropStage, growthProgress, isReady } from "../game/growth";
-import { createCropModel, type CropModel } from "./crops3d";
+import { cropStage, growthProgress } from "../game/growth";
+import { createCropLibrary } from "./crops3d";
+import type { Mutation } from "../game/weather";
 import { PALETTE, clay } from "./materials";
 import { lumpy } from "./models";
 import type { PlotState } from "../game/growth";
@@ -19,27 +21,69 @@ export const PLOT_SIZE = PLOT_SPACING;
 /** 田垄中央比田埂高出的高度 */
 export const BED_HEIGHT = 0.34;
 
-/** 田垄横截面：中间高、两侧塌成坡，边缘留一点土坎，和邻地块接成一片 */
-export function bedHeightAt(nx: number, nz: number): number {
-  const fall = Math.max(0, 1 - Math.pow(Math.abs(nx), 4)) * Math.max(0, 1 - Math.pow(Math.abs(nz), 4));
-  return 0.015 + BED_HEIGHT * Math.pow(fall, 0.9);
+// 两条菜垄位于四株作物的正下方，中央犁沟与田间小径的深度也用于脚底碰撞。
+function furrowAt(nx: number, nz: number): number {
+  const phase = nx * (PLOT_SIZE / 2) * Math.PI / 0.49 + Math.sin(nz * 3.2) * 0.13;
+  return Math.pow(0.5 + 0.5 * Math.cos(phase), 1.35);
 }
 
-function createBedGeometry(size: number, segments = 18): THREE.BufferGeometry {
-  const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+export function bedHeightAt(nx: number, nz: number, tilled = true): number {
+  const fall = Math.max(0, 1 - nx ** 4) * Math.max(0, 1 - nz ** 4);
+  const mound = tilled ? BED_HEIGHT - 0.135 * furrowAt(nx, nz) : 0.19;
+  return 0.015 + mound * Math.pow(fall, 0.85);
+}
+
+// 顶点色沿垄背提亮、沿沟底压暗。草皮取世界坐标调色，让相邻地块连成一片。
+function createBedGeometry(tilled: boolean, offset: THREE.Vector3): THREE.PlaneGeometry {
+  const geo = new THREE.PlaneGeometry(PLOT_SIZE, PLOT_SIZE, tilled ? 32 : 16, 14);
   geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const half = size / 2;
-  for (let i = 0; i < pos.count; i += 1) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    const nx = x / half;
-    const nz = z / half;
-    // 起伏也要压到边缘为 0，否则相邻地块边缘对不上又会出现缝
-    const fall = Math.max(0, 1 - Math.pow(Math.abs(nx), 4)) * Math.max(0, 1 - Math.pow(Math.abs(nz), 4));
-    const wobble = Math.sin(x * 2.4 + z * 1.9) * 0.012 + Math.sin(z * 3.3 + x * 0.7) * 0.008;
-    pos.setY(i, 0.015 + BED_HEIGHT * Math.pow(fall, 0.9) + wobble * fall);
+  const pos = geo.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const dark = new THREE.Color(tilled ? 0xbeb1a1 : 0x89a36b);
+  const light = new THREE.Color(tilled ? 0xfff6e0 : 0xb1c58a);
+  const color = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const nx = x * 2 / PLOT_SIZE, nz = z * 2 / PLOT_SIZE;
+    const wx = x + offset.x, wz = z + offset.z;
+    const brush = Math.sin(2.1 * wx - wz) * 0.09 + Math.sin(5.9 * wx + 2.8 * wz) * 0.052;
+    const grain = Math.sin(wx * 21 + wz * 12) * Math.sin(wx * 9 - wz * 7);
+    const edge = Math.max(0, 1 - nx ** 6) * Math.max(0, 1 - nz ** 6);
+    const value = tilled
+      ? 0.27 + (1 - furrowAt(nx, nz)) * 0.46 + brush + grain * 0.075
+      : 0.5 + 0.24 * Math.sin(wx * 0.7 + wz * 1.4) + brush + grain * 0.04;
+    pos.setY(i, bedHeightAt(nx, nz, tilled) + (brush * 0.044 + grain * 0.002) * edge);
+    color.copy(dark).lerp(light, THREE.MathUtils.clamp(value, 0, 1)).toArray(colors, i * 3);
   }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createGrassClump(): THREE.BufferGeometry {
+  const p: number[] = [], rgb: number[] = [];
+  const shade = new THREE.Color(0x6f925e), mid = new THREE.Color(0x95b66a), sun = new THREE.Color(0xc2cc82);
+  function vertex(x: number, y: number, z: number, color: THREE.Color) {
+    p.push(x, y, z);
+    rgb.push(color.r, color.g, color.b);
+  }
+  for (let blade = 0; blade < 9; blade++) {
+    const a = blade * 2.4;
+    const dx = Math.sin(a), dz = Math.cos(a);
+    const r = 0.035 + blade % 3 * 0.019;
+    const reach = 0.09 + blade % 4 * 0.045;
+    const tall = 0.14 + blade % 3 * 0.085;
+    const w = 0.018 + blade % 3 * 0.006;
+    const bx = dx * r, bz = dz * r;
+    const mx = bx + dx * reach * 0.42, mz = bz + dz * reach * 0.42;
+    const tx = bx + dx * reach, tz = bz + dz * reach;
+    vertex(bx - dz*w, 0, bz + dx*w, shade); vertex(mx - dz*w, tall*0.7, mz + dx*w, mid); vertex(bx + dz*w, 0, bz - dx*w, shade);
+    vertex(bx + dz*w, 0, bz - dx*w, shade); vertex(mx - dz*w, tall*0.7, mz + dx*w, mid); vertex(mx + dz*w, tall*0.7, mz - dx*w, mid);
+    vertex(mx - dz*w, tall*0.7, mz + dx*w, mid); vertex(tx, tall, tz, sun); vertex(mx + dz*w, tall*0.7, mz - dx*w, mid);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(rgb, 3));
   geo.computeVertexNormals();
   return geo;
 }
@@ -57,12 +101,13 @@ export interface PlotVisual {
   id: number;
   group: THREE.Group;
   soil: THREE.Mesh;
-  soilMat: THREE.MeshStandardMaterial;
-  crops: CropModel[];
+  meadow: THREE.BufferGeometry;
+  bed: THREE.BufferGeometry;
+  cropMesh: THREE.InstancedMesh | null;
   cropId: CropId | null;
-  tufts: THREE.Mesh[];
-  /** 开垦后土面上才出现的土斑与碎土 */
-  details: THREE.Mesh[];
+  stage: number;
+  mutation: Mutation | null;
+  tufts: THREE.InstancedMesh;
   readyRing: THREE.Mesh;
   selectRing: THREE.Mesh;
 }
@@ -71,25 +116,42 @@ export interface Plots {
   group: THREE.Group;
   visuals: PlotVisual[];
   meshes: THREE.Mesh[];
+  library: ReturnType<typeof createCropLibrary>;
+  materials: ReturnType<typeof createFieldMaterials>;
 }
 
-/** 三种土面状态共用材质，卡通色块直接给颜色，不贴图 */
-let soilMats: { empty: THREE.MeshStandardMaterial; dry: THREE.MeshStandardMaterial; wet: THREE.MeshStandardMaterial } | null = null;
-function getSoilMats() {
-  if (!soilMats) {
-    soilMats = {
-      // 未开垦：草色盖着土
-      empty: clay(PALETTE.soilGrass, { roughness: 0.95 }),
-      // 已翻好的干土
-      dry: clay(PALETTE.soil, { roughness: 0.95 }),
-      // 浇过水的湿土：更深更暖
-      wet: clay(PALETTE.soilWet, { roughness: 0.9 }),
-    };
+function createFieldMaterials() {
+  // 一张小纹理给全部土面叠上断续细笔触。近看有颗粒，缩远时 mipmap 会将其柔化。
+  const size = 128;
+  const pixels = new Uint8Array(size * size * 4);
+  for (let i = 0; i < pixels.length; i += 4) {
+    const tone = between(231, 248);
+    pixels.set([tone, tone, tone, 255], i);
   }
-  return soilMats;
+  for (let i = 0; i < 250; i++) {
+    const x = Math.floor(between(0, size)), y = Math.floor(between(0, size));
+    const length = between(2, 7), drift = between(-0.45, 0.45);
+    const tone = i % 3 === 0 ? 199 : 255;
+    for (let j = 0; j < length; j++) {
+      const u = (x + Math.round(j * drift) + size) % size, v = (y + j) % size;
+      pixels.set([tone, tone, tone, 255], 4 * (v * size + u));
+    }
+  }
+  const grain = new THREE.DataTexture(pixels, size, size);
+  grain.magFilter = THREE.LinearFilter;
+  grain.minFilter = THREE.LinearMipmapLinearFilter;
+  grain.generateMipmaps = true;
+  grain.needsUpdate = true;
+  return {
+    empty: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    dry: new THREE.MeshLambertMaterial({ color: 0xc28f6c, vertexColors: true, map: grain }),
+    wet: new THREE.MeshLambertMaterial({ color: 0x936b54, vertexColors: true, map: grain }),
+    foliage: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, vertexColors: true }),
+  };
 }
 
 const SELECT_COLOR = 0xfff4cf;
+const cropStamp = new THREE.Object3D();
 
 export function createPlots(): Plots {
   const group = new THREE.Group();
@@ -99,44 +161,44 @@ export function createPlots(): Plots {
   const meshes: THREE.Mesh[] = [];
 
   // 田垄：一整条土坡，中间高两侧塌，相邻地块边缘相接，看不到缝
-  const soilGeo = createBedGeometry(PLOT_SIZE);
-  const SOIL_MATS = getSoilMats();
-  const readyGeo = new THREE.RingGeometry(0.98, 1.12, 32);
-  const selectGeo = new THREE.RingGeometry(1.55, 1.72, 4);
-  const tuftGeo = new THREE.ConeGeometry(0.1, 0.28, 6);
-  const tuftMat = clay(PALETTE.leafDark, { roughness: 0.9 });
-  // 土面细节：细碎的土颗粒，撒在表面做质感，不用大块色斑（会像污渍）
-  const clodGeo = lumpy(0.045, 1, 0.25);
-  const clodMat = clay(0x8a5a38, { roughness: 0.95 });
+  const materials = createFieldMaterials();
+  const arcs = Array.from({ length: 4 }, (_, i) =>
+    new THREE.RingGeometry(0.99, 1.02, 8, 1, Math.PI * (0.18 + i / 2), 0.46)
+  );
+  const readyGeo = mergeGeometries(arcs)!;
+  arcs.forEach((arc) => arc.dispose());
+  const selectGeo = new THREE.RingGeometry(1.62, 1.68, 4);
+  const tuftGeo = createGrassClump();
+  const stamp = new THREE.Object3D();
 
   for (let id = 0; id < PLOT_COLS * PLOT_ROWS; id += 1) {
     const pos = plotPosition(id);
 
-    const soilMat = SOIL_MATS.empty;
-    const soil = new THREE.Mesh(soilGeo, soilMat);
+    const meadow = createBedGeometry(false, pos);
+    const bed = createBedGeometry(true, pos);
+    const soil = new THREE.Mesh(meadow, materials.empty);
     soil.castShadow = true;
     soil.receiveShadow = true;
     soil.userData.plotId = id;
 
     // 未开垦地块上的杂草
-    const tufts: THREE.Mesh[] = [];
-    for (let i = 0; i < 4; i += 1) {
-      const tuft = new THREE.Mesh(tuftGeo, tuftMat);
-      const a = (i / 4) * Math.PI * 2 + 0.4;
-      const tx = pos.x + Math.cos(a) * 0.55;
-      const tz = pos.z + Math.sin(a) * 0.55;
-      tuft.position.set(tx, bedHeightAt((tx - pos.x) / (PLOT_SIZE / 2), (tz - pos.z) / (PLOT_SIZE / 2)) + 0.02, tz);
-      tuft.rotation.z = (i - 1.5) * 0.15;
-      group.add(tuft);
-      tufts.push(tuft);
+    const tufts = new THREE.InstancedMesh(tuftGeo, materials.foliage, 10);
+    for (let i = 0; i < tufts.count; i += 1) {
+      const x = between(-1.14, 1.14), z = between(-1.14, 1.14);
+      stamp.position.set(pos.x + x, bedHeightAt(x * 2 / PLOT_SIZE, z * 2 / PLOT_SIZE, false), pos.z + z);
+      stamp.rotation.set(0, between(0, Math.PI * 2), between(-0.1, 0.1));
+      stamp.scale.setScalar(between(0.52, 1.08));
+      stamp.updateMatrix();
+      tufts.setMatrixAt(i, stamp.matrix);
     }
+    group.add(tufts);
 
     const readyRing = new THREE.Mesh(
       readyGeo,
       new THREE.MeshBasicMaterial({
-        color: 0xffce5c,
+        color: 0xffe3a3,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.58,
         side: THREE.DoubleSide,
         depthWrite: false,
       })
@@ -166,19 +228,6 @@ export function createPlots(): Plots {
     const holder = new THREE.Group();
     holder.position.copy(pos);
 
-    // 土面细节：十几颗细碎土粒，开垦后才出现
-    const details: THREE.Mesh[] = [];
-    for (let i = 0; i < 14; i += 1) {
-      const clod = new THREE.Mesh(clodGeo, clodMat);
-      const cx = between(-0.92, 0.92);
-      const cz = between(-0.92, 0.92);
-      clod.position.set(cx, bedHeightAt(cx / (PLOT_SIZE / 2), cz / (PLOT_SIZE / 2)) + 0.01, cz);
-      clod.scale.setScalar(between(0.6, 1.3));
-      clod.visible = false;
-      holder.add(clod);
-      details.push(clod);
-    }
-
     holder.add(soil);
     group.add(holder);
 
@@ -186,11 +235,13 @@ export function createPlots(): Plots {
       id,
       group: holder,
       soil,
-      soilMat,
+      bed,
+      meadow,
       cropId: null,
-      crops: [],
+      cropMesh: null,
+      mutation: null,
+      stage: -1,
       tufts,
-      details,
       readyRing,
       selectRing,
     });
@@ -241,7 +292,7 @@ export function createPlots(): Plots {
   if (rim.instanceColor) rim.instanceColor.needsUpdate = true;
   group.add(rim);
 
-  return { group, visuals, meshes };
+  return { group, visuals, meshes, library: createCropLibrary(), materials };
 }
 
 /** 每帧把 store 状态同步给 3D：结构变化才重建作物，其余只改显隐与颜色 */
@@ -252,70 +303,46 @@ export function updatePlots(
   now: number,
   t: number
 ): void {
+  plots.library.wind.value = t;
   for (let i = 0; i < plots.visuals.length; i += 1) {
     const visual = plots.visuals[i];
     const state = states[visual.id];
     if (!state) continue;
 
-    // 土面状态：未开垦 / 翻好的干土 / 浇过水的湿土，换共享材质而不是改颜色
-    const mats = getSoilMats();
-    if (!state.unlocked) {
-      visual.soil.material = mats.empty;
-      visual.soilMat = mats.empty;
-    } else if (state.watered > 0) {
-      visual.soil.material = mats.wet;
-      visual.soilMat = mats.wet;
-    } else {
-      visual.soil.material = mats.dry;
-      visual.soilMat = mats.dry;
-    }
-
-    visual.tufts.forEach((tuft) => {
-      tuft.visible = !state.unlocked;
-    });
-
-    // 开垦过才露出土斑和碎土，没开的还是草皮盖着
-    visual.details.forEach((detail) => {
-      detail.visible = state.unlocked;
-    });
-
-    if (state.crop !== visual.cropId) {
-      visual.crops.forEach((model) => {
-        visual.group.remove(model.group);
-        model.dispose();
-      });
-      visual.crops = [];
-      visual.cropId = state.crop;
-      if (state.crop) {
-        const spots: Array<[number, number]> = [
-          [-0.44, -0.44],
-          [0.44, -0.44],
-          [-0.44, 0.44],
-          [0.44, 0.44],
-        ];
-        spots.forEach(([x, z], index) => {
-          const model = createCropModel(state.crop as CropId);
-          model.group.position.set(x, BED_HEIGHT + 0.02, z);
-          model.group.rotation.y = (visual.id + index) * 0.7;
-          model.group.scale.setScalar(0.82);
-          visual.group.add(model.group);
-          visual.crops.push(model);
-        });
+    const mats = plots.materials;
+    visual.soil.material = state.unlocked ? (state.watered > 0 ? mats.wet : mats.dry) : mats.empty;
+    visual.soil.geometry = state.unlocked ? visual.bed : visual.meadow;
+    visual.tufts.visible = !state.unlocked;
+    const stage = state.crop ? cropStage(growthProgress(state, now)) : -1;
+    if (state.crop && (stage !== visual.stage || state.crop !== visual.cropId || state.mutation !== visual.mutation)) {
+      const geometry = plots.library.model(state.crop, stage, state.mutation);
+      if (!visual.cropMesh) {
+        const mesh = new THREE.InstancedMesh(geometry, plots.library.material, 4);
+        for (let k = 0; k < 4; k++) {
+          const x = k % 2 === 0 ? -0.49 : 0.49, z = k < 2 ? -0.49 : 0.49;
+          cropStamp.position.set(x, bedHeightAt(x * 2 / PLOT_SIZE, z * 2 / PLOT_SIZE), z);
+          cropStamp.rotation.y = (visual.id + k) * 1.8;
+          cropStamp.scale.setScalar(0.93 + (visual.id + k) % 3 * 0.055);
+          cropStamp.updateMatrix();
+          mesh.setMatrixAt(k, cropStamp.matrix);
+        }
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        visual.group.add(mesh);
+        visual.cropMesh = mesh;
       }
+      visual.cropMesh.geometry = geometry;
+      visual.cropMesh.computeBoundingSphere();
     }
+    if (visual.cropMesh) visual.cropMesh.visible = Boolean(state.crop);
+    visual.cropId = state.crop;
+    visual.mutation = state.mutation;
+    visual.stage = stage;
 
-    if (state.crop && visual.crops.length > 0) {
-      const progress = growthProgress(state, now);
-      const stage = cropStage(progress);
-      visual.crops.forEach((model) => model.sync(stage, t));
-    }
-
-    const ready = isReady(state, now);
+    const ready = stage === 3;
     visual.readyRing.visible = ready;
     if (ready) {
-      const pulse = 1 + Math.sin(t * 3.4) * 0.06;
-      visual.readyRing.scale.setScalar(pulse);
-      (visual.readyRing.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.sin(t * 3.4) * 0.2;
+      (visual.readyRing.material as THREE.MeshBasicMaterial).opacity = 0.48 + Math.sin(t * 1.8 + i * 0.6) * 0.08;
     }
 
     visual.selectRing.visible = selectedId === visual.id;
@@ -327,8 +354,18 @@ export function updatePlots(
 
 /** 释放所有地块资源（页面卸载时调用，demo 里主要防止热更新残留） */
 export function disposePlots(plots: Plots): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  plots.group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh && obj.material !== plots.library.material) geometries.add(obj.geometry);
+    if (obj instanceof THREE.InstancedMesh) obj.dispose();
+  });
+  plots.visuals.forEach(({ bed, meadow }) => { geometries.add(bed); geometries.add(meadow); });
+  geometries.forEach((geo) => geo.dispose());
+  plots.materials.dry.map?.dispose();
+  Object.values(plots.materials).forEach((material) => material.dispose());
+  plots.library.dispose();
   plots.visuals.forEach((v) => {
-    v.crops.forEach((model) => model.dispose());
-    v.soilMat.dispose();
+    (v.readyRing.material as THREE.Material).dispose();
+    (v.selectRing.material as THREE.Material).dispose();
   });
 }

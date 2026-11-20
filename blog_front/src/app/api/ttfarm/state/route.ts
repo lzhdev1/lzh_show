@@ -12,8 +12,9 @@ export async function GET(req: Request) {
 
   try {
     const pool = db();
-    await pool.query("SELECT 1 FROM users WHERE id = $1", [user.userId]);
-    const state = await loadSave(pool, user.userId, user.username);
+    const found = await pool.query<{ nickname: string }>("SELECT nickname FROM users WHERE id = $1", [user.userId]);
+    if (!found.rowCount) return Response.json({ error: "账号不存在" }, { status: 401 });
+    const state = await loadSave(pool, user.userId, found.rows[0].nickname);
     return Response.json({ state });
   } catch (error) {
     console.error("[ttfarm] 读存档失败", error);
@@ -39,14 +40,8 @@ export async function PUT(req: Request) {
     if (!found.rowCount) return Response.json({ error: "账号不存在" }, { status: 401 });
 
     save.nickname = save.nickname || found.rows[0].nickname;
-    await saveState(pool, user.userId, save);
-
-    // 昵称跟着账号走，方便别的页面展示
-    await pool.query("UPDATE users SET nickname = $2, avatar_id = $3 WHERE id = $1", [
-      user.userId,
-      save.nickname,
-      save.avatarId,
-    ]);
+    const raw = body!.state as Record<string, unknown>;
+    await saveState(pool, user.userId, save, "outfitId" in raw, "decor" in raw, "bottomId" in raw);
 
     return Response.json({ ok: true });
   } catch (error) {

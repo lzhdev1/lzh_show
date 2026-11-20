@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CROPS, CROP_LIST, type CropId, levelFromXp } from "./crops";
+import { CROPS, CROP_LIST, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
+import { isMutation, rollMutation, weatherAt } from "./weather";
 import { MAX_WATER, isReady, type PlotState } from "./growth";
+import { avatarIdOf, outfitIdOf, type AvatarId, type OutfitId } from "./appearance";
+import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
+export { AVATARS, type AvatarId } from "./appearance";
 
 export const PLOT_COLS = 6;
 export const PLOT_ROWS = 5;
@@ -21,32 +25,6 @@ export function landPriceOf(id: number): number {
   return LAND_PRICES[id - START_UNLOCKED] ?? LAND_PRICES[LAND_PRICES.length - 1];
 }
 
-export type AvatarId = "xiaosui";
-
-export interface AvatarOption {
-  id: AvatarId;
-  name: string;
-  tagline: string;
-  portrait: string;
-  /** 对应的 VRM 模型文件名（放在 public/avatars/vrm/ 下） */
-  model?: string;
-}
-
-const asset = (file: string) => `${import.meta.env.BASE_URL}avatars/${file}`;
-
-/** 目前只有这一个日系少女形象，其余占位角色已全部移除 */
-export const AVATARS: AvatarOption[] = [
-  {
-    id: "xiaosui",
-    name: "小穗",
-    tagline: "爱把菜畦排整齐",
-    portrait: asset("xiaosui.jpg"),
-    // 放 public/avatars/vrm/ 下的文件名；换成 VRoid Studio 导出的少女模型后改这里
-    // （或在游戏内的资料面板直接导入 .vrm）
-    model: "xiaosui.vrm",
-  },
-];
-
 export interface ToastItem {
   id: number;
   text: string;
@@ -58,9 +36,12 @@ interface GameData {
   xp: number;
   plots: PlotState[];
   seeds: Record<CropId, number>;
-  harvest: Record<CropId, number>;
+  harvest: Record<string, number>;
   nickname: string;
   avatarId: AvatarId;
+  outfitId: OutfitId;
+  bottomId: OutfitId;
+  decor: FarmDecor;
   selectedSeed: CropId;
 }
 
@@ -75,7 +56,8 @@ interface GameActions {
   expand: () => void;
   /** 一次扩建 count 块地（金币不够或没有空地时返回失败原因） */
   expandBy: (count: number) => boolean;
-  setProfile: (nickname: string, avatarId: AvatarId) => void;
+  setProfile: (nickname: string, avatarId: AvatarId, outfitId: OutfitId, bottomId: OutfitId) => void;
+  setDecor: (decor: FarmDecor) => void;
   resetSave: () => void;
   notify: (text: string, tone?: "ok" | "warn") => void;
   dismissToast: (id: number) => void;
@@ -101,6 +83,7 @@ function makePlots(): PlotState[] {
     crop: null,
     plantedAt: 0,
     watered: 0,
+    mutation: null,
   }));
 }
 
@@ -113,6 +96,9 @@ export function initialData(): GameData {
     harvest: emptyRecord(0),
     nickname: "农场主",
     avatarId: "xiaosui",
+    outfitId: "field",
+    bottomId: "field",
+    decor: { ...DEFAULT_DECOR },
     selectedSeed: "radish",
   };
 }
@@ -185,15 +171,18 @@ export const useGame = create<GameStore>()(
           return;
         }
         const now = Date.now();
+        const weather = weatherAt(now);
+        const mutation = rollMutation(weather);
+        const watered = weather === "rain" ? 1 : 0;
         set((s) => ({
           seeds: { ...s.seeds, [selectedSeed]: s.seeds[selectedSeed] - 1 },
           plots: s.plots.map((p) =>
             p.id === plotId
-              ? { ...p, crop: selectedSeed, plantedAt: now, watered: 0 }
+              ? { ...p, crop: selectedSeed, plantedAt: now, watered, mutation }
               : p
           ),
         }));
-        get().notify(`种下了${def.name}`);
+        get().notify(`种下了${def.name}${watered ? "，雨水已浇灌" : ""}`);
       },
 
       water: (plotId) => {
@@ -224,16 +213,17 @@ export const useGame = create<GameStore>()(
           return;
         }
         const def = CROPS[plot.crop];
+        const key = harvestKey(def.id, plot.mutation);
         const before = levelFromXp(get().xp);
         const after = levelFromXp(get().xp + def.xp);
         set((s) => ({
           xp: s.xp + def.xp,
-          harvest: { ...s.harvest, [def.id]: s.harvest[def.id] + def.yields },
+          harvest: { ...s.harvest, [key]: (s.harvest[key] ?? 0) + def.yields },
           plots: s.plots.map((p) =>
-            p.id === plotId ? { ...p, crop: null, plantedAt: 0, watered: 0 } : p
+            p.id === plotId ? { ...p, crop: null, plantedAt: 0, watered: 0, mutation: null } : p
           ),
         }));
-        get().notify(`收获${def.name} ×${def.yields}`);
+        get().notify(`收获${produceName(def, plot.mutation)} ×${def.yields}`);
         if (after > before) {
           get().notify(`升到 ${after} 级，解锁了新作物`);
         }
@@ -241,10 +231,7 @@ export const useGame = create<GameStore>()(
 
       sellAll: () => {
         const { harvest } = get();
-        let total = 0;
-        CROP_LIST.forEach((crop) => {
-          total += harvest[crop.id] * crop.sellPrice;
-        });
+        const total = harvestValue(harvest);
         if (total <= 0) {
           get().notify("仓库里没有可卖的菜", "warn");
           return;
@@ -296,10 +283,15 @@ export const useGame = create<GameStore>()(
         return true;
       },
 
-      setProfile: (nickname, avatarId) => {
+      setProfile: (nickname, avatarId, outfitId, bottomId) => {
         const trimmed = nickname.trim().slice(0, 12) || "农场主";
-        set({ nickname: trimmed, avatarId });
+        set({ nickname: trimmed, avatarId, outfitId, bottomId });
         get().notify("资料已保存");
+      },
+
+      setDecor: (decor) => {
+        set({ decor: normalizeDecor(decor) });
+        get().notify("农场装饰已保存");
       },
 
       resetSave: () => {
@@ -319,6 +311,9 @@ export const useGame = create<GameStore>()(
         harvest: s.harvest,
         nickname: s.nickname,
         avatarId: s.avatarId,
+        outfitId: s.outfitId,
+        bottomId: s.bottomId,
+        decor: s.decor,
         selectedSeed: s.selectedSeed,
       }),
       // 兼容字段缺失（版本升级、新增作物）的情况
@@ -327,16 +322,21 @@ export const useGame = create<GameStore>()(
         const base = initialData();
         const plots = base.plots.map((plot) => {
           const old = saved.plots?.find((p) => p.id === plot.id);
-          return old ? { ...plot, ...old } : plot;
+          return old ? {
+            ...plot,
+            ...old,
+            mutation: old.crop && isMutation(old.mutation) ? old.mutation : null,
+          } : plot;
         });
         return {
           ...current,
           ...base,
           ...saved,
-          // 测试期：旧存档里的金币也统一抬到测试额度，否则会被本地存档覆盖回 120
-          coins: TEST_COINS,
-          // 旧存档里可能存着已删掉的形象 id，统一收回唯一的少女形象
-          avatarId: "xiaosui",
+          coins: saved.coins ?? base.coins,
+          avatarId: avatarIdOf(saved.avatarId),
+          outfitId: outfitIdOf(saved.outfitId),
+          bottomId: outfitIdOf(saved.bottomId, outfitIdOf(saved.outfitId)),
+          decor: normalizeDecor(saved.decor),
           plots,
           seeds: { ...base.seeds, ...saved.seeds },
           harvest: { ...base.harvest, ...saved.harvest },

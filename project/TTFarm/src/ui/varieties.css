@@ -1,0 +1,8 @@
+.variety-mark {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.variety-mark.amber { color: #885717; }
+.variety-mark.mist { color: #735093; }
+.variety-mark.pearl { color: #20756e; }

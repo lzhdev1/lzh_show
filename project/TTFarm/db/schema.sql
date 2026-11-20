@@ -33,5 +33,12 @@ CREATE TABLE IF NOT EXISTS farm_states (
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
--- 常用查询：按等级排行的潜力（现在没用上，先把索引留好，避免以后加索引要锁表）
+-- 同一份脚本也可升级已有农场，旧存档会沿用原木庭院与田间工装。
+-- bottom_id 为空时，下装随 outfit_id 的整套服装。
+ALTER TABLE farm_states
+  ADD COLUMN IF NOT EXISTS outfit_id VARCHAR(32) NOT NULL DEFAULT 'field',
+  ADD COLUMN IF NOT EXISTS bottom_id VARCHAR(32),
+  ADD COLUMN IF NOT EXISTS decor JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
+CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);

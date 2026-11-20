@@ -1,18 +1,29 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { buildWaterSurface } from "./riverWater";
+import { buildSubmergedDetails } from "./riverBed";
+import { buildRain, type SkyWeather } from "./atmosphere";
+import { bakeScenery } from "./scenery";
+import { meadowGround } from "./grassGround";
+import { buildWindmill } from "./windmill";
+import { createFarmDecor } from "./farmDecor";
+import type { FarmDecor } from "../game/decor";
+import { WorldObstacles } from "./obstacles";
 import { PALETTE, clay } from "./materials";
 import {
   BRIDGE,
   FENCE_X,
   FENCE_Z,
   GATE_GAP,
-  GATE_HALF,
+  FARM_BARN,
+  FARM_MILL,
   MOUNTAIN_LINE,
-  RIVER_HALF_WIDTH,
+  RIVER_BED,
   RIVER_POINTS,
   ROAD_HALF_WIDTH,
   ROAD_POINTS,
   WORLD_HALF,
+  riverBedHeight,
   riverInfo,
   roadInfo,
 } from "./layout";
@@ -20,167 +31,18 @@ import {
 import {
   buildBarn,
   buildBush,
-  buildFenceSegment,
   buildFlower,
   buildGrassTuft,
   buildMountain,
   buildRock,
-  buildSign,
   buildTree,
   buildWell,
-  lumpy,
+  flowerGeometry,
+  flowerMaterial,
+  grassTuftGeometry,
+  grassTuftMaterial,
+  updateGrassWind,
 } from "./models";
-
-function createSignTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#fff6e2";
-  ctx.fillRect(0, 0, 512, 256);
-  ctx.strokeStyle = "#7cc14e";
-  ctx.lineWidth = 14;
-  ctx.strokeRect(16, 16, 480, 224);
-  ctx.fillStyle = "#3f7a34";
-  ctx.font = 'bold 96px "PingFang SC", "Microsoft YaHei", sans-serif';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("TT农场", 256, 116);
-  ctx.fillStyle = "#9aa86f";
-  ctx.font = 'bold 26px "Helvetica Neue", Arial, sans-serif';
-  ctx.fillText("T T F A R M", 256, 198);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
-
-/** 沿矩形四边铺围栏段，转角处补一根立柱，围栏不再是一条直线拼板 */
-function buildFenceRing(): THREE.Group {
-  const ring = new THREE.Group();
-  const segment = 1.55;
-
-  const sides: Array<{ from: THREE.Vector3; to: THREE.Vector3; open?: boolean }> = [
-    // 后墙也开一道门：农场后方那片草原不该只能绕一大圈才能到
-    { from: new THREE.Vector3(-FENCE_X, 0, -FENCE_Z), to: new THREE.Vector3(FENCE_X, 0, -FENCE_Z), open: true },
-    { from: new THREE.Vector3(FENCE_X, 0, -FENCE_Z), to: new THREE.Vector3(FENCE_X, 0, FENCE_Z) },
-    // 正面朝玩家的一边开个门，中间那段不铺围栏
-    { from: new THREE.Vector3(FENCE_X, 0, FENCE_Z), to: new THREE.Vector3(-FENCE_X, 0, FENCE_Z), open: true },
-    { from: new THREE.Vector3(-FENCE_X, 0, FENCE_Z), to: new THREE.Vector3(-FENCE_X, 0, -FENCE_Z) },
-  ];
-
-  sides.forEach(({ from, to, open }) => {
-    const dir = to.clone().sub(from);
-    const length = dir.length();
-    const count = Math.max(1, Math.round(length / segment));
-    dir.normalize();
-    const rotY = Math.atan2(dir.x, dir.z) + Math.PI / 2;
-
-    for (let i = 0; i < count; i += 1) {
-      const pieceLen = length / count;
-      const center = from.clone().addScaledVector(dir, (i + 0.5) * pieceLen);
-      // 门口留空：中间那几段围栏直接跳过
-      if (open && Math.abs(center.x) < GATE_HALF) continue;
-      const fence = buildFenceSegment(pieceLen);
-      fence.position.set(center.x, 0, center.z);
-      fence.rotation.y = rotY;
-      ring.add(fence);
-    }
-    // 转角立柱
-    const corner = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.1, 1.08, 12),
-      clay(PALETTE.wood)
-    );
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), clay(PALETTE.plank));
-    cap.position.y = 1.08;
-    cap.scale.y = 0.7;
-    corner.position.set(from.x, 0.54, from.z);
-    corner.castShadow = true;
-    cap.position.x = from.x;
-    cap.position.z = from.z;
-    cap.castShadow = true;
-    ring.add(corner);
-    ring.add(cap);
-  });
-
-  // —— 农场大门：两根门柱 + 圆木门楣 + 两扇向外敞开的木门 ——
-  const gate = new THREE.Group();
-  gate.position.set(0, 0, FENCE_Z);
-  const postH = 1.52;
-
-  [-1, 1].forEach((sign) => {
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.13, postH, 14),
-      clay(PALETTE.woodDark)
-    );
-    post.position.set(sign * GATE_HALF, postH / 2, 0);
-    post.castShadow = true;
-    gate.add(post);
-
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), clay(PALETTE.plank));
-    cap.position.set(sign * GATE_HALF, postH + 0.04, 0);
-    cap.scale.y = 0.72;
-    cap.castShadow = true;
-    gate.add(cap);
-
-    // 门柱上的斜撑：两根短斜木，给敞开的门口一点结构感
-    const bracket = new THREE.Mesh(
-      new RoundedBoxGeometry(0.62, 0.09, 0.09, 2, 0.03),
-      clay(PALETTE.woodDark)
-    );
-    bracket.position.set(sign * (GATE_HALF - 0.02), postH - 0.3, 0);
-    bracket.rotation.z = sign * 0.55;
-    bracket.castShadow = true;
-    gate.add(bracket);
-  });
-
-  // 门楣圆木
-  const lintel = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.085, 0.085, GATE_HALF * 2 + 0.6, 12),
-    clay(PALETTE.wood)
-  );
-  lintel.rotation.z = Math.PI / 2;
-  lintel.position.set(0, postH, 0);
-  lintel.castShadow = true;
-  gate.add(lintel);
-
-  // 门楣下挂一块小木牌
-  const board = new THREE.Mesh(
-    new RoundedBoxGeometry(0.62, 0.26, 0.05, 2, 0.02),
-    clay(PALETTE.cream)
-  );
-  board.position.set(0, postH - 0.26, 0);
-  board.castShadow = true;
-  gate.add(board);
-
-
-
-  ring.add(gate);
-
-  // —— 后门：两根门柱 + 一道门楣（门楣抬到人头顶上方，别做成拦路的横杆）——
-  const backGate = new THREE.Group();
-  backGate.position.set(0, 0, -FENCE_Z);
-  [-1, 1].forEach((sign) => {
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.09, 0.12, 2.05, 12),
-      clay(PALETTE.woodDark)
-    );
-    post.position.set(sign * GATE_HALF, 1.02, 0);
-    post.castShadow = true;
-    backGate.add(post);
-  });
-  const backLintel = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, GATE_HALF * 2 + 0.5, 10),
-    clay(PALETTE.wood)
-  );
-  backLintel.rotation.z = Math.PI / 2;
-  backLintel.position.set(0, 2.02, 0);
-  backLintel.castShadow = true;
-  backGate.add(backLintel);
-  ring.add(backGate);
-
-  return ring;
-}
 
 function createGlowSprite(): THREE.CanvasTexture {
   const size = 64;
@@ -239,78 +101,27 @@ function createDustMotes(): { points: THREE.Points; update: (t: number) => void 
   return { points, update };
 }
 
-/** 草地上的深浅色斑：让大平面不平，也不显脏 */
-function buildGrassPatches(): THREE.Group {
-  const group = new THREE.Group();
-  const patches: Array<[number, number, number, number]> = [
-    [-7.5, 3.2, 4.6, PALETTE.grassLight],
-    [6.4, 4.6, 3.8, PALETTE.grassDark],
-    [2.6, -6.2, 4.2, PALETTE.grassLight],
-    [-4.2, -6.6, 3.4, PALETTE.grassDark],
-    [8.2, -1.2, 3.0, PALETTE.grassLight],
-    [-8.6, -3.4, 2.8, PALETTE.grassLight],
-    // 远处的草色差：色差要小、块要碎，否则像贴在地上一块块的光斑
-    [-52, 34, 12, 0x97d765],
-    [48, 22, 10, 0x85c857],
-    [-34, -64, 13, 0x97d765],
-    [62, -58, 11, 0x85c857],
-    [-88, 6, 14, 0x97d765],
-    [96, -14, 12, 0x85c857],
-    [-66, 78, 12, 0x85c857],
-    [118, 40, 10, 0x97d765],
-    [-108, -92, 15, 0x85c857],
-    [24, 116, 11, 0x97d765],
-    [-126, 54, 13, 0x97d765],
-    [126, 96, 12, 0x85c857],
-    [-120, -30, 12, 0x97d765],
-    [14, -118, 13, 0x85c857],
-    [-58, 128, 11, 0x85c857],
-    [76, -112, 12, 0x97d765],
-    [-14, 60, 10, 0x97d765],
-    [40, -26, 9, 0x85c857],
-    [-76, -18, 11, 0x97d765],
-    [88, 118, 12, 0x85c857],
-  ];
-  patches.forEach(([x, z, r, color], i) => {
-    // 每块用两个错位的圆拼，边缘就不会是规规矩矩的一个圆
-    const blob = new THREE.Group();
-    [
-      [0, 0, r, 1],
-      [r * 0.55, -r * 0.3, r * 0.62, 2],
-    ].forEach(([ox, oz, rr, k]) => {
-      const disc = new THREE.Mesh(
-        new THREE.CircleGeometry(rr, k === 1 ? 26 : 18),
-        clay(color, { roughness: 0.95 })
-      );
-      disc.rotation.x = -Math.PI / 2;
-      disc.rotation.z = i * 0.7 + k;
-      disc.position.set(ox, 0.004, oz);
-      disc.receiveShadow = true;
-      disc.material.polygonOffset = true;
-      disc.material.polygonOffsetFactor = -1;
-      disc.material.polygonOffsetUnits = -1;
-      blob.add(disc);
-    });
-    blob.position.set(x, 0, z);
-    group.add(blob);
-  });
-  return group;
-}
-
 /** 四边的大山：贴着方形地图的四条边摆一圈，正门方向（+z 边）留一道山口 */
-function buildMountains(): THREE.Group {
+function buildMountains(obstacles: WorldObstacles): THREE.Group {
   const group = new THREE.Group();
   const PER_SIDE = 12;
+  const ridges = new Map<string, THREE.Group>();
 
   let variant = 0;
   const place = (x: number, z: number, scaleJitter: number) => {
     // 底宽大于高度：山才是一片连绵的山脊，而不是一排尖锥
     const base = 40 + ((variant * 23) % 13) + scaleJitter * 0.5;
-    const height = 34 + ((variant * 19) % 13);
+    const height = 24 + ((variant * 19) % 15) + 11*Math.sin(variant*.82+1.4);
     const mountain = buildMountain(base, height, variant);
     mountain.position.set(x, 0, z);
     mountain.rotation.y = variant * 0.9;
-    group.add(mountain);
+    mountain.traverse(part => {
+      if (part instanceof THREE.Mesh) obstacles.addMountainSection(part);
+    });
+    const key = Math.floor(x / 75) + "," + Math.floor(z / 75);
+    let ridge = ridges.get(key);
+    if (!ridge) { ridge = new THREE.Group(); ridges.set(key, ridge); }
+    ridge.add(mountain);
     variant += 1;
   };
 
@@ -353,78 +164,61 @@ function buildMountains(): THREE.Group {
     place(sx * MOUNTAIN_LINE, sz * MOUNTAIN_LINE, 0);
   });
 
+  for (const ridge of ridges.values()) {
+    const mesh = bakeScenery(ridge);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    group.add(mesh);
+  }
   return group;
 }
 
-/** 沿一条中心线生成贴地的条带（河、路都靠它） */
-function buildRibbon(
-  pts: THREE.Vector3[],
-  halfWidth: number,
-  y: number,
-  color: number,
-  roughness: number,
-  wobbleAmp = 0.09,
-  emissive?: number
-): THREE.Mesh {
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  for (let i = 0; i < pts.length; i += 1) {
-    const prev = pts[Math.max(0, i - 1)];
-    const next = pts[Math.min(pts.length - 1, i + 1)];
-    const tx = next.x - prev.x;
-    const tz = next.z - prev.z;
-    const len = Math.hypot(tx, tz) || 1;
-    const nx = -tz / len;
-    const nz = tx / len;
-    // 宽度不要像两条平行线，加一点起伏更像自然地形
-    const wobble =
-      1 + Math.sin(i * 0.33) * wobbleAmp + Math.sin(i * 0.09) * wobbleAmp * 0.7;
-    const w = halfWidth * wobble;
-    positions.push(pts[i].x + nx * w, y, pts[i].z + nz * w);
-    positions.push(pts[i].x - nx * w, y, pts[i].z - nz * w);
-  }
-
-  for (let i = 0; i < pts.length - 1; i += 1) {
-    const a = i * 2;
-    indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-
-  const mat = clay(color, {
-    roughness,
-    emissive,
-    emissiveIntensity: emissive ? 0.12 : 0,
+function buildRoad(points = ROAD_POINTS, halfWidth = ROAD_HALF_WIDTH): THREE.Mesh {
+  const positions: number[] = [], colors: number[] = [], indices: number[] = [];
+  const bands = [-1, -.87, -.68, 0, .68, .87, 1];
+  const tints = [0x9db57b, 0xb4b187, 0xc2ad89, 0xcab592, 0xc4ac85, 0xb5b489, 0x9db57b];
+  const color = new THREE.Color();
+  points.forEach((p,i) => {
+    const prev = points[Math.max(0,i-1)];
+    const next = points[Math.min(points.length-1,i+1)];
+    const dx = next.x-prev.x, dz = next.z-prev.z, len = Math.hypot(dx,dz);
+    // Feather the gate end into the turf and give each shoulder an irregular width.
+    const tip = THREE.MathUtils.smoothstep(i,0,6);
+    bands.forEach((factor,k) => {
+      const jitter = Math.sin(i * 1.91 + Math.sign(factor)*8.) * 0.12 + Math.sin(i*.53)*.09;
+      const width = halfWidth * (1+jitter*Math.abs(factor)) * (.70+.30*tip);
+      positions.push(p.x-factor*width*dz/len, .014, p.z+factor*width*dx/len);
+      color.setHex(tints[k]);
+      const edgeAlpha = 1 - THREE.MathUtils.smoothstep(Math.abs(factor), 0.68, 1);
+      colors.push(color.r, color.g, color.b, edgeAlpha * tip);
+      if (i && k) {
+        const j=i*bands.length+k;
+        indices.push(j-bands.length-1,j-bands.length,j-1,j-bands.length,j,j-1);
+      }
+    });
   });
-  mat.side = THREE.DoubleSide;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4));
+  geo.setIndex(indices); geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, transparent: true, depthWrite: false });
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = "varying vec2 pathXZ;\n" + shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n pathXZ=position.xz;");
+    shader.fragmentShader = "varying vec2 pathXZ;\n" + shader.fragmentShader.replace("#include <color_fragment>", `
+      #include <color_fragment>
+      vec2 cells = pathXZ * vec2(4.5,7.6);
+      vec2 tile = floor(cells);
+      vec2 seed = fract(sin(vec2(dot(tile,vec2(13.2,71.3)),dot(tile,vec2(51.1,23.7))))*713.31);
+      float pebble = length(fract(cells)-(.2+.6*seed));
+      diffuseColor.rgb *= 1. + (.45-seed.x)*.31*(1.-smoothstep(.06,.21+fwidth(pebble),pebble));
+    `);
+  };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   return mesh;
 }
-
-/** 沿河道生成一条贴地的条带（沙岸、水边过渡、水面都靠它） */
-function buildRiverRibbon(
-  halfWidth: number,
-  y: number,
-  color: number,
-  roughness: number,
-  emissive?: number
-): THREE.Mesh {
-  return buildRibbon(RIVER_POINTS, halfWidth, y, color, roughness, 0.09, emissive);
-}
-
-/** 农场门口通往木桥的土路 */
-function buildRoad(): THREE.Mesh {
-  // 比地块的土浅一点、灰一点，别在草地上压出一道扎眼的红棕带
-  return buildRibbon(ROAD_POINTS, ROAD_HALF_WIDTH, 0.012, 0xc9a273, 0.95, 0.06);
-}
-
 /** 过河的桥：桥面 + 横铺木条 + 两端坡道 + 栏杆 + 桥桩 */
-function buildBridge(): THREE.Group {
+function buildBridge(obstacles: WorldObstacles): THREE.Group {
   const group = new THREE.Group();
   group.position.set(BRIDGE.x, 0, BRIDGE.z);
   // 让局部 +z 对准跨河方向，桥就横着架在河上
@@ -438,90 +232,173 @@ function buildBridge(): THREE.Group {
     new RoundedBoxGeometry(halfWid * 2, 0.2, halfLen * 2, 3, 0.06),
     clay(PALETTE.wood, { roughness: 0.9 })
   );
-  deck.position.y = deckY;
+  deck.position.y = deckY - 0.135;
   deck.castShadow = true;
   deck.receiveShadow = true;
   // 桥面要能被点击选中，否则点到桥上会打穿到桥下的地面，目标点落回自己脚下
   deck.name = "bridge-deck";
   group.add(deck);
 
-  // 横铺的桥板：给桥面分出一格一格的木条
-  for (let i = -4; i <= 4; i += 1) {
+  // Keep the structural details in one batch and the deck as a separate ray target.
+  const framing = new THREE.Group();
+  const boardCount = 29;
+  const pitch = halfLen * 2 / boardCount;
+  const boards = [0xb68b64, 0xc89c72, 0xb99370, 0xd0ab7e, 0xc59b74];
+  for (let i = 0; i < boardCount; i++) {
+    const z = -halfLen + (i + 0.5) * pitch;
     const slat = new THREE.Mesh(
-      new RoundedBoxGeometry(halfWid * 2 - 0.26, 0.06, 1.1, 2, 0.02),
-      clay(PALETTE.plank, { roughness: 0.95 })
+      new THREE.BoxGeometry(halfWid * 2 + Math.sin(i * 5) * 0.075, 0.095, pitch - 0.026),
+      clay(boards[(i * 7) % boards.length])
     );
-    slat.position.set(0, deckY + 0.12, (i * (halfLen * 2 - 1.4)) / 8);
-    group.add(slat);
+    slat.position.set(0, deckY - 0.047, z);
+    framing.add(slat);
   }
 
   // 两端坡道：把桥面接到地面，别让桥板看上去漂在草上
   [-1, 1].forEach((sign) => {
-    const rampLen = 3.0;
+    const rampLen = BRIDGE.rampLength;
     const ramp = new THREE.Mesh(
       new RoundedBoxGeometry(halfWid * 2 - 0.24, 0.16, rampLen, 3, 0.05),
-      clay(PALETTE.wood, { roughness: 0.9 })
+      clay(0xb79470)
     );
-    ramp.position.set(0, deckY * 0.5, sign * (halfLen + rampLen / 2 - 0.35));
-    ramp.rotation.x = sign * -0.19;
+    ramp.position.set(0, deckY * 0.5 - 0.075, sign * (halfLen + rampLen / 2 - 0.12));
+    ramp.rotation.x = sign * Math.atan2(deckY, rampLen);
     ramp.castShadow = true;
     ramp.receiveShadow = true;
+    ramp.name = "bridge-ramp";
     group.add(ramp);
   });
 
   // 栏杆：两侧各五根立柱 + 两根横杆，顺桥面通长
   [-1, 1].forEach((side) => {
     const railX = side * (halfWid - 0.18);
+    const railCenter = group.localToWorld(new THREE.Vector3(railX, 0, 0));
+    obstacles.addBox(railCenter.x, railCenter.z, 0.13, halfLen - 0.02, group.rotation.y, "deck");
     [-1, -0.5, 0, 0.5, 1].forEach((t) => {
       const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.06, 0.08, 1.0, 8),
-        clay(PALETTE.woodDark)
+        new THREE.CylinderGeometry(0.095, 0.13, 1.14, 8),
+        clay(0x8d6853)
       );
       post.position.set(railX, deckY + 0.5, t * (halfLen - 0.15));
       post.castShadow = true;
-      group.add(post);
+      framing.add(post);
     });
     [0.62, 0.98].forEach((h) => {
       const rail = new THREE.Mesh(
         new THREE.CylinderGeometry(0.05, 0.05, halfLen * 1.94, 8),
-        clay(PALETTE.wood)
+        clay(0xab8968)
       );
       rail.rotation.x = Math.PI / 2;
       rail.position.set(railX, deckY + h, 0);
       rail.castShadow = true;
-      group.add(rail);
+      framing.add(rail);
     });
   });
 
   // 桥桩：四根斜插进水里
   [-1, 1].forEach((side) => {
     [-1, 1].forEach((sign) => {
+      const bottom = RIVER_BED.bedY - .15;
       const pile = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.1, 0.13, 1.1, 8),
-        clay(PALETTE.woodDark)
+        new THREE.CylinderGeometry(0.15, 0.21, deckY - bottom, 8),
+        clay(0x8d6853)
       );
-      pile.position.set(side * (halfWid - 0.5), deckY - 0.55, sign * halfLen * 0.55);
-      group.add(pile);
+      pile.position.set(side * (halfWid - 0.5), (deckY + bottom) * .5, sign * halfLen * 0.55);
+      const pileCenter = group.localToWorld(pile.position.clone());
+      obstacles.addCircle(pileCenter.x, pileCenter.z, 0.21, "terrain");
+      framing.add(pile);
     });
   });
 
+  group.add(bakeScenery(framing));
   return group;
 }
 
-/** 河：从山口流进来，S 形折到地图右上角，岸边有石头和芦苇 */
-function buildRiver(): THREE.Group {
+/**
+ * 河谷：草地上真正凹下去的一道沟。岸肩、下坡、水面线、水下坡、河床都在这一张壳上，
+ * 用顶点色从草土渐变到湿沙再到河床泥，所以看不出是拼出来的几条色带。
+ */
+function buildRiverValley() {
+  // 横截面从左岸到右岸：位置 / 高度 / 颜色
+  const PROFILE: Array<[number, number, number]> = [
+    [RIVER_BED.shoulder, 0.004, 0x8fb061],
+    [RIVER_BED.edge, 0.004, 0x9aa869],
+    [RIVER_BED.waterLine, RIVER_BED.waterY, 0xc1b493],
+    [RIVER_BED.bedEdge, RIVER_BED.bedY, 0xa6b19a],
+    [0, RIVER_BED.bedY - 0.02, 0x96a99a],
+    [-RIVER_BED.bedEdge, RIVER_BED.bedY, 0xa6b19a],
+    [-RIVER_BED.waterLine, RIVER_BED.waterY, 0xc1b493],
+    [-RIVER_BED.edge, 0.004, 0x9aa869],
+    [-RIVER_BED.shoulder, 0.004, 0x8fb061],
+  ];
+
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const sectionStart: number[] = [];
+  const SECTION_STEP = 1; // 与草地开口及水面使用同一套采样，岸沿没有漏缝。
+  const tint = new THREE.Color();
+
+  for (let i = 0; i < RIVER_POINTS.length; i += SECTION_STEP) {
+    const p = RIVER_POINTS[i];
+    const prev = RIVER_POINTS[Math.max(0, i - 1)];
+    const next = RIVER_POINTS[Math.min(RIVER_POINTS.length - 1, i + 1)];
+    const tx = next.x - prev.x;
+    const tz = next.z - prev.z;
+    const len = Math.hypot(tx, tz) || 1;
+    const nx = -tz / len;
+    const nz = tx / len;
+    sectionStart.push(positions.length / 3);
+    for (const [off, y, hex] of PROFILE) {
+      positions.push(p.x + nx * off, y, p.z + nz * off);
+      tint.setHex(hex);
+      colors.push(tint.r, tint.g, tint.b);
+    }
+  }
+
+  const P = PROFILE.length;
+  for (let s = 0; s < sectionStart.length - 1; s += 1) {
+    const a = sectionStart[s];
+    const b = sectionStart[s + 1];
+    for (let k = 0; k < P - 1; k += 1) {
+      indices.push(a + k, a + k + 1, b + k);
+      indices.push(b + k, a + k + 1, b + k + 1);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.96,
+    envMapIntensity: 0.45,
+  });
+  mat.side = THREE.DoubleSide;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+/** 河：凹进草地的河谷 + 沟底流动的水面 + 水面上的碎波光；update 让水一直在动 */
+function buildRiver(obstacles: WorldObstacles) {
   const group = new THREE.Group();
+  // 河谷地形（岸坡 + 河床）先铺，水面压在沟里
+  const valley = buildRiverValley();
+  group.add(valley);
 
-  group.add(buildRiverRibbon(RIVER_HALF_WIDTH + 2.4, 0.014, 0xded0a6, 0.96));
-  group.add(buildRiverRibbon(RIVER_HALF_WIDTH + 0.8, 0.024, 0x4f9fbf, 0.5));
-  group.add(
-    buildRiverRibbon(RIVER_HALF_WIDTH, 0.035, PALETTE.water, 0.18, 0x2b7fa8)
-  );
+  // 水面宽度正好等于 waterLine，与岸坡严丝合缝地相交，不会出现悬空的水边
+  const water = buildWaterSurface();
+  const bed = buildSubmergedDetails(valley, water.time, water.cloud);
+  group.add(...water.tiles, bed.details);
 
-  // 岸石与芦苇：沿河道两侧交替，别让河岸是一条光秃秃的色带
+  // 岸石与芦苇：沿河道两侧交替，石头压在岸肩上，芦苇立在坡上
   let placed = 0;
   RIVER_POINTS.forEach((p, i) => {
-    if (i % 7 !== 0) return;
+    if (i % 5 !== 0) return;
     const prev = RIVER_POINTS[Math.max(0, i - 1)];
     const next = RIVER_POINTS[Math.min(RIVER_POINTS.length - 1, i + 1)];
     const tx = next.x - prev.x;
@@ -530,7 +407,8 @@ function buildRiver(): THREE.Group {
     const nx = -tz / len;
     const nz = tx / len;
     const side = placed % 2 === 0 ? 1 : -1;
-    const off = RIVER_HALF_WIDTH + 1.9 + (placed % 3) * 0.5;
+    const isRock = placed % 3 === 0;
+    const off = isRock ? 8.5 + (placed % 3) * 0.6 : 7.5 + (placed % 4) * 0.28;
     const x = p.x + nx * off * side;
     const z = p.z + nz * off * side;
     // 桥位附近别放东西，免得挡住上桥的路
@@ -538,32 +416,82 @@ function buildRiver(): THREE.Group {
       placed += 1;
       return;
     }
-    if (placed % 3 === 0) {
+    const y = riverBedHeight(off);
+    if (isRock) {
       const rock = buildRock(0.7 + (placed % 4) * 0.12);
-      rock.position.set(x, 0.02, z);
+      rock.position.set(x, y, z);
+      obstacles.addCircle(x, z, rock.scale.x * 0.40, "terrain");
       group.add(rock);
     } else {
       const tuft = buildGrassTuft();
-      tuft.position.set(x, 0, z);
+      tuft.position.set(x, y, z);
       tuft.scale.set(1.0, 2.1 + (placed % 3) * 0.3, 1.0);
       group.add(tuft);
     }
     placed += 1;
   });
 
-  group.add(buildBridge());
+  // Cattails, stones and floating leaves form irregular pockets on the inside banks.
+  const shallows = new THREE.Group();
+  for (let i = 3; i < RIVER_POINTS.length - 2; i += 3) {
+    const p = RIVER_POINTS[i], next = RIVER_POINTS[i+1];
+    const len = p.distanceTo(next), tx = (next.x-p.x)/len, tz = (next.z-p.z)/len;
+    const sign = i % 2 ? 1 : -1;
+    const x = p.x - sign*tz*6.7, z = p.z + sign*tx*6.7;
+    if (Math.hypot(x-BRIDGE.x,z-BRIDGE.z)<6) continue;
+    for (let j=0;j<4;j++) {
+      const h = 0.62 + 0.60*(0.5+0.5*Math.sin(i+j*5.92));
+      const px = x + tx*j*0.23, pz = z + tz*j*0.23;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(.013,.025,h,5),clay(0x759557));
+      stem.position.set(px,RIVER_BED.waterY+h*.5-.06,pz);
+      const catkin = new THREE.Mesh(new THREE.CylinderGeometry(.033,.038,.18,6),clay(0x85654b));
+      catkin.position.set(px,RIVER_BED.waterY+h-.13,pz);
+      shallows.add(stem,catkin);
+      const inset = .43 + .95*(0.5+0.5*Math.cos(i*.76+j*3.21));
+      const pad = new THREE.Mesh(new THREE.CircleGeometry(.21 + .1*Math.sin(i+j), 10, 0.25, 5.86),clay(j % 2 ? 0x86a66d : 0xa1b57e));
+      pad.rotation.x = -Math.PI / 2;
+      pad.rotation.z = i+j;
+      pad.position.set(px+sign*tz*inset+tx*j*.41,RIVER_BED.waterY+.017,pz-sign*tx*inset+tz*j*.41);
+      shallows.add(pad);
+    }
+    const rock = buildRock(1.12);
+    rock.position.set(x,RIVER_BED.waterY-.06,z);
+    obstacles.addCircle(x, z, rock.scale.x * 0.40, "terrain");
+    shallows.add(rock);
+  }
+  const bankDetail = bakeScenery(shallows);
+  bankDetail.castShadow = false;
+  group.add(bankDetail);
 
-  return group;
+  const bridge = buildBridge(obstacles);
+  group.add(bridge);
+  const surfaces = [valley, ...water.tiles, ...bridge.children.filter(part => part.name.startsWith("bridge-"))];
+  return { group, surfaces, update: water.update, dispose: bed.dispose };
 }
 
-/** 农场外的草原：树、石头、草丛散在围栏外面，别让草原一眼望到山还是一片空 */
-function buildMeadow(): THREE.Group {
+/** 农场外的草原：树、石头撑骨架，草和野花铺满近处，别让草原一眼望到山还是一片空 */
+function buildMeadow(obstacles: WorldObstacles): THREE.Group {
   const group = new THREE.Group();
 
+  const treeBeds: Sprite[][] = [[], [], []];
+  const rocks: Sprite[] = [];
+  const tufts: Sprite[] = [];
+  const pinkFlowers: Sprite[] = [];
+  const yellowFlowers: Sprite[] = [];
+
+  /** 院子里、河道里、桥位附近、土路上都留空 */
+  const blocked = (x: number, z: number): boolean => {
+    if (Math.abs(x) < FENCE_X + 2 && Math.abs(z) < FENCE_Z + 2) return true;
+    if (riverInfo(x, z).dist < RIVER_BED.shoulder) return true;
+    if (Math.hypot(x - BRIDGE.x, z - BRIDGE.z) < 14) return true;
+    if (roadInfo(x, z) < ROAD_HALF_WIDTH + 1.6) return true;
+    return false;
+  };
+
   // 方形地图太大，黄金角散点会中间密、边上稀；改成带抖动的方格，
-  // 铺到山脚每 10 米左右一件，密度均匀又不会像摆出来的阵列
+  // 铺到山脚每 8 米左右一件，密度均匀又不会像摆出来的阵列
   const SPAN = WORLD_HALF - 3;
-  const GRID = 34;
+  const GRID = 38;
   const STEP = (SPAN * 2) / GRID;
 
   for (let i = 0; i < GRID; i += 1) {
@@ -583,69 +511,186 @@ function buildMeadow(): THREE.Group {
       const x = gx + (r1 - 0.5) * STEP * 0.82;
       const z = gz + (r2 - 0.5) * STEP * 0.82;
 
-      // 院子里、河道里、桥位附近、土路上都留空
-      if (Math.abs(x) < 15.5 && Math.abs(z) < 13.5) continue;
-      if (riverInfo(x, z).dist < RIVER_HALF_WIDTH + 4.4) continue;
-      if (Math.hypot(x - BRIDGE.x, z - BRIDGE.z) < 14) continue;
-      if (roadInfo(x, z) < ROAD_HALF_WIDTH + 1.6) continue;
+      if (blocked(x, z)) continue;
       // 留一部分空地，草原上不该每格都插着东西
       if (r4 < 0.3) continue;
 
       const scale = 0.95 + r3 * 0.9;
       const kind = Math.floor(r3 * 1000) % 10;
-      // 远处的小草簇根本看不见，只留树和石头，省下来的开销拿来加密近处
-      const distant = Math.hypot(x, z) > 96;
-      if (distant && kind >= 5) continue;
-      if (kind < 2) {
-        const tree = buildTree(scale, i * 7 + j);
-        tree.position.set(x, 0, z);
-        tree.rotation.y = r1 * 6.28;
-        group.add(tree);
-      } else if (kind < 5) {
-        const rock = buildRock(scale * 0.95);
-        rock.position.set(x, 0.02, z);
-        rock.rotation.y = r2 * 6.28;
-        group.add(rock);
-      } else {
-        const tuft = buildGrassTuft();
-        tuft.position.set(x, 0, z);
-        tuft.scale.setScalar(scale * 1.6);
-        tuft.rotation.y = r3 * 6.28;
-        group.add(tuft);
-        // 草簇旁边带一小簇野花，远看是一点点彩色的碎光
-        if (kind > 7 && !distant) {
-          for (let f = 0; f < 3; f += 1) {
-            const fa = r1 * 6.28 + f * 2.1;
-            const flower = buildFlower(f % 2 === 0 ? PALETTE.flowerPink : PALETTE.flowerYellow);
-            flower.position.set(x + Math.cos(fa) * 0.9, 0.02, z + Math.sin(fa) * 0.9);
-            group.add(flower);
-          }
+      if (kind < 3) {
+        const species = r1 < 0.16 ? 1 : r1 > 0.70 ? 2 : 0;
+        treeBeds[species].push({x, z, s: scale, r: r2 * 6.28});
+        obstacles.addCircle(x, z, 0.20 * scale);
+      } else if (kind < 6) {
+        rocks.push({x, z, s: scale * 0.95, r: r2 * 6.28});
+        obstacles.addCircle(x, z, 0.40 * scale * 0.95);
+      } else if (Math.hypot(x, z) > 100) {
+        // 只有远处的草交给这张疏网格，近处由下面的密网格负责
+        tufts.push({ x, z, s: scale * 1.5, r: r3 * 6.28 });
+      }
+    }
+  }
+
+  // 近处密网格：4 米一簇草、每簇再带两三朵野花，走到草原上才有草地的质感
+  const NEAR = 62;
+  const NGRID = window.matchMedia("(pointer: coarse)").matches ? 26 : 32;
+  const NSTEP = (NEAR * 2) / NGRID;
+  for (let i = 0; i < NGRID; i += 1) {
+    for (let j = 0; j < NGRID; j += 1) {
+      const gx = -NEAR + (i + 0.5) * NSTEP;
+      const gz = -NEAR + (j + 0.5) * NSTEP;
+
+      const h1 = Math.sin(i * 51.19 + j * 13.71) * 31847.31;
+      const r1 = h1 - Math.floor(h1);
+      const h2 = Math.sin(i * 17.83 + j * 91.27) * 19423.77;
+      const r2 = h2 - Math.floor(h2);
+      const h3 = Math.sin(i * 33.41 + j * 27.59) * 48151.19;
+      const r3 = h3 - Math.floor(h3);
+      const h4 = Math.sin(i * 79.13 + j * 5.37) * 27139.53;
+      const r4 = h4 - Math.floor(h4);
+
+      const x = gx + (r1 - 0.5) * NSTEP * 0.86;
+      const z = gz + (r2 - 0.5) * NSTEP * 0.86;
+
+      if (blocked(x, z)) continue;
+      if (r4 < 0.1) continue;
+
+      const scale = 0.8 + r3 * 0.55;
+      tufts.push({ x, z, s: scale * 1.55, r: r3 * 6.28 });
+
+      if (r4 > 0.42) {
+        const count = 2 + Math.floor(r2 * 3); // 每簇 2~4 朵
+        for (let f = 0; f < count; f += 1) {
+          const a = r1 * 6.28 + f * 1.9;
+          const d = 0.34 + r3 * 0.55;
+          const bucket = f % 2 === 0 ? pinkFlowers : yellowFlowers;
+          bucket.push({
+            x: x + Math.cos(a) * d,
+            z: z + Math.sin(a) * d,
+            s: 1.35 + r2 * 0.75,
+            r: r1 * 6.28,
+          });
         }
       }
     }
   }
 
+  const templates = [0,1,4].map((variant) => bakeScenery(buildTree(1, variant)));
+  templates.forEach((tree, index) => {
+    group.add(instanceTiles(tree.geometry, tree.material, treeBeds[index], 70, true));
+  });
+  const rock = buildRock(1);
+  rock.geometry.scale(1,0.72,1.05);
+  rock.geometry.translate(0,0.14,0);
+  group.add(
+    instanceTiles(rock.geometry, rock.material, rocks, 80, false),
+    instanceTiles(grassTuftGeometry(), grassTuftMaterial(), tufts, 40, false),
+    instanceTiles(flowerGeometry(PALETTE.flowerPink), flowerMaterial(), pinkFlowers, 40, false),
+    instanceTiles(flowerGeometry(PALETTE.flowerYellow), flowerMaterial(), yellowFlowers, 40, false),
+  );
+
   return group;
+}
+
+interface Sprite { x: number; z: number; s: number; r: number }
+
+/** Chunk the meadow so off-camera groves and wildflowers cost no vertex work. */
+function instanceTiles(geo: THREE.BufferGeometry, mat: THREE.Material, items: Sprite[], size: number, shadow: boolean) {
+  const cells = new Map<string, Sprite[]>();
+  for (const it of items) {
+    const key = Math.floor(it.x / size) + "," + Math.floor(it.z / size);
+    const cell = cells.get(key);
+    if (cell) cell.push(it);
+    else cells.set(key, [it]);
+  }
+  const group = new THREE.Group();
+  for (const cell of cells.values()) {
+    const mesh = instanceSprites(geo, mat, cell);
+    mesh.castShadow = shadow;
+    group.add(mesh);
+  }
+  return group;
+}
+
+/** 把一堆 {位置, 缩放, 朝向} 铺成一个 InstancedMesh */
+function instanceSprites(
+  geo: THREE.BufferGeometry,
+  mat: THREE.Material,
+  sprites: Array<{ x: number; z: number; s: number; r: number }>
+): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, sprites.length));
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const p = new THREE.Vector3();
+  const s = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  sprites.forEach((it, i) => {
+    q.setFromAxisAngle(up, it.r);
+    p.set(it.x, 0, it.z);
+    s.setScalar(it.s);
+    m.compose(p, q, s);
+    mesh.setMatrixAt(i, m);
+  });
+  mesh.count = sprites.length;
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export interface World {
   group: THREE.Group;
   ground: THREE.Mesh;
-  update?: (t: number) => void;
+  obstacles: WorldObstacles;
+  walkSurfaces: THREE.Object3D[];
+  setDecor: (decor: FarmDecor) => void;
+  update: (t: number, weather?: SkyWeather, player?: THREE.Vector3, swimAmount?: number) => void;
+  dispose: () => void;
 }
 
-export function createWorld(): World {
+export function createWorld(initialDecor?: FarmDecor): World {
   const group = new THREE.Group();
+  const obstacles = new WorldObstacles();
 
-  const ground = new THREE.Mesh(
-    // 山在 ±164，山脚外缘到 ±200；地面铺到 ±240，山外只留一条窄边，不会从山上看到一整片空地
-    new THREE.PlaneGeometry(WORLD_HALF * 3.2, WORLD_HALF * 3.2),
-    clay(PALETTE.grass, { roughness: 0.95 })
-  );
-  ground.rotation.x = -Math.PI / 2;
+  // 草地：地面必须沿河道挖出一条洞，否则那块平平的草会把下凹的河谷整片盖住
+  const GROUND_HALF = WORLD_HALF * 1.6;
+  const groundShape = new THREE.Shape();
+  groundShape.moveTo(-GROUND_HALF, -GROUND_HALF);
+  groundShape.lineTo(GROUND_HALF, -GROUND_HALF);
+  groundShape.lineTo(GROUND_HALF, GROUND_HALF);
+  groundShape.lineTo(-GROUND_HALF, GROUND_HALF);
+  groundShape.closePath();
+
+  // 洞的轮廓：沿河心左右各推到岸肩，与河谷壳的外缘严丝合缝
+  const holePath = new THREE.Path();
+  {
+    const leftEdge: THREE.Vector2[] = [];
+    const rightEdge: THREE.Vector2[] = [];
+    for (let i = 0; i < RIVER_POINTS.length; i += 1) {
+      const p = RIVER_POINTS[i];
+      const prev = RIVER_POINTS[Math.max(0, i - 1)];
+      const next = RIVER_POINTS[Math.min(RIVER_POINTS.length - 1, i + 1)];
+      const tx = next.x - prev.x;
+      const tz = next.z - prev.z;
+      const len = Math.hypot(tx, tz) || 1;
+      const nx = -tz / len;
+      const nz = tx / len;
+      const w = RIVER_BED.shoulder;
+      // Shape 走 XY 平面，rotateX(-90°) 后 shape 的 y 对应世界的 -z
+      leftEdge.push(new THREE.Vector2(p.x + nx * w, -(p.z + nz * w)));
+      rightEdge.push(new THREE.Vector2(p.x - nx * w, -(p.z - nz * w)));
+    }
+    holePath.setFromPoints(leftEdge.concat(rightEdge.reverse()));
+    holePath.closePath();
+  }
+  groundShape.holes.push(holePath);
+
+  const groundGeo = new THREE.ShapeGeometry(groundShape);
+  groundGeo.rotateX(-Math.PI / 2);
+  const ground = new THREE.Mesh(groundGeo, meadowGround());
   ground.receiveShadow = true;
   group.add(ground);
-  group.add(buildGrassPatches());
+
 
   // 田埂：一整块圆角草台，地块是草台上一格格翻好的土
   // 6×5 的地块占 15.6×13，草台各边再留 0.7 走脚
@@ -657,39 +702,60 @@ export function createWorld(): World {
   field.receiveShadow = true;
   group.add(field);
 
-  group.add(buildFenceRing());
-  group.add(buildMountains());
-  group.add(buildMeadow());
-  group.add(buildRiver());
+  const decor = createFarmDecor(obstacles, initialDecor);
+  group.add(decor.group);
+  group.add(buildMountains(obstacles));
+  group.add(buildMeadow(obstacles));
+  const river = buildRiver(obstacles);
+  group.add(river.group);
   group.add(buildRoad());
 
-  // 谷仓挪到围栏外左侧：农场扩大后围栏内全是田，谷仓做背景，屋顶高过栅栏
+  // 谷仓和磨坊分居院内西、东北两边，给田边和双门留下通道。
   const barn = buildBarn();
-  barn.position.set(-13.8, 0, -3.2);
-  barn.rotation.y = 0.24;
-  group.add(barn);
+  barn.position.set(FARM_BARN.x, 0, FARM_BARN.z);
+  barn.rotation.y = FARM_BARN.yaw;
+  obstacles.addBox(barn.position.x, barn.position.z, 1.75, 1.55, barn.rotation.y);
+  const hay = barn.localToWorld(new THREE.Vector3(-2.05, 0, 0.6));
+  obstacles.addBox(hay.x, hay.z, 0.25, 0.34, barn.rotation.y);
+  const barrel = barn.localToWorld(new THREE.Vector3(1.95, 0, 0.8));
+  obstacles.addCircle(barrel.x, barrel.z, 0.28);
+  const barnMesh = bakeScenery(barn);
+  barnMesh.name = "farm-barn";
+  group.add(barnMesh);
+  const mill = buildWindmill();
+  mill.group.position.set(FARM_MILL.x, 0, FARM_MILL.z);
+  mill.group.rotation.y = FARM_MILL.yaw;
+  mill.group.name = "farm-windmill";
+  obstacles.addCircle(mill.group.position.x, mill.group.position.z, 1.48 * mill.group.scale.x);
+  group.add(mill.group);
+  // Two narrower paths skirt the raised planting beds and meet the building doors.
+  const barnDoor = barn.localToWorld(new THREE.Vector3(0,0,1.56));
+  const millDoor = mill.group.localToWorld(new THREE.Vector3(0,0,1.49));
+  for (const points of [
+    [[-.70,11.5],[-4.5,10.3],[-9.55,8.1],[-10.95,4.2],[-11.35,.15],[barnDoor.x,barnDoor.z]],
+    [[.70,12.3],[5.3,10.5],[10.8,8.6],[12.2,4.1],[12.1,-.8],[11.6,-5.1],[millDoor.x,millDoor.z]],
+  ]) {
+    const curve = new THREE.CatmullRomCurve3(points.map(([x,z]) => new THREE.Vector3(x,0,z)));
+    group.add(buildRoad(curve.getSpacedPoints(42), .70));
+  }
 
   // 水井放在草台与右侧围栏之间的走道上
   const well = buildWell();
   well.position.set(9.9, 0, -3.8);
-  group.add(well);
+  obstacles.addCircle(well.position.x, well.position.z, 0.82);
+  group.add(bakeScenery(well));
 
   // 门外用一串踩实的土块石阶代替整块路板：不铺平板，看起来更像走出来的乡间小路
-  const pathStones: Array<[number, number, number]> = [
-    [0.1, FENCE_Z + 0.7, 0.46],
-    [-0.42, FENCE_Z + 2.0, 0.42],
-    [0.36, FENCE_Z + 3.2, 0.44],
-    [-0.3, FENCE_Z + 4.4, 0.38],
-    [0.24, FENCE_Z + 5.6, 0.4],
-  ];
-  pathStones.forEach(([x, z, s], index) => {
-    const stone = new THREE.Mesh(lumpy(s, 2, 0.14), clay(0xab845e, { roughness: 1 }));
-    stone.position.set(x, 0.03, z);
-    stone.scale.y = 0.12;
-    stone.rotation.y = index * 0.9;
-    stone.receiveShadow = true;
-    group.add(stone);
-  });
+  const trail = new THREE.Group();
+  for (let i=0;i<29;i++) {
+    const p = ROAD_POINTS[Math.min(ROAD_POINTS.length-1,Math.floor(i*.64))];
+    const edge = i%4<2 ? -.83 : .87;
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(.12+(i%3)*.039),clay([0xc4b494,0xa79b82,0xb8ab92][i%3]));
+    rock.scale.set(1.25,.26,.73); rock.rotation.y = i*.71;
+    rock.position.set(p.x+edge+.21*Math.sin(i*2.3),.035,p.z+.23*Math.cos(i*4.31));
+    trail.add(rock);
+  }
+  group.add(bakeScenery(trail));
   // 路两侧零散的石头（相对门口位置，随围栏一起外移）
   const pathRocks: Array<[number, number, number]> = [
     [-1.7, FENCE_Z + 1.3, 0.2],
@@ -702,31 +768,30 @@ export function createWorld(): World {
     group.add(rock);
   });
 
-  const sign = buildSign(createSignTexture());
-  sign.position.set(-10.4, 0, 7.5);
-  sign.rotation.y = Math.PI / 3;
-  group.add(sign);
 
   const dust = createDustMotes();
   group.add(dust.points);
+  const rain = buildRain();
+  group.add(rain.mesh);
 
   const trees: Array<[number, number, number]> = [
     [-15.4, -8.6, 1.25],
     [-16.6, 1.4, 1.05],
     [-14.8, 9.6, 1.15],
-    [15.6, -8.4, 1.1],
+    [17.5, -12.3, 1.1],
     [16.8, 1.8, 1.2],
     [15.2, 10.0, 1.0],
-    [-8.6, 15.4, 1.3],
-    [8.8, 15.8, 1.15],
-    [-16.0, 14.8, 1.2],
-    [16.2, 14.4, 1.05],
+    [-8.6, 12.5, 1.3],
+    [8.8, 12.8, 1.15],
+    [-17.2, 12.1, 1.2],
+    [17.1, 12.4, 1.05],
   ];
   trees.forEach(([x, z, s], i) => {
     const tree = buildTree(s, i);
     tree.position.set(x, 0, z);
     tree.rotation.y = i * 1.2;
-    group.add(tree);
+    obstacles.addCircle(x, z, 0.20 * tree.scale.x);
+    group.add(bakeScenery(tree));
   });
 
   // 石头
@@ -740,6 +805,7 @@ export function createWorld(): World {
     const rock = buildRock(s);
     rock.position.x = x;
     rock.position.z = z;
+    obstacles.addCircle(x, z, 0.40 * rock.scale.x);
     group.add(rock);
   });
 
@@ -774,7 +840,7 @@ export function createWorld(): World {
   ].forEach(([x, z, s], i) => {
     const bush = buildBush(s, i);
     bush.position.set(x, 0, z);
-    group.add(bush);
+    group.add(bakeScenery(bush));
   });
 
   // 野花
@@ -793,8 +859,48 @@ export function createWorld(): World {
   flowers.forEach(([x, z, color]) => {
     const flower = buildFlower(color);
     flower.position.set(x, 0, z);
-    group.add(flower);
+    group.add(bakeScenery(flower));
   });
 
-  return { group, ground, update: dust.update };
+  let lastTime = 0;
+  return {
+    group,
+    ground,
+    obstacles,
+    walkSurfaces: [ground, ...river.surfaces],
+    setDecor: decor.setDecor,
+    dispose() {
+      river.dispose();
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>();
+      group.traverse((node) => {
+        if (node instanceof THREE.InstancedMesh) node.dispose();
+        if (!(node instanceof THREE.Mesh || node instanceof THREE.Points || node instanceof THREE.Line)) return;
+        geometries.add(node.geometry);
+        const list = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of list) {
+          materials.add(material);
+          if (material.map) textures.add(material.map);
+        }
+      });
+      geometries.forEach(g => g.dispose());
+      materials.forEach(m => m.dispose());
+      textures.forEach(t => t.dispose());
+      group.clear();
+    },
+    update(t, weather = "sunny", player, swimAmount = 0) {
+      decor.update(t);
+      const raining = weather === "rain";
+      updateGrassWind(t);
+      dust.points.visible = weather === "sunny";
+      if (dust.points.visible) dust.update(t);
+      rain.mesh.visible = raining;
+      if (raining) rain.update(t, player);
+      river.update(t, weather, player, swimAmount);
+      const dt = Math.min(0.1, Math.max(0, t - lastTime));
+      mill.rotor.rotation.z += dt * (raining ? 0.85 : weather === "cloudy" ? 0.53 : 0.28);
+      lastTime = t;
+    },
+  };
 }

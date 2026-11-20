@@ -1,181 +1,124 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
-import type { AvatarRig } from "./rig";
+import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
+import type { AvatarMotion, AvatarRig } from "./rig";
+import { alignAvatar, createCapturedPose, motionBones, type SolePoint } from "./capturedMotion";
+import { createStrawHat } from "./strawHat";
+import { dressFarmer } from "./farmerWardrobe";
+import type { AvatarId, OutfitId } from "../game/appearance";
 
-/** 角色统一高度：VRM 导进来后按包围盒缩放到这个身高（米） */
 const TARGET_HEIGHT = 1.66;
-
 const loader = new GLTFLoader();
-loader.register((parser) => new VRMLoaderPlugin(parser));
+loader.register(parser => new VRMLoaderPlugin(parser));
 
-export interface VrmRig extends AvatarRig {
-  vrm: VRM;
-}
-
-/** 取骨架节点，缺骨骼时给一个空 Object3D，保证 Player 的赋值不会崩 */
-function bone(vrm: VRM, name: string): THREE.Object3D {
-  const node =
-    vrm.humanoid?.getNormalizedBoneNode(name as never) ??
-    vrm.humanoid?.getRawBoneNode(name as never);
-  return (node as THREE.Object3D | null) ?? new THREE.Object3D();
-}
-
-export async function loadVrmRig(url: string): Promise<VrmRig> {
+export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId = "xiaosui",
+                                 outfit: OutfitId = "field", bottom: OutfitId = outfit): Promise<AvatarRig> {
   const gltf = await loader.loadAsync(url);
   const vrm = gltf.userData.vrm as VRM | undefined;
-  if (!vrm) throw new Error("文件不是有效的 VRM 模型");
-
-  // 官方推荐的清理与骨架合并：少一批 draw call，动画更省
-  try {
-    VRMUtils.removeUnnecessaryVertices(gltf.scene);
-    VRMUtils.combineSkeletons(gltf.scene);
-  } catch (err) {
-    console.warn("[vrm] 预处理跳过", err);
+  if (!vrm) {
+    VRMUtils.deepDispose(gltf.scene);
+    throw new Error("文件不是有效的 VRM 模型");
   }
-  // VRM 0.x 面向 -Z，统一转成 +Z，和农场里的朝向约定一致
+  VRMUtils.removeUnnecessaryVertices(gltf.scene);
+  VRMUtils.combineMorphs(vrm);
+  VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
 
-  // —— 按包围盒统一身高，并把脚底贴到 y=0 ——
   vrm.scene.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(vrm.scene);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  const scale = TARGET_HEIGHT / (size.y || TARGET_HEIGHT);
-  vrm.scene.scale.setScalar(scale);
-  vrm.scene.updateMatrixWorld(true);
-  const box2 = new THREE.Box3().setFromObject(vrm.scene);
-  vrm.scene.position.y -= box2.min.y;
-
-  vrm.scene.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.castShadow = true;
-    mesh.receiveShadow = false;
-    // VRM 的头发/裙摆常有薄片，关掉视锥剔除免得转身时闪没
-    mesh.frustumCulled = false;
+  const bounds = new THREE.Box3().setFromObject(vrm.scene);
+  const scale = TARGET_HEIGHT / (bounds.max.y - bounds.min.y || TARGET_HEIGHT);
+  const visual = new THREE.Group();
+  visual.add(vrm.scene);
+  visual.scale.setScalar(scale);
+  vrm.scene.position.y -= bounds.min.y;
+  visual.updateMatrixWorld(true);
+  vrm.scene.traverse(obj => {
+    if (obj instanceof THREE.Mesh) {
+      obj.castShadow = !(obj.material?.isOutline);
+      obj.receiveShadow = false;
+      obj.frustumCulled = false;
+    }
   });
 
-  // 外套一层 group 承载整体倾斜，避免直接改 vrm.scene 的旋转与 VRM0 修正打架
-  const body = new THREE.Group();
-  body.add(vrm.scene);
+  let hat: THREE.Mesh | undefined;
+  if (builtin) {
+    const head = vrm.humanoid.getRawBoneNode("head");
+    if (head) {
+      hat = createStrawHat();
+      head.getWorldPosition(hat.position);
+      hat.position.y = TARGET_HEIGHT - 0.064;
+      hat.position.z -= 0.018;
+      hat.rotation.set(-0.08, -0.12, 0.09);
+      // 先在世界空间定尺寸和倾角，再挂到原始骨骼，避免作者绑定姿态的局部轴偏转。
+      head.attach(hat);
+    }
+  }
 
-  const visual = new THREE.Group();
-  visual.add(body);
-
-  const head = bone(vrm, "head");
-  const leftLeg = bone(vrm, "leftUpperLeg");
-  const rightLeg = bone(vrm, "rightUpperLeg");
-  const leftKnee = bone(vrm, "leftLowerLeg");
-  const rightKnee = bone(vrm, "rightLowerLeg");
-  const leftArm = bone(vrm, "leftUpperArm");
-  const rightArm = bone(vrm, "rightUpperArm");
-  const leftElbow = bone(vrm, "leftLowerArm");
-  const rightElbow = bone(vrm, "rightLowerArm");
-  const chest = bone(vrm, "chest");
-  const hips = bone(vrm, "hips");
-
-  // VRM 的骨架绑定姿态是 T-pose，必须先记下原始朝向，再改成自然下垂的 A-pose
-  const rest = {
-    leftArm: leftArm.quaternion.clone(),
-    rightArm: rightArm.quaternion.clone(),
-    leftLeg: leftLeg.quaternion.clone(),
-    rightLeg: rightLeg.quaternion.clone(),
-    leftKnee: leftKnee.quaternion.clone(),
-    rightKnee: rightKnee.quaternion.clone(),
-    leftElbow: leftElbow.quaternion.clone(),
-    rightElbow: rightElbow.quaternion.clone(),
-    chest: chest.quaternion.clone(),
-    hips: hips.quaternion.clone(),
-  };
-  const ARM_DOWN = 1.22;
-  const AXIS_X = new THREE.Vector3(1, 0, 0);
-  const AXIS_Y = new THREE.Vector3(0, 1, 0);
-  const AXIS_Z = new THREE.Vector3(0, 0, 1);
-  const qx = new THREE.Quaternion();
-  const qy = new THREE.Quaternion();
-  const qz = new THREE.Quaternion();
-
-  // —— 眨眼：只改 blink 表情，不做口型 ——
-  let blinkClock = 0;
-  let blinkNext = 2.6 + Math.random() * 2.2;
-
-  const animate = (dt: number, _t: number, moving: boolean, phase: number) => {
-    // 走路时是一个真正的迈步循环：大腿前后摆、小腿屈膝、手臂反向摆、胸口轻微扭转；
-    // 站着时只有极小的呼吸摆幅，避免"僵尸直腿"。
-    // 姿态用四元数在父空间里叠加：先按 Z 轴把 T-pose 的手臂放下，再按 X 轴做前后摆，
-    // 直接用 Euler 的 x/z 会互相耦合，手臂就会横着飞出去。
-    const amp = moving ? 1 : 0.06;
-    const s = Math.sin(phase);
-
-    // 大腿：前后摆，左腿与右腿反相（正角度 = 脚往身后走）
-    qx.setFromAxisAngle(AXIS_X, s * 0.62 * amp);
-    leftLeg.quaternion.copy(rest.leftLeg).premultiply(qx);
-    qx.setFromAxisAngle(AXIS_X, -s * 0.62 * amp);
-    rightLeg.quaternion.copy(rest.rightLeg).premultiply(qx);
-
-    // 小腿：在腿往后摆的半个周期里屈膝（正角度 = 脚后收，符合膝盖只能往后弯）
-    qx.setFromAxisAngle(AXIS_X, Math.max(0, Math.sin(phase + Math.PI / 2)) * 0.9 * amp);
-    leftKnee.quaternion.copy(rest.leftKnee).premultiply(qx);
-    qx.setFromAxisAngle(AXIS_X, Math.max(0, Math.sin(phase - Math.PI / 2)) * 0.9 * amp);
-    rightKnee.quaternion.copy(rest.rightKnee).premultiply(qx);
-
-    // 手臂：与对侧腿同相摆动（左腿向后时左臂向前）
-    const armSwing = s * 0.55 * amp;
-    qz.setFromAxisAngle(AXIS_Z, -ARM_DOWN);
-    qx.setFromAxisAngle(AXIS_X, -armSwing);
-    leftArm.quaternion.copy(rest.leftArm).premultiply(qz).premultiply(qx);
-    qz.setFromAxisAngle(AXIS_Z, ARM_DOWN);
-    qx.setFromAxisAngle(AXIS_X, armSwing);
-    rightArm.quaternion.copy(rest.rightArm).premultiply(qz).premultiply(qx);
-
-    // 手肘保持一点自然前弯（负角度 = 小臂往前收）
-    qx.setFromAxisAngle(AXIS_X, -0.14 - Math.max(0, armSwing) * 0.4);
-    leftElbow.quaternion.copy(rest.leftElbow).premultiply(qx);
-    qx.setFromAxisAngle(AXIS_X, -0.14 - Math.max(0, -armSwing) * 0.4);
-    rightElbow.quaternion.copy(rest.rightElbow).premultiply(qx);
-
-    // 躯干：胸口与胯部反向轻微扭转，走路才不像一块板
-    qy.setFromAxisAngle(AXIS_Y, s * 0.1 * amp);
-    chest.quaternion.copy(rest.chest).premultiply(qy);
-    qy.setFromAxisAngle(AXIS_Y, -s * 0.06 * amp);
-    hips.quaternion.copy(rest.hips).premultiply(qy);
-
+  // The skeleton carries the long hair with the head. Removing the loose
+  // hair chains also avoids a burst of inertia after a turn or a dropped frame.
+  if (builtin && vrm.springBoneManager) {
+    for (const spring of vrm.springBoneManager.joints) {
+      if (/^J_Sec_(Hair|[LR]_TopsUpperArm)/.test(spring.bone.name)) {
+        vrm.springBoneManager.deleteJoint(spring);
+      }
+    }
+  }
+  const humanoid = vrm.humanoid;
+  const pose = createCapturedPose();
+  const nodes = motionBones.map(name => humanoid.getNormalizedBoneNode(name as VRMHumanBoneName));
+  const legacy = vrm.meta.metaVersion === "0";
+  const fingers: { node: THREE.Object3D; curl: number }[] = [];
+  for (const side of ["left", "right"] as const) {
+    const sign = (side === "left" ? -1 : 1) * (legacy ? -1 : 1);
+    for (const [i, digit] of ["Index","Middle","Ring","Little"].entries()) {
+      for (const [j, joint] of ["Proximal","Intermediate","Distal"].entries()) {
+        const node = humanoid.getNormalizedBoneNode(`${side}${digit}${joint}` as VRMHumanBoneName);
+        if (node) fingers.push({ node, curl: sign * (1 + i * 0.12) * [0.20,0.40,0.21][j] });
+      }
+    }
+  }
+  const soles: SolePoint[] = [];
+  for (const side of ["left", "right"] as const) {
+    const foot = humanoid.getRawBoneNode(`${side}Foot`);
+    if (!foot) continue;
+    const toes = humanoid.getRawBoneNode(`${side}Toes`) ?? foot;
+    const heelPoint = foot.getWorldPosition(new THREE.Vector3());
+    heelPoint.set(heelPoint.x, 0, heelPoint.z - 0.042);
+    const toePoint = toes.getWorldPosition(new THREE.Vector3());
+    toePoint.set(toePoint.x, 0, toePoint.z + (toes === foot ? 0.14 : 0.036));
+    soles.push({ bone: foot, local: foot.worldToLocal(heelPoint) },
+      { bone: toes, local: toes.worldToLocal(toePoint) });
+  }
+  const align = alignAvatar(visual, soles, humanoid.getRawBoneNode("head")!);
+  let blinkClock = 0, nextBlink = 3;
+  const animate = (dt: number, _time: number, m: AvatarMotion) => {
+    pose.sample(m);
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (!node) continue;
+      const q = node.quaternion.copy(pose.bones[i]);
+      if (legacy) { q.x = -q.x; q.z = -q.z; }
+    }
+    const grip = (1 + 1.1 * m.running * (1 - m.jumpWeight)) * (1 - 0.8 * m.swimming);
+    for (const finger of fingers) finger.node.rotation.z = finger.curl * grip;
+    visual.position.x = pose.shift;
     blinkClock += dt;
-    if (blinkClock >= blinkNext) {
+    if (blinkClock > nextBlink) {
       blinkClock = 0;
-      blinkNext = 2.6 + Math.random() * 2.2;
+      nextBlink = 2.8 + Math.random() * 2;
     }
-    const manager = vrm.expressionManager;
-    if (manager) {
-      // 0.18s 内快速闭合再张开
-      const phaseBlink = blinkClock;
-      const value = phaseBlink < 0.18 ? Math.sin((phaseBlink / 0.18) * Math.PI) : 0;
-      manager.setValue("blink", value);
-    }
-    // 发丝物理、表情混合都在这里推进
+    vrm.expressionManager?.setValue("blink", blinkClock < 0.15 ? Math.sin(blinkClock / 0.15 * Math.PI) : 0);
     vrm.update(dt);
+    align(pose.flight, pose.headAboveWater, m);
   };
-
-  const dispose = () => {
-    try {
-      VRMUtils.deepDispose(vrm.scene);
-    } catch (err) {
-      console.warn("[vrm] dispose 失败", err);
-    }
+  let undress: (() => void) | undefined;
+  const setAppearance = (id: AvatarId, clothes: OutfitId, trousers: OutfitId = clothes) => {
+    undress?.();
+    undress = dressFarmer(vrm, id, clothes, trousers);
+    visual.scale.setScalar(scale * (id === "qinghe" ? 1.065 : 1));
+    if (hat) hat.visible = id === "xiaosui" && clothes === "field";
   };
-
-  return {
-    vrm,
-    visual,
-    body,
-    head,
-    leftLeg,
-    rightLeg,
-    leftArm,
-    rightArm,
-    animate,
-    selfAnimated: true,
-    dispose,
-  };
+  if (builtin) setAppearance(avatar, outfit, bottom);
+  return { visual, animate, setAppearance: builtin ? setAppearance : undefined,
+    dispose: () => { undress?.(); VRMUtils.deepDispose(vrm.scene); } };
 }

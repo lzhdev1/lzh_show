@@ -1,129 +1,104 @@
-import { useRef, useState } from "react";
-import { levelFromXp } from "../game/crops";
-import { AVATARS, useGame } from "../game/state";
+import { useRef, useState, type ChangeEvent } from "react";
+import { useGame } from "../game/state";
+import { AVATARS, BOTTOM_NAMES, OUTFITS, outfitPreview, type OutfitId } from "../game/appearance";
 import { getCustomModel, setCustomModel } from "../scene/avatarModel";
 import { useAccount } from "../game/account";
 import { CloseIcon } from "./icons";
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const nickname = useGame((s) => s.nickname);
-  const xp = useGame((s) => s.xp);
-  const setProfile = useGame((s) => s.setProfile);
-  const resetSave = useGame((s) => s.resetSave);
+  const avatarId = useGame((s) => s.avatarId);
+  const outfitId = useGame((s) => s.outfitId);
+  const bottomId = useGame((s) => s.bottomId);
   const notify = useGame((s) => s.notify);
   const user = useAccount((s) => s.user);
-
+  const [tab, setTab] = useState<"closet" | "account">("closet");
   const [draftName, setDraftName] = useState(nickname);
+  const [actor, setActor] = useState(avatarId);
+  const [outfit, setOutfit] = useState(outfitId);
+  const [bottom, setBottom] = useState(bottomId);
   const [modelLabel, setModelLabel] = useState(getCustomModel().label);
   const fileRef = useRef<HTMLInputElement>(null);
-  const level = levelFromXp(xp);
-  const changed = draftName.trim() !== nickname;
-  const avatar = AVATARS[0];
-
+  const avatar = AVATARS.find(a => a.id === actor)!;
+  const suit = OUTFITS.find(o => o.id === outfit)!;
   const save = () => {
-    setProfile(draftName, avatar.id);
+    if (tab === "closet" && modelLabel) setCustomModel(null);
+    useGame.getState().setProfile(tab === "account" ? draftName : nickname,
+      tab === "closet" ? actor : avatarId, tab === "closet" ? outfit : outfitId, tab === "closet" ? bottom : bottomId);
     onClose();
   };
-
-  const reset = () => {
-    if (window.confirm("重置会清空金币、地块和收成，确定要重来吗？")) {
-      resetSave();
-      onClose();
-    }
-  };
-
-  const pickModel = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const pickModel = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".vrm")) {
-      notify("请选择 VRoid 导出的 .vrm 文件", "warn");
-      return;
-    }
-    if (file.size > 40 * 1024 * 1024) {
-      notify("模型太大了（超过 40MB），先精简贴图再导", "warn");
+    if (!file.name.toLowerCase().endsWith(".vrm") || file.size > 40 * 1024 * 1024) {
+      notify("请选择 40 MB 以内的 .vrm 模型", "warn");
       return;
     }
     setCustomModel(URL.createObjectURL(file), file.name);
     setModelLabel(file.name);
-    notify(`已载入模型：${file.name}`);
+    notify("已选择本次游玩的模型");
   };
 
-  const clearModel = () => {
-    setCustomModel(null);
-    setModelLabel(null);
-    notify("已回到内置形象");
-  };
-
-  return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>农场主资料</h2>
-          <button className="icon-btn ghost" onClick={onClose} aria-label="关闭">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="modal-sub">昵称和形象随时可以改，存档会记住你的选择</p>
-
-        <label className="field">
-          <span className="field-label">昵称</span>
-          <input
-            type="text"
-            value={draftName}
-            maxLength={12}
-            placeholder="给自己起个名字"
-            onChange={(e) => setDraftName(e.target.value)}
-          />
-          <span className="field-hint muted small">最多 12 个字 · 当前 Lv{level}</span>
-        </label>
-
-        <h3 className="section-title">当前形象</h3>
-        <div className="avatar-grid single">
-          <div className="avatar-card active static">
-            <img src={avatar.portrait} alt={avatar.name} loading="lazy" />
-            <strong>{avatar.name}</strong>
-            <span className="muted small">{avatar.tagline}</span>
-          </div>
-        </div>
-
-        <h3 className="section-title">导入自己的 3D 模型</h3>
-        <div className="avatar-import">
-          <p className="muted small">
-            在 VRoid Studio 里捏好、导出 .vrm 后选进来就能当场替换角色（仅本次打开有效，刷新后回到内置形象）。
-          </p>
-          <div className="import-actions">
-            <button className="btn plain" onClick={() => fileRef.current?.click()}>
-              选择 .vrm 文件
-            </button>
-            {modelLabel && (
-              <button className="btn plain" onClick={clearModel}>
-                恢复内置形象
-              </button>
-            )}
-          </div>
-          {modelLabel && <p className="small">当前模型：{modelLabel}</p>}
-          <input ref={fileRef} type="file" accept=".vrm" hidden onChange={pickModel} />
-        </div>
-
-        <h3 className="section-title">账号</h3>
-        <div className="account-row">
-          <span className="account-name">{user?.nickname ?? "未登录"}</span>
-          <span className="muted small">进度已存在数据库里</span>
-          <button className="btn plain" onClick={() => useAccount.getState().signOut()}>
-            退出登录
-          </button>
-        </div>
-
-        <div className="modal-actions">
-          <button className="btn plain" onClick={reset}>
-            重置存档
-          </button>
-          <button className="btn primary" onClick={save} disabled={!changed}>
-            保存
-          </button>
-        </div>
+  return <div className="modal-scrim" onClick={onClose}>
+    <section role="dialog" aria-modal="true" aria-labelledby="profile-title" className="modal wardrobe-modal" onClick={e => e.stopPropagation()}>
+      <header className="modal-head"><h2 id="profile-title">农场主</h2>
+        <button type="button" className="icon-btn ghost" aria-label="关闭" onClick={onClose}><CloseIcon /></button>
+      </header>
+      <div className="farm-tabs">
+        <button aria-pressed={tab === "closet"} onClick={() => setTab("closet")}>角色衣橱</button>
+        <button aria-pressed={tab === "account"} onClick={() => setTab("account")}>账号资料</button>
       </div>
-    </div>
-  );
+      {tab === "closet" ? <>
+        <div className="fitting-room">
+          <figure className={`outfit-stage stage-${outfit}`}>
+            <img src={outfitPreview(actor, outfit, bottom)} alt={`${avatar.name}穿着${suit.name}上装和${BOTTOM_NAMES[bottom]}下装的全身效果`} />
+            <figcaption><strong>{avatar.name}</strong><span>{outfit === bottom ? suit.name : "自选搭配"}</span></figcaption>
+          </figure>
+          <div className="closet-choices">
+            <fieldset><legend>角色</legend><div className="actor-options">
+              {AVATARS.map(a => <button key={a.id} aria-pressed={actor === a.id} onClick={() => setActor(a.id)}>
+                <img src={a.portrait} alt="" /><span>{a.name}<small>{a.gender}</small></span></button>)}
+            </div></fieldset>
+            <fieldset><legend>服装套装</legend><div className="suit-options">
+              {OUTFITS.map(s => <button key={s.id} onClick={() => { setOutfit(s.id); setBottom(s.id); }} aria-pressed={outfit === s.id}>
+                <span className={`fabric fabric-${s.id}`} aria-hidden="true" />{s.name}
+                {outfit === s.id && <span className="picked" aria-hidden="true">✓</span>}
+              </button>)}
+            </div></fieldset>
+            <label className="bottom-picker">下装与鞋靴
+              <select value={bottom} onChange={e => setBottom(e.target.value as OutfitId)}>
+                {OUTFITS.map(s => <option key={s.id} value={s.id}>{BOTTOM_NAMES[s.id]}</option>)}
+              </select>
+            </label>
+          </div>
+        </div>
+        {modelLabel && <p className="muted small">当前使用导入模型。穿戴后将切换为所选的内置角色。</p>}
+        <footer className="closet-footer"><button className="btn primary" onClick={save}
+          disabled={actor === avatarId && outfit === outfitId && bottom === bottomId && !modelLabel}>穿戴并保存</button></footer>
+      </> : <>
+        <label className="field"><span className="field-label">昵称</span>
+          <input value={draftName} maxLength={12} onChange={e => setDraftName(e.target.value)} />
+        </label>
+        <h3 className="section-title">本地 VRM 模型</h3>
+        <div className="avatar-import">
+          <p className="muted small">{modelLabel ?? "可导入 40 MB 以内的 .vrm 文件，仅在本次游玩中使用。"}</p>
+          <div className="import-actions"><button className="btn plain" onClick={() => fileRef.current?.click()}>选择模型</button>
+            {modelLabel && <button className="btn plain" onClick={() => { setCustomModel(null); setModelLabel(null); }}>恢复内置形象</button>}</div>
+          <input ref={fileRef} type="file" accept=".vrm" hidden onChange={pickModel}/>
+        </div>
+        <h3 className="section-title">账号</h3>
+        <div className="account-row"><strong>{user?.username}</strong>
+          <button className="btn plain" onClick={() => { onClose(); useAccount.getState().signOut(); }}>退出登录</button></div>
+        <div className="modal-actions">
+          <button className="btn plain" onClick={() => {
+            if (window.confirm("重置会清空金币、地块、收成和装扮，确定要重来吗？")) {
+              useGame.getState().resetSave(); onClose();
+            }
+          }}>重置存档</button>
+          <button className="btn primary" disabled={draftName.trim() === nickname} onClick={save}>保存昵称</button>
+        </div>
+      </>}
+    </section>
+  </div>;
 }

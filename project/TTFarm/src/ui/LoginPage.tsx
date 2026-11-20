@@ -36,7 +36,7 @@ export function LoginPage() {
             }}
             placeholder="2-16 位中文、字母、数字或下划线"
             maxLength={16}
-            autoFocus
+            autoComplete="username"
             spellCheck={false}
           />
         </label>
@@ -76,7 +76,7 @@ export function LoginPage() {
         </div>
 
         <p className="login-note">
-          现在只要填账号就能进，密码字段已经留在库里，等以后要开密码登录再接上。
+          在其他设备输入同一账号，即可继续这座农场的进度。
         </p>
       </div>
     </div>

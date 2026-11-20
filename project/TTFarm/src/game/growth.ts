@@ -1,4 +1,5 @@
 import { CROPS, type CropId } from "./crops";
+import type { Mutation } from "./weather";
 
 export interface PlotState {
   id: number;
@@ -8,6 +9,7 @@ export interface PlotState {
   plantedAt: number;
   /** 已浇水次数，受上限约束 */
   watered: number;
+  mutation: Mutation | null;
 }
 
 export const MAX_WATER = 3;

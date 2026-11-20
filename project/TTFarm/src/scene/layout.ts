@@ -14,12 +14,55 @@ export const MOUNTAIN_LINE = 164;
 export const GATE_GAP = 32;
 
 /** 农场围栏（矩形），正面（+z）和后墙（-z）各开一道门 */
-export const FENCE_X = 11.6;
-export const FENCE_Z = 8.6;
-export const GATE_HALF = 1.7;
+export const FENCE_X = 20;
+export const FENCE_Z = 15;
+export const GATE_HALF = 2.2;
+export const FARM_BARN = { x: -13.1, z: -4.3, yaw: 0.50 };
+export const FARM_MILL = { x: 12.7, z: -9.4, yaw: -0.48 };
+export const FARM_SIGN = { x: -4.05, z: FENCE_Z - 0.7, yaw: 0.26 };
 
 /** 河宽的一半 */
 export const RIVER_HALF_WIDTH = 6.5;
+
+/**
+ * 河谷横截面：河不是平铺在地上的一条蓝带，而是草地上真正凹下去的一道沟。
+ * 岸肩与草地齐平 → 下坡 → 水面线 → 水下坡 → 河床底。
+ * 水面宽度就取 waterLine，正好与岸坡相交，不会出现"水浮在岸上"的悬空边。
+ */
+export const RIVER_BED = {
+  /** 与草地齐平的外缘（岸肩外沿） */
+  shoulder: 11.4,
+  /** 平肩结束、开始下坡的位置 */
+  edge: 8.4,
+  /** 水面与岸坡的交线（水面宽度） */
+  waterLine: 7.0,
+  /** 水面高度：低于草地 0.5 米，看着才像一条沟里的水 */
+  waterY: -0.5,
+  /** 河床底平台边缘 */
+  bedEdge: 2.6,
+  /** 河床最低处 */
+  bedY: -1.60,
+};
+
+/** 距河心 dist 处的河谷地面高度（水下的地形；岸肩外返回 0） */
+export function riverBedHeight(dist: number): number {
+  const { shoulder, edge, waterLine, waterY, bedEdge, bedY } = RIVER_BED;
+  if (dist >= shoulder) return 0;
+  if (dist >= edge) {
+    // 岸肩：比草地高 4mm，避免和地面 z-fighting
+    const t = (shoulder - dist) / (shoulder - edge);
+    return 0.004 * t;
+  }
+  if (dist >= waterLine) {
+    const t = (edge - dist) / (edge - waterLine);
+    return 0.004 + (waterY - 0.004) * t * t;
+  }
+  if (dist >= bedEdge) {
+    const t = (waterLine - dist) / (waterLine - bedEdge);
+    return waterY + (bedY - waterY) * t;
+  }
+  return bedY;
+}
 
 /**
  * 河：从地图左下角的山脚流出来，沿 +z 边往右拐一段，
@@ -85,6 +128,7 @@ export const BRIDGE = {
   halfWidth: 2.7,
   /** 桥面高度 */
   deckY: 0.62,
+  rampLength: 3.0,
 };
 
 /** 点到河道中心线的最近距离，同时给出从中心指向该点的单位法线 */
@@ -92,7 +136,7 @@ export function riverInfo(
   x: number,
   z: number
 ): { dist: number; nx: number; nz: number; cx: number; cz: number } {
-  let best = Infinity;
+  let bestSq = Infinity;
   let bx = x;
   let bz = z;
   let nx = 1;
@@ -111,14 +155,15 @@ export function riverInfo(
     const pz = a.z + abz * t;
     const dx = x - px;
     const dz = z - pz;
-    const d = Math.hypot(dx, dz);
-    if (d < best) {
-      best = d;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestSq) {
+      bestSq = d2;
       bx = px;
       bz = pz;
     }
   }
 
+  const best = Math.sqrt(bestSq);
   if (best > 1e-6) {
     nx = (x - bx) / best;
     nz = (z - bz) / best;
@@ -147,6 +192,15 @@ export function onBridge(x: number, z: number, pad = 0): boolean {
   return Math.abs(along) <= BRIDGE.halfLength && Math.abs(across) <= BRIDGE.halfWidth + pad;
 }
 
+/** Height of the bridge deck or its two inclined approach ramps. */
+export function bridgeHeightAt(x: number, z: number): number | undefined {
+  const dx = x - BRIDGE.x, dz = z - BRIDGE.z;
+  const along = Math.abs(dx * BRIDGE.nx + dz * BRIDGE.nz);
+  const across = Math.abs(-dx * BRIDGE.nz + dz * BRIDGE.nx);
+  if (across > BRIDGE.halfWidth || along > BRIDGE.halfLength + BRIDGE.rampLength) return;
+  return BRIDGE.deckY * (1 - Math.max(0, along - BRIDGE.halfLength) / BRIDGE.rampLength);
+}
+
 /** 点位是否落在可走的方形范围内 */
 export function inWorld(x: number, z: number): boolean {
   return Math.abs(x) <= WORLD_HALF && Math.abs(z) <= WORLD_HALF;
@@ -160,12 +214,17 @@ export const ROAD_HALF_WIDTH = 1.2;
  * 有这条路，出门往桥走这件事才不显得像在空地上乱窜。
  */
 const ROAD_CTRL: Array<[number, number]> = [
-  [0, 9.6],
-  [4, 16],
+  [0, 7.4],
+  [0, FENCE_Z - 2.4],
+  [0, FENCE_Z + 0.5],
+  [3, 20],
   [9, 24],
   [13, 32],
   [17, 39],
-  [20.5, 45],
+  [BRIDGE.x - BRIDGE.nx * (BRIDGE.halfLength + BRIDGE.rampLength + 2.5),
+   BRIDGE.z - BRIDGE.nz * (BRIDGE.halfLength + BRIDGE.rampLength + 2.5)],
+  [BRIDGE.x - BRIDGE.nx * (BRIDGE.halfLength + BRIDGE.rampLength - 0.35),
+   BRIDGE.z - BRIDGE.nz * (BRIDGE.halfLength + BRIDGE.rampLength - 0.35)],
 ];
 
 export const ROAD_POINTS: THREE.Vector3[] = new THREE.CatmullRomCurve3(
@@ -177,7 +236,7 @@ export const ROAD_POINTS: THREE.Vector3[] = new THREE.CatmullRomCurve3(
 
 /** 点到土路中心线的最近距离 */
 export function roadInfo(x: number, z: number): number {
-  let best = Infinity;
+  let bestSq = Infinity;
   for (let i = 0; i < ROAD_POINTS.length - 1; i += 1) {
     const a = ROAD_POINTS[i];
     const b = ROAD_POINTS[i + 1];
@@ -188,8 +247,9 @@ export function roadInfo(x: number, z: number): number {
       lenSq === 0
         ? 0
         : Math.max(0, Math.min(1, ((x - a.x) * abx + (z - a.z) * abz) / lenSq));
-    const d = Math.hypot(x - (a.x + abx * t), z - (a.z + abz * t));
-    if (d < best) best = d;
+    const dx = x - (a.x + abx * t);
+    const dz = z - (a.z + abz * t);
+    bestSq = Math.min(bestSq, dx * dx + dz * dz);
   }
-  return best;
+  return Math.sqrt(bestSq);
 }

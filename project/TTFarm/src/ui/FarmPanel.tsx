@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { PLOT_COUNT, landPriceOf, useGame } from "../game/state";
 import { CloseIcon, CoinIcon, LandIcon } from "./icons";
+import { useClock } from "../game/clock";
+import { MUTATIONS, WEATHER, weatherAt, weatherEndsAt } from "../game/weather";
+import { formatRemain } from "../game/growth";
+import { FarmDecorPanel } from "./FarmDecorPanel";
 
 const money = (value: number) => value.toLocaleString("zh-CN");
 
 /** 农场面板：目前只放扩建，能一次选好几块地一起扩建 */
 export function FarmPanel({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState<"field" | "decor">("field");
   const coins = useGame((s) => s.coins);
   const plots = useGame((s) => s.plots);
   const expandBy = useGame((s) => s.expandBy);
+  const now = useClock((s) => s.now);
+  const weatherKind = weatherAt(now);
+  const weather = WEATHER[weatherKind];
+  const variety = MUTATIONS[weather.mutation];
+  const next = WEATHER[weatherAt(weatherEndsAt(now))];
 
   const unlocked = plots.filter((p) => p.unlocked).length;
   const locked = plots.filter((p) => !p.unlocked);
@@ -24,7 +34,7 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label="农场" className="modal estate-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>农场</h2>
           <div className="coin-pill">
@@ -35,9 +45,24 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
             <CloseIcon />
           </button>
         </div>
-        <p className="modal-sub">
+        <div className="farm-tabs">
+          <button aria-pressed={tab === "field"} onClick={() => setTab("field")}>农田管理</button>
+          <button aria-pressed={tab === "decor"} onClick={() => setTab("decor")}>庭院装饰</button>
+        </div>
+        {tab === "decor" ? <FarmDecorPanel onClose={onClose}/> : <><p className="modal-sub">
           共 {PLOT_COUNT} 块地，已开垦 {unlocked} 块{locked.length > 0 ? `，还有 ${locked.length} 块待扩建` : "，全部开垦完毕"}
         </p>
+
+        <h3 className="section-title">田间气象</h3>
+        <div className="row">
+          <div className="row-main">
+            <strong>{weather.label} · {formatRemain(weatherEndsAt(now) - now)}后转为{next.label}</strong>
+            <span className="muted small">
+              此时播种有 {Math.round(weather.chance * 100)}% 概率培育出{variety.label}变异，售价 ×{variety.multiplier}。
+              {weatherKind === "rain" ? "雨水会替新种下的作物浇一次水。" : ""}
+            </span>
+          </div>
+        </div>
 
         <h3 className="section-title">扩建</h3>
         {locked.length > 0 ? (
@@ -94,7 +119,7 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
               {plot.id + 1}
             </span>
           ))}
-        </div>
+        </div></>}
       </div>
     </div>
   );

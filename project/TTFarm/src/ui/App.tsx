@@ -7,13 +7,30 @@ import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./ic
 import { PlotSheet } from "./PlotSheet";
 import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
+import { farmInput, releaseTouchInput } from "../game/input";
+import { ControlGuide, TouchControls, WeatherBadge } from "./FieldControls";
 import { FarmPanel } from "./FarmPanel";
+import { Leaderboard, TrophyIcon } from "./Leaderboard";
 
 export function App() {
   const token = useAccount((s) => s.token);
+  const [touchActive, setTouchActive] = useState(() => matchMedia("(pointer: coarse)").matches);
+  useEffect(() => {
+    const pointer = (event: PointerEvent) => setTouchActive(event.pointerType !== "mouse");
+    const keyboard = (event: KeyboardEvent) => {
+      if (!(event.target instanceof HTMLInputElement)) setTouchActive(false);
+    };
+    window.addEventListener("pointerdown", pointer, true);
+    window.addEventListener("keydown", keyboard);
+    return () => {
+      window.removeEventListener("pointerdown", pointer, true);
+      window.removeEventListener("keydown", keyboard);
+    };
+  }, []);
   const [shopOpen, setShopOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [farmOpen, setFarmOpen] = useState(false);
+  const [rankingOpen, setRankingOpen] = useState(false);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
   useEffect(() => {
@@ -30,6 +47,22 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
+  const panelOpen = shopOpen || profileOpen || farmOpen || rankingOpen;
+  useEffect(() => {
+    if (!panelOpen) return;
+    const dismiss = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing) return;
+      setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => window.removeEventListener("keydown", dismiss);
+  }, [panelOpen]);
+  useEffect(() => {
+    farmInput.blocked = !token || panelOpen;
+    releaseTouchInput();
+    return () => { farmInput.blocked = true; };
+  }, [token, panelOpen]);
+
   const level = levelFromXp(xp);
   const nextXp = nextLevelXp(level);
   const prevXp = LEVEL_XP[level - 1] ?? 0;
@@ -40,7 +73,7 @@ export function App() {
   if (!token) return <LoginPage />;
 
   return (
-    <div className="hud">
+    <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
       <header className="topbar">
         <button className="profile-chip" onClick={() => setProfileOpen(true)} aria-label="查看农场主资料">
           <img src={avatar.portrait} alt="" />
@@ -56,6 +89,9 @@ export function App() {
         </button>
 
         <div className="top-right">
+          <button className="icon-btn rank-trigger" aria-label="金币排行榜" title="金币排行榜" onClick={() => setRankingOpen(true)}>
+            <TrophyIcon /><span>排行</span>
+          </button>
           <div className="coin-pill" aria-label={`金币 ${coins}`}>
             <CoinIcon />
             <b>{coins.toLocaleString("zh-CN")}</b>
@@ -71,7 +107,10 @@ export function App() {
       </header>
 
       {selectedPlot === null && (
-        <div className="hint">点击地块走过去 · WASD 走动 · 拖拽旋转视角 · 滚轮缩放 · 按 R 或双击画面复位</div>
+        <>
+          <div className="field-status"><WeatherBadge onOpen={() => setFarmOpen(true)} /><ControlGuide /></div>
+          {!panelOpen && <TouchControls />}
+        </>
       )}
 
       <div className="dock">
@@ -111,6 +150,7 @@ export function App() {
       {shopOpen && <ShopPanel onClose={() => setShopOpen(false)} />}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {farmOpen && <FarmPanel onClose={() => setFarmOpen(false)} />}
+      {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
 
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (

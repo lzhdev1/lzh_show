@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { PALETTE, clay } from "./materials";
 
 /** 固定种子随机：每次刷新场景细节一样，不会东一块西一块地跳 */
@@ -31,48 +32,10 @@ function rounded(w: number, h: number, d: number, r: number): THREE.BufferGeomet
   return new RoundedBoxGeometry(w, h, d, 2, r);
 }
 
-function addShadow(mesh: THREE.Mesh, receive = true): THREE.Mesh {
+function addShadow<M extends THREE.Mesh>(mesh: M, receive = true): M {
   mesh.castShadow = true;
   mesh.receiveShadow = receive;
   return mesh;
-}
-
-/* ---------------- 栅栏 ---------------- */
-
-export function buildFenceSegment(length: number, height = 0.95): THREE.Group {
-  const group = new THREE.Group();
-
-  // 立柱：圆锥收一下上端，再加个圆头，不再是一根方柱
-  const post = new THREE.Group();
-  const postBody = addShadow(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.085, height, 12), clay(PALETTE.wood))
-  );
-  postBody.position.y = height / 2;
-  post.add(postBody);
-  const cap = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.078, 12, 8), clay(PALETTE.plank)));
-  cap.position.y = height;
-  cap.scale.y = 0.7;
-  post.add(cap);
-  post.position.x = -length / 2;
-  post.rotation.z = between(-0.02, 0.02);
-  group.add(post);
-
-  const post2 = post.clone();
-  post2.position.x = length / 2;
-  post2.rotation.z = between(-0.02, 0.02);
-  group.add(post2);
-
-  // 两道横杆：略带上扬的圆角板
-  [0.42, 0.72].forEach((h, i) => {
-    const rail = addShadow(
-      new THREE.Mesh(rounded(length, 0.1, 0.07, 0.035), clay(i === 0 ? PALETTE.plank : PALETTE.wood))
-    );
-    rail.position.y = h;
-    rail.rotation.z = between(-0.012, 0.012);
-    group.add(rail);
-  });
-
-  return group;
 }
 
 /* ---------------- 谷仓 ---------------- */
@@ -219,8 +182,109 @@ export function buildBarn(): THREE.Group {
   barrel.position.set(1.95, 0, 0.8);
   group.add(barrel);
 
-  group.position.set(-4.9, 0, -4.9);
-  group.rotation.y = 0.22;
+  // The gable end and side wall are visible at player height. Projecting eaves,
+  // limewashed corner trim and dark glazing give the barn readable depth.
+  const trim = clay(0xf3ddb3);
+  for (const x of [-1, 1]) {
+    for (const z of [-1,1]) {
+      const corner = new THREE.Mesh(new THREE.BoxGeometry(.11,H,.12),trim);
+      corner.position.set(x*(W/2-.03),H/2+.22,z*(D/2-.035));
+      group.add(corner);
+    }
+    const sideZ = .08;
+    const jamb = new THREE.Mesh(new THREE.BoxGeometry(.091,.87,1.06),trim);
+    jamb.position.set(x*(W/2+.018),1.36,sideZ);
+    group.add(jamb);
+    for (const k of [-1,1]) {
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(.043,.67,.36),clay(0x5f8587));
+      pane.position.set(x*(W/2+.078),1.35,sideZ+k*.22);
+      group.add(pane);
+      const shutter = new THREE.Mesh(new THREE.BoxGeometry(.09,.83,.28),clay(0x738c82));
+      shutter.position.set(x*(W/2+.075),1.35,sideZ+k*.70);
+      group.add(shutter);
+    }
+    const box = new THREE.Mesh(new THREE.BoxGeometry(.29,.21,1.23),clay(0xbd946d));
+    box.position.set(x*(W/2+.14),.90,sideZ);
+    group.add(box);
+    for (let i=0;i<6;i++) {
+      const sprig = buildFlower(i%3 === 0 ? 0xe5a0b3 : 0xffdf9e);
+      sprig.position.set(x*(W/2+.16),1.0,sideZ+i*.17-.42);
+      sprig.scale.setScalar(.8);
+      group.add(sprig);
+    }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(.099,.055,.99),trim);
+    bar.position.set(x*(W/2+.10),1.36,sideZ);
+    group.add(bar);
+    const eave = new THREE.Mesh(new THREE.BoxGeometry(.13,.16,D+.72),clay(0xefcfa5));
+    eave.position.set(x*(W/2+.26),ridgeY-.82,0);
+    group.add(eave);
+  }
+  for (const y of [0.43,.97]) {
+    const hinge = new THREE.Mesh(new THREE.BoxGeometry(.22,.058,.064),clay(0x786859));
+    hinge.position.set(-.36,y+.24,D/2+.13);
+    group.add(hinge);
+  }
+  // The ridgeline carries a timber cupola, a folded copper cap and a swallow vane.
+  const detail = (geometry: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => {
+    const mesh = new THREE.Mesh(geometry, clay(color));
+    mesh.position.set(x,y,z);
+    group.add(mesh);
+    return mesh;
+  };
+  const board = (color: number, x: number, y: number, z: number, w: number, h: number, d: number) =>
+    detail(new THREE.BoxGeometry(w,h,d),color,x,y,z);
+  const copper = 0x537a73, cream = 0xf5dfa7, timber = 0x6e5141;
+  board(timber, 0, 3.15, -.21, .93, .24, .89);
+  board(cream, 0, 3.45, -.21, .74, .54, .69);
+  for (const side of [-1,1]) {
+    board(timber,0,3.45,-.21+side*.35,.53,.35,.028);
+    board(timber,side*.38,3.45,-.21,.028,.35,.48);
+    for (let i = 0; i < 4; i++) {
+      board(0xc4ab80,0,3.30+i*.085,-.21+side*.37,.55,.032,.055);
+      board(0xc4ab80,side*.397,3.30+i*.085,-.21,.055,.032,.51);
+    }
+  }
+  board(cream,0,3.74,-.21,1,.09,.92);
+  const cap = detail(new THREE.ConeGeometry(.72,.53,4),copper,0,4.02,-.21);
+  cap.rotation.y=Math.PI/4; cap.scale.z=.92;
+  detail(new THREE.CylinderGeometry(.015,.022,.41,7),timber,0,4.41,-.21);
+  detail(new THREE.OctahedronGeometry(.058),0xe1b96b,0,4.37,-.21);
+  board(timber,0,4.55,-.21,.56,.027,.028);
+  const vane = new THREE.Shape();
+  vane.moveTo(-.24,.11);vane.lineTo(-.12,.04);vane.lineTo(-.06,.10);
+  vane.lineTo(.02,.062);vane.lineTo(.13,.12);vane.lineTo(.16,.08);
+  vane.lineTo(.24,.065);vane.lineTo(.16,.045);vane.quadraticCurveTo(.10,-.05,-.05,-.045);
+  vane.lineTo(-.24,-.02);vane.lineTo(-.15,.035);vane.closePath();
+  detail(new THREE.ExtrudeGeometry(vane,{depth:.028,bevelEnabled:false}),0xb98a4f,0,4.58,-.22);
+
+  // Dark window recesses sit behind cream muntins. A little patinated canopy
+  // and gable brackets cast shadows over the double door at player height.
+  for (const x of [-.95,.95]) {
+    for (const dx of [-.105,.105]) for (const dy of [-.105,.105]) {
+      board(dy>0?0x688e91:0x93ada7,x+dx,1.37+dy,1.474,.158,.158,.015);
+    }
+  }
+  board(0x946247,0,1.04,1.518,.023,1.48,.022);
+  for (const side of [-1,1]) {
+    detail(new THREE.SphereGeometry(.042,8,6),0xb69a64,side*.082,.93,1.55);
+    board(timber,side*.62,1.83,1.53,.075,.46,.08).rotation.x=.57;
+    board(cream,side*.84,2.64,1.475,1.83,.074,.085).rotation.z=-side*slopeAngle;
+    board(0x9d7051,side*.45,2.48,1.46,.076,.55,.065).rotation.z=side*.66;
+  }
+  board(0x5f7567,0,1.99,1.64,1.59,.105,.57).rotation.x=.18;
+  board(cream,0,1.955,1.92,1.64,.07,.077);
+  for (const x of [-.70,-.35,0,.35,.70]) {
+    board(copper,x,2.05,1.64,.035,.035,.58).rotation.x=.18;
+  }
+  // Split the straw roll into tied layers, with woven rings visible on the ends.
+  for (const offset of [-.15,.15]) {
+    const band = detail(new THREE.TorusGeometry(.341,.018,5,14),0xc89250,-2.05+offset,.36,.6);
+    band.rotation.y=Math.PI/2;
+  }
+  for (const side of [-1,1]) {
+    const coil = detail(new THREE.TorusGeometry(.18,.017,4,14),0xddab50,-2.05+side*.256,.36,.6);
+    coil.rotation.y=Math.PI/2;
+  }
   return group;
 }
 
@@ -311,21 +375,29 @@ function makePeak(radius: number, height: number, segments: number, variant: num
   const geo = new THREE.ConeGeometry(radius, height, segments, 4, false);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i += 1) {
+  const colors = new Float32Array(pos.count * 3);
+  const foothill = new THREE.Color(0x728f82);
+  const mountain = new THREE.Color(0x81979b);
+  const rock = new THREE.Color(0xbbc6bc);
+  const peakColor = new THREE.Color();
+  const skew = variant * 2.13;
+  for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
-    const t = (v.y + height / 2) / height; // 0 山脚 → 1 山顶
-    const wobble = 1 + Math.sin(v.x * 0.42 + v.z * 0.35 + variant * 2.1) * 0.24 * (1 - t * 0.55);
-    v.x *= wobble;
-    v.z *= wobble;
-    v.y += Math.sin(t * 6.2 + variant * 1.7) * height * 0.04;
-    // 山顶削平一小截：低模山的顶尖太薄太尖，削成小平台更像山，也不扎眼
-    const flat = height / 2 - height * 0.08;
-    if (v.y > flat) v.y = flat;
+    const t = (v.y + height / 2) / height;
+    const theta = Math.atan2(v.z, v.x);
+    const ridge = 1 + .18*Math.sin(theta*3. + skew) + .08*Math.sin(theta*5. - skew);
+    const shoulder = 1 + .22*Math.sin(t * Math.PI*1.7);
+    v.x = v.x * ridge * shoulder + radius * .19 * t*t * Math.sin(skew);
+    v.z = v.z * ridge * shoulder + radius * .26 * t*t * Math.cos(skew);
+    v.y += height*.105 * Math.sin(theta*2.+skew) * Math.sin(t*Math.PI);
     pos.setXYZ(i, v.x, v.y, v.z);
+    const crag = THREE.MathUtils.smoothstep(t + .10*Math.sin(3.*theta+skew), .39, .91);
+    peakColor.copy(foothill).lerp(mountain, THREE.MathUtils.smoothstep(t, .10,.46)).lerp(rock,crag*.70);
+    peakColor.toArray(colors, i*3);
   }
+  geo.setAttribute("color",new THREE.BufferAttribute(colors,3));
   geo.computeVertexNormals();
-  // 山体走柔光，不做大三角棱面：一圈山排开时棱面会碎成一排纸片
-  return new THREE.Mesh(geo, clay(PALETTE.mountain, { roughness: 0.96 }));
+  return new THREE.Mesh(geo,flowerMaterial());
 }
 
 /** 远山：主峰 + 两座侧峰 + 山脚矮丘，一座就是一小段山脊 */
@@ -358,51 +430,66 @@ export function buildMountain(radius: number, height: number, variant: number): 
   return group;
 }
 
+/** Three silhouettes share the meadow: orchard trees, flowering cherries and cypresses. */
 export function buildTree(scale: number, variant: number): THREE.Group {
-  const group = new THREE.Group();
-
-  // 树干：底部粗、往上收，带一点弧度
-  const trunk = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.19, 1.25, 12), clay(0x9c6a3e, { roughness: 0.9 })));
-  trunk.position.y = 0.62;
-  group.add(trunk);
-
-  // 两根分枝：让树干不是一根直筒
-  [[0.32, 1.05, 0.55], [-0.3, 1.15, -0.4]].forEach(([x, y], i) => {
-    const branch = addShadow(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.075, 0.6, 8), clay(0x9c6a3e, { roughness: 0.9 }))
-    );
-    branch.position.set(x, y, 0);
-    branch.rotation.z = i === 0 ? -0.55 : 0.6;
-    group.add(branch);
-  });
-
-  // 树冠：一簇揉皱的球，三层深浅绿，边缘不规则
-  const greens = [PALETTE.leaf, PALETTE.leafLight, PALETTE.leafDark, 0xa9dd74];
-  const blobs: Array<[number, number, number, number]> = [
-    [0, 1.72, 0, 0.88],
-    [-0.52, 1.5, 0.2, 0.62],
-    [0.55, 1.56, -0.18, 0.56],
-    [0.1, 2.12, 0.1, 0.52],
-    [-0.3, 2.0, -0.5, 0.44],
-    [0.36, 1.95, 0.52, 0.42],
-  ];
-  blobs.forEach(([bx, by, bz, r], i) => {
-    const crown = addShadow(
-      new THREE.Mesh(lumpy(r, 2, 0.09), clay(greens[(i + variant) % greens.length], { roughness: 0.92 }))
-    );
-    crown.position.set(bx, by, bz);
-    crown.scale.set(1, 0.94, 1);
-    crown.rotation.set(i * 0.5, i * 0.9, i * 0.3);
-    group.add(crown);
-  });
-
-  group.scale.setScalar(scale);
-  return group;
+  const tree = new THREE.Group();
+  const blossom = variant % 7 === 1;
+  const cypress = variant % 5 === 4 && !blossom;
+  const bark = clay(blossom ? 0x795c66 : 0x8c674c);
+  const wood = (start: THREE.Vector3, end: THREE.Vector3, base: number, tip: number) => {
+    const axis = end.clone().sub(start);
+    const twig = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(tip, base, axis.length(), 7), bark));
+    twig.position.copy(start).lerp(end, 0.5);
+    twig.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+    tree.add(twig);
+  };
+  const fork = new THREE.Vector3(0.09, 1.12, 0);
+  wood(new THREE.Vector3(), fork, 0.20, 0.11);
+  const crownColors = blossom
+    ? [0xd892a8, 0xf4b6c5, 0xf8ccd3, 0xdd94a9, 0xffdfdc]
+    : [0x689b65, 0x83aa64, 0xa0c477, 0x77a86d, 0xc0d88a];
+  if (cypress) {
+    for (let tier = 0; tier < 4; tier++) {
+      const cone = addShadow(new THREE.Mesh(
+        new THREE.ConeGeometry(0.90 - tier * 0.17, 1.4 - tier * 0.15, 9),
+        clay([0x386e61, 0x488875, 0x63a28b, 0x82b6a0][tier], { flatShading: true })
+      ));
+      cone.position.set(0.08, 1.30 + tier * 0.40, 0);
+      cone.rotation.y = tier * 0.49;
+      tree.add(cone);
+    }
+  } else {
+    const lobes = [
+      [-0.55, 1.65, 0.15, 0.75], [0.5, 1.84, 0.24, 0.70],
+      [0.12, 2.09, -0.35, 0.91], [-0.31, 2.25, 0.28, 0.70],
+      [0.16, 2.50, 0.02, 0.53],
+    ];
+    lobes.forEach(([x, y, z, r], index) => {
+      if (index < 3) wood(fork, new THREE.Vector3(x, y, z), 0.10, 0.045);
+      const geo = lumpy(r, 1, 0.15);
+      const positions = geo.getAttribute("position");
+      const colors = new Float32Array(positions.count * 3);
+      const shaded = new THREE.Color(crownColors[index]);
+      const tip = shaded.clone().lerp(new THREE.Color(blossom ? 0xffebdf : 0xd8e8a0), 0.36);
+      const c = new THREE.Color();
+      for (let i = 0; i < positions.count; i++) {
+        c.copy(shaded).lerp(tip, THREE.MathUtils.smoothstep(positions.getY(i) / r, -0.25, 0.9)).toArray(colors, i * 3);
+      }
+      geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+      const crown = addShadow(new THREE.Mesh(geo, flowerMaterial()));
+      crown.position.set(x, y, z);
+      crown.scale.set(1.17, blossom ? 0.67 : 0.82, 1);
+      crown.rotation.y = index * 1.61;
+      tree.add(crown);
+    });
+  }
+  tree.scale.setScalar(scale);
+  return tree;
 }
 
 /* ---------------- 石头 / 草丛 / 花 / 灌木 ---------------- */
 
-export function buildRock(scale: number): THREE.Mesh {
+export function buildRock(scale: number) {
   const rock = addShadow(new THREE.Mesh(lumpy(0.36, 2, 0.16), clay(0xcfcaba, { roughness: 0.95 })));
   rock.scale.set(scale, scale * 0.72, scale * 1.05);
   rock.position.y = 0.17;
@@ -410,50 +497,9 @@ export function buildRock(scale: number): THREE.Mesh {
   return rock;
 }
 
-function grassBladeTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  ctx.clearRect(0, 0, 128, 128);
-  for (let i = 0; i < 9; i += 1) {
-    const x = 12 + i * 13 + between(-4, 4);
-    const h = between(70, 118);
-    const leftCtl = x + between(-16, -8);
-    const width = between(3.5, 6);
-    const g = ctx.createLinearGradient(0, 128, 0, 128 - h);
-    g.addColorStop(0, "#3f8a33");
-    g.addColorStop(1, "#9ad964");
-    ctx.strokeStyle = g;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.moveTo(x, 128);
-    ctx.quadraticCurveTo(leftCtl, 128 - h * 0.55, x + between(-6, 6), 128 - h);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-let grassTex: THREE.CanvasTexture | null = null;
-
 export function buildGrassTuft(): THREE.Group {
   const group = new THREE.Group();
-  grassTex ??= grassBladeTexture();
-  const mat = new THREE.MeshStandardMaterial({
-    map: grassTex,
-    transparent: true,
-    alphaTest: 0.42,
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-  });
-  for (let i = 0; i < 3; i += 1) {
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.44), mat);
-    card.position.y = 0.22;
-    card.rotation.y = (i / 3) * Math.PI + between(-0.1, 0.1);
-    group.add(card);
-  }
+  group.add(new THREE.Mesh(grassTuftGeometry(), grassTuftMaterial()));
   return group;
 }
 
@@ -485,6 +531,122 @@ export function buildFlower(color: number): THREE.Group {
   return group;
 }
 
+/* ---------------- 可实例化的草丛与野花 ----------------
+ * 草原上要密铺几千簇草和花，一簇三个 mesh、一朵花八个 mesh 会把 draw call 撑爆。
+ * 这里把部件合并成一份几何、用顶点色区分茎叶花瓣，交给 InstancedMesh 一次画完。 */
+
+/** 给整份几何统一涂一个颜色，合并后各部件就还分得清 */
+function tinted(geo: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
+  const c = new THREE.Color(color);
+  const count = geo.attributes.position.count;
+  const arr = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    arr[i * 3] = c.r;
+    arr[i * 3 + 1] = c.g;
+    arr[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+  return geo;
+}
+
+let tuftGeoCache: THREE.BufferGeometry | null = null;
+/** Seven folded, tapered blades. Opaque triangles avoid alpha-card overdraw. */
+export function grassTuftGeometry(): THREE.BufferGeometry {
+  if (tuftGeoCache) return tuftGeoCache;
+  const xyz: number[] = [], colors: number[] = [];
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.40, x = Math.cos(a), z = Math.sin(a);
+    const r = 0.045 + (i % 3) * 0.025, w = 0.031;
+    const h = 0.16 + (i % 4) * 0.065, lean = r + h * 0.52;
+    const left = [r*x - w*z, 0, r*z + w*x], right = [r*x + w*z, 0, r*z - w*x];
+    const fold = [x*(r+0.02), h*0.54, z*(r+0.02)], tip = [x*lean, h, z*lean];
+    xyz.push(...left, ...fold, ...tip, ...fold, ...right, ...tip);
+    for (const hex of [0x53845f, 0x87af6c, 0xb7cd84, 0x6d9b63, 0x54845e, 0xb0c97e]) {
+      const c = new THREE.Color(hex);
+      colors.push(c.r, c.g, c.b);
+    }
+  }
+  tuftGeoCache = new THREE.BufferGeometry();
+  tuftGeoCache.setAttribute("position", new THREE.Float32BufferAttribute(xyz, 3));
+  tuftGeoCache.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  tuftGeoCache.computeVertexNormals();
+  return tuftGeoCache;
+}
+
+const windTime = { value: 0 };
+export function updateGrassWind(t: number) { windTime.value = t; }
+
+function meadowVertexShader(material: THREE.MeshStandardMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.windTime = windTime;
+    shader.vertexShader = "uniform float windTime;\n" + shader.vertexShader.replace("#include <begin_vertex>", `
+      #include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vec2 origin = instanceMatrix[3].xz;
+        float seed = fract(sin(dot(origin,vec2(19.23,71.1)))*1673.42);
+        float distanceToEye = distance(instanceMatrix[3].xyz, cameraPosition);
+        // Thin out the smallest silhouettes gradually before they become subpixel.
+        float limit = 27.+seed*39.;
+        transformed *= 1.-smoothstep(limit,limit+9.,distanceToEye);
+        transformed.x += transformed.y*transformed.y*.32*sin(windTime*1.9+origin.x*.6+origin.y*.37);
+      #endif
+    `);
+  };
+  return material;
+}
+
+let tuftMatCache: THREE.MeshStandardMaterial | null = null;
+export function grassTuftMaterial(): THREE.MeshStandardMaterial {
+  tuftMatCache ??= meadowVertexShader(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, side: THREE.DoubleSide }));
+  return tuftMatCache;
+}
+
+const flowerGeoCache = new Map<number, THREE.BufferGeometry>();
+/** 一朵花：茎 + 叶 + 五片花瓣 + 花心，按颜色合并成一份几何 */
+export function flowerGeometry(color: number): THREE.BufferGeometry {
+  const cached = flowerGeoCache.get(color);
+  if (cached) return cached;
+
+  const parts: THREE.BufferGeometry[] = [];
+
+  const stem = new THREE.CylinderGeometry(0.009, 0.014, 0.30, 3, 1, true).toNonIndexed();
+  stem.translate(0, 0.15, 0);
+  parts.push(tinted(stem, PALETTE.leafDark));
+
+  const petals = new THREE.BufferGeometry();
+  const xyz: number[] = [], colors: number[] = [];
+  const inner = new THREE.Color(color), outer = inner.clone().lerp(new THREE.Color(0xfff5df), 0.55);
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 0.4, x = Math.cos(a), z = Math.sin(a);
+    const l = [0.057*x - 0.031*z, 0.31, 0.057*z + 0.031*x];
+    const r = [0.057*x + 0.031*z, 0.31, 0.057*z - 0.031*x];
+    const middle = [0, 0.28, 0], tip = [0.093*x, 0.323, 0.093*z];
+    xyz.push(...middle, ...l, ...tip, ...middle, ...tip, ...r);
+    for (const c of [inner, outer, outer, inner, outer, outer]) colors.push(c.r,c.g,c.b);
+  }
+  petals.setAttribute("position", new THREE.Float32BufferAttribute(xyz, 3));
+  petals.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  petals.computeVertexNormals();
+  const core = new THREE.OctahedronGeometry(0.024);
+  core.scale(1, 0.65, 1);
+  core.translate(0, 0.305, 0);
+  parts.push(tinted(core, PALETTE.flowerYellow), petals);
+  for (const part of parts) part.deleteAttribute("uv");
+
+  const merged = mergeGeometries(parts, false)!;
+  flowerGeoCache.set(color, merged);
+  return merged;
+}
+
+let flowerMatCache: THREE.MeshStandardMaterial | null = null;
+export function flowerMaterial(): THREE.MeshStandardMaterial {
+  flowerMatCache ??= meadowVertexShader(new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.85,
+  }));
+  return flowerMatCache;
+}
+
 export function buildBush(scale: number, variant: number): THREE.Group {
   const group = new THREE.Group();
   const greens = [PALETTE.leafDark, PALETTE.leaf, PALETTE.leafLight];
@@ -500,47 +662,5 @@ export function buildBush(scale: number, variant: number): THREE.Group {
     group.add(blob);
   });
   group.scale.setScalar(scale);
-  return group;
-}
-
-/* ---------------- 招牌 ---------------- */
-
-export function buildSign(texture: THREE.Texture): THREE.Group {
-  const group = new THREE.Group();
-
-  const board = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.1, 1.05),
-    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75, metalness: 0, side: THREE.DoubleSide })
-  );
-  board.position.set(0, 1.42, 0.02);
-  board.castShadow = true;
-  group.add(board);
-
-  // 背板 + 四周木框
-  const back = addShadow(new THREE.Mesh(rounded(2.2, 1.15, 0.09, 0.03), clay(PALETTE.plank)));
-  back.position.set(0, 1.42, -0.04);
-  group.add(back);
-  [
-    [0, 1.42 + 0.58, 0, 2.3, 0.1, 0.1],
-    [0, 1.42 - 0.58, 0, 2.3, 0.1, 0.1],
-    [-1.1, 1.42, 0, 0.1, 1.24, 0.1],
-    [1.1, 1.42, 0, 0.1, 1.24, 0.1],
-  ].forEach(([x, y, z, w, h, d]) => {
-    const bar = new THREE.Mesh(rounded(w, h, d, 0.03), clay(PALETTE.wood));
-    bar.position.set(x, y, z);
-    group.add(bar);
-  });
-
-  // 两根圆木柱 + 斜撑
-  [-0.88, 0.88].forEach((x) => {
-    const post = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.9, 10), clay(PALETTE.wood)));
-    post.position.set(x, 0.95, -0.02);
-    group.add(post);
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), clay(PALETTE.plank));
-    foot.position.set(x, 0.07, -0.02);
-    foot.scale.y = 0.6;
-    group.add(foot);
-  });
-
   return group;
 }
