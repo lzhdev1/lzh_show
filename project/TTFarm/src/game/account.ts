@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { ttfarmApi, type AccountUser, type RemoteState } from "../api/client";
 import { useGame } from "./state";
 import { isMutation } from "./weather";
-import { avatarIdOf, outfitIdOf } from "./appearance";
+import { normalizeAppearance } from "./appearance";
 import { normalizeDecor } from "./decor";
 
 interface AccountStore {
@@ -36,9 +36,7 @@ function applyRemoteState(state: RemoteState): void {
     seeds: state.seeds,
     harvest: state.harvest,
     nickname: state.nickname,
-    avatarId: avatarIdOf(state.avatarId),
-    outfitId: outfitIdOf(state.outfitId),
-    bottomId: outfitIdOf(state.bottomId, outfitIdOf(state.outfitId)),
+    ...normalizeAppearance(state.avatarId, state.outfitId, state.bottomId),
     decor: normalizeDecor(state.decor),
     selectedSeed: state.selectedSeed,
   });

@@ -4,6 +4,7 @@ import type { AvatarRig } from "./rig";
 import { alignAvatar, createCapturedPose, motionBones } from "./capturedMotion";
 import { createStrawHat } from "./strawHat";
 import type { AvatarId, OutfitId } from "../game/appearance";
+import { COUTURE } from "../game/couture";
 
 /** 内置低面数小穗。VRM 下载或解码期间可直接操作，离线时也保留完整形象。 */
 export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId = "field", bottom: OutfitId = outfit): AvatarRig {
@@ -13,8 +14,10 @@ export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId
   const material = new THREE.MeshToonMaterial({ vertexColors: true });
   const geometries: THREE.BufferGeometry[] = [];
   const male = avatar === "qinghe", rain = outfit === "raincoat", ranger = outfit === "ranger";
-  const cream = rain ? 0xe3a644 : ranger ? 0x586e56 : 0xfff1d6, skin = male ? 0xe8bf9c : 0xf7caaf;
-  const chestnut = male ? 0x334441 : 0x856652, navy = bottom === "ranger" ? 0x998064 : 0x374f59;
+  const dress = !male && COUTURE.find(item => item.id === outfit);
+  const cream = dress ? new THREE.Color(dress.swatch).getHex() : rain ? 0xe3a644 : ranger ? 0x586e56 : 0xfff1d6;
+  const skin = male ? 0xe8bf9c : 0xf7caaf, chestnut = male ? 0x334441 : 0x856652;
+  const navy = dress ? new THREE.Color(dress.swatch).multiplyScalar(.62).getHex() : bottom === "ranger" ? 0x998064 : 0x374f59;
   let pieces: THREE.BufferGeometry[] = [];
   function piece(g: THREE.BufferGeometry, hex: number, x: number, y: number, z: number) {
     g.translate(x, y, z);
@@ -42,12 +45,19 @@ export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId
     return mesh;
   }
   cloth(0.92, rain ? .20 : 0.151, male ? .202 : 0.177, 0.29, cream);
-  cloth(0.727, male || ranger ? .155 : 0.199, 0.143, 0.22, rain ? cream : navy, 14);
+  if(dress){
+    cloth(.708,.25,.14,.275,cream,24);
+    cloth(.575,.249,.241,.014,0xf7e1cb,24);
+    cloth(.843,.151,.149,.033,navy,24);
+  } else cloth(0.727, male || ranger ? .155 : 0.199, 0.143, 0.22, rain ? cream : navy, 14);
   if (ranger) oval(0,.911,-.144,.125,.147,.072,0x9d794f);
   cloth(1.079, 0.171, 0.073, 0.082, navy);
   oval(0, 1.13, 0, 0.065, 0.072, 0.065, skin);
-  oval(0, 1.038, 0.118, 0.032, 0.040, 0.032, 0xe58a49);
-  oval(0, 0.988, 0.125, 0.029, 0.048, 0.017, 0xdb7542);
+  if(dress) oval(0,1.043,.122,.025,.031,.015,0xf3e9c8);
+  else {
+    oval(0, 1.038, 0.118, 0.032, 0.040, 0.032, 0xe58a49);
+    oval(0, 0.988, 0.125, 0.029, 0.048, 0.017, 0xdb7542);
+  }
   const torso = finish(body);
 
   oval(0, 0.19, 0.012, 0.211, 0.248, 0.185, skin);
@@ -76,11 +86,11 @@ export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId
   hat.visible = !male && outfit === "field";
 
   const limbs = [1, -1].map(sign => {
-    oval(0, -0.12, 0, 0.067, 0.154, 0.074, male || bottom !== "field" ? navy : skin);
+    oval(0, -0.12, 0, 0.067, 0.154, 0.074, !dress && (male || bottom !== "field") ? navy : skin);
     const thigh = finish(body, sign * 0.084, 0.714);
-    oval(0, -0.126, 0, 0.051, 0.161, 0.057, male || bottom !== "field" ? navy : cream);
+    oval(0, -0.126, 0, 0.051, 0.161, 0.057, dress ? skin : male || bottom !== "field" ? navy : cream);
     const shin = finish(thigh, 0, -0.284);
-    oval(0, -0.020, 0.031, 0.061, 0.063, 0.1, 0x705747);
+    oval(0, -0.020, 0.031, 0.061, 0.063, 0.1, dress ? navy : 0x705747);
     const shoe = finish(shin, 0, -0.231);
     oval(0, -0.105, 0, 0.066, 0.13, 0.068, cream);
     const shoulder = finish(body, sign * 0.17, 1.044);

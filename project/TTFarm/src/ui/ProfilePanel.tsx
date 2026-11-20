@@ -1,9 +1,17 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { useGame } from "../game/state";
-import { AVATARS, BOTTOM_NAMES, OUTFITS, outfitPreview, type OutfitId } from "../game/appearance";
+import { AVATARS, BOTTOM_NAMES, OUTFITS, outfitPreview, type AvatarId, type BasicOutfitId, type OutfitId } from "../game/appearance";
+import { COUTURE, isCouture, type CoutureFamily } from "../game/couture";
 import { getCustomModel, setCustomModel } from "../scene/avatarModel";
 import { useAccount } from "../game/account";
 import { CloseIcon } from "./icons";
+
+const collections = {
+  basic: "田园日常", petal: "花语", tide: "潮汐", astral: "星夜",
+} satisfies Record<"basic" | CoutureFamily, string>;
+
+const collectionIds = ["basic", "petal", "tide", "astral"] as const;
+type Collection = (typeof collectionIds)[number];
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const nickname = useGame((s) => s.nickname);
@@ -17,10 +25,28 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
   const [actor, setActor] = useState(avatarId);
   const [outfit, setOutfit] = useState(outfitId);
   const [bottom, setBottom] = useState(bottomId);
+  const [back, setBack] = useState(false);
+  const [collection, setCollection] = useState<Collection>(() =>
+    COUTURE.find(item => item.id === outfitId)?.family ?? "basic");
   const [modelLabel, setModelLabel] = useState(getCustomModel().label);
   const fileRef = useRef<HTMLInputElement>(null);
   const avatar = AVATARS.find(a => a.id === actor)!;
-  const suit = OUTFITS.find(o => o.id === outfit)!;
+  const dress = COUTURE.find(item => item.id === outfit);
+  const basicBottom = !isCouture(bottom) ? bottom : "field";
+  const suitName = dress?.name ?? OUTFITS.find(item => item.id === outfit)!.name;
+  const mixed = !dress && outfit !== bottom;
+  const visibleSuits = collection === "basic" ? OUTFITS : COUTURE.filter(item => item.family === collection);
+  function trySuit(id: OutfitId) {
+    setOutfit(id);
+    setBottom(id);
+  }
+  function chooseActor(id: AvatarId) {
+    setActor(id);
+    if (id === "qinghe") {
+      setCollection("basic");
+      if (isCouture(outfit)) trySuit("field");
+    }
+  }
   const save = () => {
     if (tab === "closet" && modelLabel) setCustomModel(null);
     useGame.getState().setProfile(tab === "account" ? draftName : nickname,
@@ -41,7 +67,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
   };
 
   return <div className="modal-scrim" onClick={onClose}>
-    <section role="dialog" aria-modal="true" aria-labelledby="profile-title" className="modal wardrobe-modal" onClick={e => e.stopPropagation()}>
+    <section role="dialog" aria-modal="true" aria-labelledby="profile-title" data-tab={tab} className="modal wardrobe-modal" onClick={e => e.stopPropagation()}>
       <header className="modal-head"><h2 id="profile-title">农场主</h2>
         <button type="button" className="icon-btn ghost" aria-label="关闭" onClick={onClose}><CloseIcon /></button>
       </header>
@@ -50,27 +76,50 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
         <button aria-pressed={tab === "account"} onClick={() => setTab("account")}>账号资料</button>
       </div>
       {tab === "closet" ? <>
+        <div className="closet-toolbar">
+          <div className="actor-options" role="group" aria-label="选择角色">
+            {AVATARS.map(a => <button type="button" key={a.id} aria-pressed={actor === a.id} onClick={() => chooseActor(a.id)}>
+              <img src={a.portrait} alt="" /><span>{a.name}<small>{a.gender}</small></span></button>)}
+          </div>
+          {actor === "xiaosui" && <div className="collection-options" role="group" aria-label="浏览服饰系列">
+            {collectionIds.map(id => <button type="button" key={id} aria-pressed={id === collection}
+              onClick={() => setCollection(id)}>{collections[id]}</button>)}
+          </div>}
+        </div>
         <div className="fitting-room">
-          <figure className={`outfit-stage stage-${outfit}`}>
-            <img src={outfitPreview(actor, outfit, bottom)} alt={`${avatar.name}穿着${suit.name}上装和${BOTTOM_NAMES[bottom]}下装的全身效果`} />
-            <figcaption><strong>{avatar.name}</strong><span>{outfit === bottom ? suit.name : "自选搭配"}</span></figcaption>
+          <figure className="outfit-stage" data-family={dress?.family ?? "basic"}>
+            <div className="fitting-image">
+              <img src={outfitPreview(actor, outfit, bottom, back)}
+                alt={`${avatar.name}穿着${suitName}${mixed ? "搭配" + BOTTOM_NAMES[basicBottom] : ""}的${dress && back ? "背面" : "正面"}全身效果`} />
+            </div>
+            <figcaption aria-live="polite">
+              <div className="fitting-caption">
+                <span>{avatar.name} · {collections[dress?.family ?? "basic"]}</span>
+                {dress && <button type="button" className="reverse-view" onClick={() => setBack(!back)}>
+                  {back ? "看正面" : "看背面"}
+                </button>}
+              </div>
+              <strong>{suitName}</strong>
+              {dress ? <p>{dress.detail}</p> : mixed && <p>搭配{BOTTOM_NAMES[basicBottom]}</p>}
+            </figcaption>
           </figure>
           <div className="closet-choices">
-            <fieldset><legend>角色</legend><div className="actor-options">
-              {AVATARS.map(a => <button key={a.id} aria-pressed={actor === a.id} onClick={() => setActor(a.id)}>
-                <img src={a.portrait} alt="" /><span>{a.name}<small>{a.gender}</small></span></button>)}
-            </div></fieldset>
-            <fieldset><legend>服装套装</legend><div className="suit-options">
-              {OUTFITS.map(s => <button key={s.id} onClick={() => { setOutfit(s.id); setBottom(s.id); }} aria-pressed={outfit === s.id}>
-                <span className={`fabric fabric-${s.id}`} aria-hidden="true" />{s.name}
+            <fieldset><legend>{collections[collection]}<small>{visibleSuits.length} 款</small></legend>
+              <div className="suit-options">
+              {visibleSuits.map(s => <button type="button" key={s.id} onClick={() => trySuit(s.id)} aria-pressed={outfit === s.id}>
+                <span className="suit-thumbnail" data-family={collection} aria-hidden="true">
+                  <img src={outfitPreview(actor, s.id, s.id)} alt="" />
+                </span>
+                <span className="suit-name">{s.name}{"swatch" in s && typeof s.swatch === "string" &&
+                  <i aria-hidden="true" style={{ backgroundColor: s.swatch }} />}</span>
                 {outfit === s.id && <span className="picked" aria-hidden="true">✓</span>}
               </button>)}
             </div></fieldset>
-            <label className="bottom-picker">下装与鞋靴
-              <select value={bottom} onChange={e => setBottom(e.target.value as OutfitId)}>
+            {collection === "basic" && !dress && <label className="bottom-picker">下装与鞋靴
+              <select value={basicBottom} onChange={e => setBottom(e.target.value as BasicOutfitId)}>
                 {OUTFITS.map(s => <option key={s.id} value={s.id}>{BOTTOM_NAMES[s.id]}</option>)}
               </select>
-            </label>
+            </label>}
           </div>
         </div>
         {modelLabel && <p className="muted small">当前使用导入模型。穿戴后将切换为所选的内置角色。</p>}

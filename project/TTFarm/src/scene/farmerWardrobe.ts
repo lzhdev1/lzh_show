@@ -2,6 +2,12 @@ import * as T from "three";
 import { overallTexture } from "./overallTexture";
 import type { VRM } from "@pixiv/three-vrm";
 import type { AvatarId, OutfitId } from "../game/appearance";
+import { COUTURE } from "../game/couture";
+import { Atelier } from "./couture/atelier";
+import { fitCoutureSkin } from "./couture/skin";
+import { buildPetal } from "./couture/petal";
+import { buildTide } from "./couture/tide";
+import { buildAstral } from "./couture/astral";
 
 type V = [number, number, number];
 type Ring = [height: number, width: number, depth: number, centerZ: number];
@@ -179,6 +185,24 @@ export function dressFarmer(vrm: VRM, avatar: AvatarId, outfit: OutfitId, bottom
       pos.array.set(before); normal.array.set(normals);
       pos.needsUpdate=normal.needsUpdate=true;
     });
+  }
+
+  const design = !male && COUTURE.find(s=>s.id===outfit);
+  if (design) {
+    const atelier = new Atelier(shirt,design);
+    ({petal:buildPetal, tide:buildTide, astral:buildAstral})[design.family](atelier,design.id);
+    const shirtVisible = shirt.visible, shoeVisible = shoes.visible;
+    shirt.visible = shoes.visible = false;
+    restore.push(() => { shirt.visible = shirtVisible; shoes.visible = shoeVisible; });
+    restore.push(fitCoutureSkin(scene.getObjectByName("Body_1") as T.SkinnedMesh));
+    // Match the inner skirt and tuck the loose work shorts inside its hip line.
+    const originalShorts = shorts.geometry, lining = originalShorts.clone();
+    lining.scale(.87,.76,.81); lining.translate(0,.17,0);
+    shorts.geometry = lining;
+    restore.push(() => { shorts.geometry=originalShorts; lining.dispose(); });
+    fabric(shorts,atelier.liningColor ?? 0xca9ca9);
+    restore.push(atelier.mount());
+    return () => restore.forEach(reset=>reset());
   }
 
   const field=outfit==="field", rain=outfit==="raincoat";

@@ -6,6 +6,7 @@ import { alignAvatar, createCapturedPose, motionBones, type SolePoint } from "./
 import { createStrawHat } from "./strawHat";
 import { dressFarmer } from "./farmerWardrobe";
 import type { AvatarId, OutfitId } from "../game/appearance";
+import { isCouture } from "../game/couture";
 
 const TARGET_HEIGHT = 1.66;
 const loader = new GLTFLoader();
@@ -67,6 +68,10 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
   const pose = createCapturedPose();
   const nodes = motionBones.map(name => humanoid.getNormalizedBoneNode(name as VRMHumanBoneName));
   const legacy = vrm.meta.metaVersion === "0";
+  const leftArm = humanoid.getNormalizedBoneNode("leftUpperArm");
+  const rightArm = humanoid.getNormalizedBoneNode("rightUpperArm");
+  const roll = new THREE.Quaternion(), forward = new THREE.Vector3(0, 0, 1);
+  let dressArmAngle = 0;
   const fingers: { node: THREE.Object3D; curl: number }[] = [];
   for (const side of ["left", "right"] as const) {
     const sign = (side === "left" ? -1 : 1) * (legacy ? -1 : 1);
@@ -99,6 +104,12 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
       const q = node.quaternion.copy(pose.bones[i]);
       if (legacy) { q.x = -q.x; q.z = -q.z; }
     }
+    if (dressArmAngle) {
+      const idle = (1 - m.moving) * (1 - m.jumpWeight) * (1 - m.swimming);
+      const angle = dressArmAngle * idle;
+      leftArm?.quaternion.premultiply(roll.setFromAxisAngle(forward, angle));
+      rightArm?.quaternion.premultiply(roll.setFromAxisAngle(forward, -angle));
+    }
     const grip = (1 + 1.1 * m.running * (1 - m.jumpWeight)) * (1 - 0.8 * m.swimming);
     for (const finger of fingers) finger.node.rotation.z = finger.curl * grip;
     visual.position.x = pose.shift;
@@ -115,6 +126,22 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
   const setAppearance = (id: AvatarId, clothes: OutfitId, trousers: OutfitId = clothes) => {
     undress?.();
     undress = dressFarmer(vrm, id, clothes, trousers);
+    dressArmAngle = 0;
+    if (id === "xiaosui" && isCouture(clothes)) {
+      // Sample the dress once at palm height, so a slim sheath needs less
+      // shoulder abduction than a wide tutu. All garments share VRM bind space.
+      let width = 0;
+      vrm.scene.traverse(mesh => {
+        if (!(mesh instanceof THREE.SkinnedMesh) || !mesh.name.startsWith("couture-") || mesh.name==="couture-halo") return;
+        const p = mesh.geometry.getAttribute("position");
+        for (let i = 0; i < p.count; i++) {
+          if (p.getY(i) >= .73 && p.getY(i) <= .86 && Math.abs(p.getZ(i) - .05) < .085)
+            width = Math.max(width, Math.abs(p.getX(i)));
+        }
+      });
+      // Resting fingertips sit 16 cm off centre, 52 cm below the shoulder.
+      dressArmAngle = THREE.MathUtils.clamp((width + .018 - .16) / .52, 0, .41);
+    }
     visual.scale.setScalar(scale * (id === "qinghe" ? 1.065 : 1));
     if (hat) hat.visible = id === "xiaosui" && clothes === "field";
   };

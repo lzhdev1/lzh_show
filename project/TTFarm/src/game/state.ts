@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { CROPS, CROP_LIST, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
 import { isMutation, rollMutation, weatherAt } from "./weather";
 import { MAX_WATER, isReady, type PlotState } from "./growth";
-import { avatarIdOf, outfitIdOf, type AvatarId, type OutfitId } from "./appearance";
+import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
 export { AVATARS, type AvatarId } from "./appearance";
 
@@ -285,7 +285,7 @@ export const useGame = create<GameStore>()(
 
       setProfile: (nickname, avatarId, outfitId, bottomId) => {
         const trimmed = nickname.trim().slice(0, 12) || "农场主";
-        set({ nickname: trimmed, avatarId, outfitId, bottomId });
+        set({ nickname: trimmed, ...normalizeAppearance(avatarId, outfitId, bottomId) });
         get().notify("资料已保存");
       },
 
@@ -333,9 +333,7 @@ export const useGame = create<GameStore>()(
           ...base,
           ...saved,
           coins: saved.coins ?? base.coins,
-          avatarId: avatarIdOf(saved.avatarId),
-          outfitId: outfitIdOf(saved.outfitId),
-          bottomId: outfitIdOf(saved.bottomId, outfitIdOf(saved.outfitId)),
+          ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
           decor: normalizeDecor(saved.decor),
           plots,
           seeds: { ...base.seeds, ...saved.seeds },

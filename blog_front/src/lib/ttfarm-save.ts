@@ -12,8 +12,15 @@ const MAX_WATER = 3;
 const CROP_IDS = ["radish", "cabbage", "tomato", "corn", "strawberry", "pumpkin"];
 const MUTATIONS = ["amber", "mist", "pearl"];
 const HARVEST_KEYS = CROP_IDS.flatMap((crop) => [crop, ...MUTATIONS.map((m) => `${crop}:${m}`)]);
-const isOutfit = (value: unknown): value is "field" | "raincoat" | "ranger" =>
+const isBasicOutfit = (value: unknown): value is "field" | "raincoat" | "ranger" =>
   value === "field" || value === "raincoat" || value === "ranger";
+// The farm client and the account service ship separately. Accept only the
+// complete stage sets present in the client's game/couture catalogue.
+const COUTURE_IDS = new Set([
+  "petal-waltz", "rose-cadenza", "peach-fan", "lilac-ballet", "champagne-bell",
+  "tide-jelly", "azure-sail", "pearl-opera", "mint-ripple", "glacier-lace",
+  "lunar-arc", "violet-nocturne", "aurora-prism", "meteor-idol", "dusk-orbit",
+]);
 
 const decorStyle = (value: unknown) => value === "lantern" || value === "moon" ? value : "orchard";
 function displayText(value: unknown, limit: number, fallback: string) {
@@ -128,7 +135,10 @@ export function normalizeSave(raw: unknown, fallbackNick: string): FarmSave | nu
   }
 
   const base = initialSave(fallbackNick);
-  const outfitId = isOutfit(src.outfitId) ? src.outfitId : base.outfitId;
+  const avatarId = src.avatarId === "qinghe" ? "qinghe" : "xiaosui";
+  const selected = src.outfitId;
+  const stageSet = avatarId === "xiaosui" && typeof selected === "string" && COUTURE_IDS.has(selected);
+  const outfitId = stageSet || isBasicOutfit(selected) ? selected : base.outfitId;
   return {
     coins: int(src.coins, 0, 9_999_999_999, base.coins),
     xp: int(src.xp, 0, 99_999_999, 0),
@@ -136,9 +146,9 @@ export function normalizeSave(raw: unknown, fallbackNick: string): FarmSave | nu
     seeds: record(src.seeds, base.seeds, CROP_IDS),
     harvest: record(src.harvest, base.harvest, HARVEST_KEYS),
     nickname: displayText(src.nickname, 12, fallbackNick),
-    avatarId: src.avatarId === "qinghe" ? "qinghe" : "xiaosui",
+    avatarId,
     outfitId,
-    bottomId: isOutfit(src.bottomId) ? src.bottomId : outfitId,
+    bottomId: stageSet || !isBasicOutfit(src.bottomId) ? outfitId : src.bottomId,
     decor: readDecor(src.decor),
     selectedSeed: typeof src.selectedSeed === "string" && CROP_IDS.includes(src.selectedSeed)
       ? src.selectedSeed
