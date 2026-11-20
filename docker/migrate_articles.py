@@ -98,7 +98,7 @@ def run_psql(database, sql, password=None, as_reader=False):
         shell += "export ARTICLE_READER_PASSWORD=\"$PGPASSWORD\"; unset PGPASSWORD; "
     shell += f'exec psql -XqAtw -v ON_ERROR_STOP=1 {login} -d "$1"'
     result = subprocess.run(["docker", "exec", "-i", CONTAINER, "sh", "-ec", shell, "sh", database],
-                            input=sql.encode(), capture_output=True)
+                            input=sql.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode:
         if password is None:
             raise SystemExit(result.stderr.decode(errors="replace").strip())

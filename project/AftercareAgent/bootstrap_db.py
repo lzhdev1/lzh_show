@@ -59,8 +59,8 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='aftercare_agent') \ge
               'IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -XAtw -h 127.0.0.1 '
               '-U aftercare_agent -d aftercare_agent -c "SELECT pg_get_userbyid(datdba) '
               'FROM pg_database WHERE datname=current_database()"']
-    check = subprocess.run(verify, input=unquote(parsed.password) + "\n", text=True,
-                           capture_output=True, check=False)
+    check = subprocess.run(verify, input=unquote(parsed.password) + "\n", universal_newlines=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if check.returncode or check.stdout.strip() != ACCOUNT:
         raise SystemExit("Check the existing aftercare_agent database ownership and its password in .env")
     print("Ready: shared-postgres / aftercare_agent")
