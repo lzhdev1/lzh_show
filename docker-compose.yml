@@ -38,6 +38,7 @@ services:
       # 源码挂载实现热更新；匿名卷防止 Windows 的 node_modules 覆盖容器内 Linux 依赖
       - ./blog_front:/app
       - ./project/TTFarm:/ttfarm
+      - ./project/TTFarm/src/game:/app/farm-rules:ro
       - /app/node_modules
       - /app/.next
       - /ttfarm/node_modules

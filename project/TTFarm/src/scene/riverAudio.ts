@@ -6,7 +6,7 @@ import rainRecording from "../assets/rain-on-leaves.mp3?url";
 import {
   getRainSoundEnabled, getRiverSoundEnabled, RAIN_SOUND_CHANGED, RIVER_SOUND_CHANGED,
 } from "../game/riverSoundSetting";
-import type { WeatherKind } from "../game/weather";
+import { isRainy, type WeatherKind } from "../game/weather";
 import { RIVER_BED, riverInfo } from "./layout";
 
 export {
@@ -112,6 +112,51 @@ export function createRiverAudio() {
   let lastProximity = NaN;
   let lastBearing = NaN;
   let nextUpdate = 0;
+  let air: AudioBufferSourceNode | undefined;
+  let airGain: GainNode | undefined;
+  let airFilter: BiquadFilterNode | undefined;
+
+  // 同一段低频噪声随阵风起伏，也能生成闪电之后的滚雷。
+  function mixAir() {
+    if (!context) return;
+    const active = getRainSoundEnabled() && (weather === "gale" || weather === "storm") && !document.hidden;
+    if (!active) {
+      if (air) { air.stop(); air.disconnect(); air = undefined; }
+      return;
+    }
+    if (context.state !== "running") return;
+    if (!airGain || !airFilter) {
+      airGain = context.createGain();
+      airGain.gain.value = 0;
+      airFilter = context.createBiquadFilter();
+      airFilter.type = "lowpass";
+      airFilter.Q.value = .65;
+      airFilter.connect(airGain).connect(context.destination);
+    }
+    if (!air) {
+      const rate = 16000, length = rate*3;
+      const buffer = context.createBuffer(1, length, rate);
+      const samples = buffer.getChannelData(0);
+      let brown = 0;
+      for (let i = 0; i < length; i++) {
+        const white = Math.random()*2-1;
+        brown = (brown+.045*white)/1.045;
+        samples[i] = (brown*2.1 + white*.08)*Math.min(1,i/300,(length-i)/300);
+      }
+      air = context.createBufferSource();
+      air.buffer = buffer;
+      air.loop = true;
+      air.connect(airFilter);
+      air.start();
+    }
+    const time = performance.now()*.001;
+    const gust = .5+.5*Math.sin(time*1.17+Math.sin(time*.71));
+    const delay = time % 13 - .65;
+    const rumble = delay > 0 ? Math.min(1,delay*4)*Math.exp(-delay*.94) : 0;
+    const storm = weather === "storm";
+    airFilter.frequency.setTargetAtTime(storm ? 115 + rumble*160 : 380+gust*680, context.currentTime, .22);
+    airGain.gain.setTargetAtTime(storm ? .15+rumble*1.42 : .24 + gust*.45, context.currentTime, .12);
+  }
 
   function mix() {
     if (!context || document.hidden) return;
@@ -124,7 +169,8 @@ export function createRiverAudio() {
       lastBearing = bearing;
     }
     river?.setVolume(getRiverSoundEnabled() ? proximity * 0.78 : 0);
-    rain?.setVolume(getRainSoundEnabled() && weather === "rain" ? 0.72 : 0);
+    rain?.setVolume(getRainSoundEnabled() && isRainy(weather) ? (weather === "storm" ? .91 : .72) : 0);
+    mixAir();
   }
 
   function unlock() {
@@ -156,6 +202,7 @@ export function createRiverAudio() {
     if (document.hidden) {
       river?.stop();
       rain?.stop();
+      mixAir();
       void context.suspend().catch(() => {});
     } else if (getRiverSoundEnabled() || getRainSoundEnabled()) {
       // A quick return can arrive before the preceding suspend() promise settles.
@@ -199,6 +246,7 @@ export function createRiverAudio() {
       river?.stop();
       rain?.stop();
       river = rain = undefined;
+      air?.stop(); air?.disconnect(); airFilter?.disconnect(); airGain?.disconnect();
       if (context) {
         context.onstatechange = null;
         void context.close().catch(() => {});

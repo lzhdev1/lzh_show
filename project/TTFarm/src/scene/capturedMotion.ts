@@ -68,15 +68,44 @@ class ClipCursor {
   curve(values: number[]) { return lerp(values[this.a], values[this.b], this.weight) / 1000; }
 }
 
+function ridingPose() {
+  const bones = standingPose();
+  const rotation = new THREE.Euler();
+  const set = (name: string, x: number, y = 0, z = 0) =>
+    bones[motionBones.indexOf(name)].setFromEuler(rotation.set(x, y, z));
+  set("spine", 0.09);
+  set("neck", -0.07);
+  for (const [side, sign] of [["left", 1], ["right", -1]] as const) {
+    set(side + "UpperLeg", -1.02, -0.18 * sign, 0.58 * sign);
+    set(side + "LowerLeg", 1.17);
+    set(side + "Foot", -0.18, 0.08 * sign, -0.31 * sign);
+    // Hands meet in front of the rider, elbows below the shoulders.
+    const rest = new THREE.Vector3(sign, 0, 0);
+    const upper = bones[motionBones.indexOf(side + "UpperArm")];
+    upper.setFromUnitVectors(rest, new THREE.Vector3(0.16 * sign, -0.88, 0.44).normalize());
+    bones[motionBones.indexOf(side + "LowerArm")].setFromUnitVectors(rest,
+      new THREE.Vector3(-0.28 * sign, -0.12, 0.95).normalize().applyQuaternion(upper.clone().invert()));
+  }
+  return bones;
+}
+
 /** Shared actor motion for the VRM and the loading avatar; no per-frame allocations. */
 export function createCapturedPose() {
   const walkCursor = new ClipCursor(walk), runCursor = new ClipCursor(run), jumpCursor = new ClipCursor(jump);
   const rotation = new THREE.Quaternion();
   const still = standingPose();
+  const seated = ridingPose();
   const bones = motionBones.map(() => new THREE.Quaternion());
   const pose = {
     bones, shift: 0, flight: 0, headAboveWater: 0,
     sample(m: AvatarMotion) {
+      if (m.saddleHeight) {
+        for (let i = 0; i < bones.length; i++) bones[i].copy(seated[i]);
+        bones[spine].multiply(rotation.setFromAxisAngle(axisX, Math.sin(m.phase * Math.PI * 4) * 0.045 * m.moving));
+        bones[chest].multiply(rotation.setFromAxisAngle(axisZ, -(m.turn ?? 0) * 0.09));
+        pose.shift = pose.flight = pose.headAboveWater = 0;
+        return;
+      }
       if (m.swimming === 1) {
         pose.shift = pose.flight = 0;
         pose.headAboveWater = sampleSwim(bones, m.swimPhase, m.moving, 1);
@@ -122,7 +151,7 @@ export interface SolePoint { bone: THREE.Object3D; local: THREE.Vector3; }
 
 /** Keep the feet planted on land and the swimmer's head at the surface. On
  * the bank slope, ground contact can support the body before it fully floats. */
-export function alignAvatar(visual: THREE.Group, soles: SolePoint[], head: THREE.Object3D) {
+export function alignAvatar(visual: THREE.Group, soles: SolePoint[], head: THREE.Object3D, pelvis: THREE.Object3D) {
   const tmp = new THREE.Vector3();
   const anchor = new THREE.Vector3(), offset = new THREE.Vector3(), localOffset = new THREE.Vector3();
   const parentRotation = new THREE.Quaternion();
@@ -130,6 +159,13 @@ export function alignAvatar(visual: THREE.Group, soles: SolePoint[], head: THREE
   return (lift: number, headAboveWater: number, motion: AvatarMotion) => {
     const { swimming, waterFloor } = motion;
     const origin = visual.parent?.getWorldPosition(tmp).y ?? 0;
+    if (motion.saddleHeight) {
+      planted = -1;
+      offset.set(0, 0, 0);
+      visual.position.z = 0;
+      visual.position.y += origin + motion.saddleHeight + 0.08 - pelvis.getWorldPosition(tmp).y;
+      return;
+    }
     let minY = Infinity, bedCorrection = -Infinity;
     const soleMargin = 0.004 + 0.022 * THREE.MathUtils.smoothstep(swimming, 0, 0.18);
     // Roll the loaded foot from heel to forefoot, keeping its active point

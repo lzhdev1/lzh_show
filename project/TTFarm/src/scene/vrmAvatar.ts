@@ -94,7 +94,7 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
     soles.push({ bone: foot, local: foot.worldToLocal(heelPoint) },
       { bone: toes, local: toes.worldToLocal(toePoint) });
   }
-  const align = alignAvatar(visual, soles, humanoid.getRawBoneNode("head")!);
+  const align = alignAvatar(visual, soles, humanoid.getRawBoneNode("head")!, humanoid.getRawBoneNode("hips")!);
   let blinkClock = 0, nextBlink = 3;
   const animate = (dt: number, _time: number, m: AvatarMotion) => {
     pose.sample(m);
@@ -104,7 +104,7 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
       const q = node.quaternion.copy(pose.bones[i]);
       if (legacy) { q.x = -q.x; q.z = -q.z; }
     }
-    if (dressArmAngle) {
+    if (dressArmAngle && !m.saddleHeight) {
       const idle = (1 - m.moving) * (1 - m.jumpWeight) * (1 - m.swimming);
       const angle = dressArmAngle * idle;
       leftArm?.quaternion.premultiply(roll.setFromAxisAngle(forward, angle));

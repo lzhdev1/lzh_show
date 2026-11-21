@@ -1,4 +1,4 @@
-import { MUTATIONS, type Mutation } from "./weather";
+import { MUTATIONS, isSpirit, type Mutation } from "./weather";
 
 /** 作物配置表 */
 export type CropId =
@@ -112,14 +112,15 @@ export function harvestKey(id: CropId, mutation: Mutation | null): string {
 }
 
 export function produceName(crop: CropDef, mutation: Mutation | null): string {
-  return mutation ? MUTATIONS[mutation].label + crop.name : crop.name;
+  if (!mutation) return crop.name;
+  return isSpirit(mutation) ? `${MUTATIONS[mutation].label}（${crop.name}）` : MUTATIONS[mutation].label + crop.name;
 }
 
 export function producePrice(crop: CropDef, mutation: Mutation | null): number {
   return crop.sellPrice * (mutation ? MUTATIONS[mutation].multiplier : 1);
 }
 
-const varieties: (Mutation | null)[] = [null, "amber", "mist", "pearl"];
+const varieties: (Mutation | null)[] = [null, ...Object.keys(MUTATIONS) as Mutation[]];
 const produce = CROP_LIST.flatMap((crop) => varieties.map((mutation) => ({
   key: harvestKey(crop.id, mutation),
   crop,

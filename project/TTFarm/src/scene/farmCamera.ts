@@ -23,6 +23,7 @@ export function createFarmCamera(canvas: HTMLCanvasElement, camera: PerspectiveC
   const contacts = new Map<number, Contact>();
   const events = new AbortController();
   const { signal } = events;
+  let touring = false;
 
   function zoom(factor: number) {
     goal.radius = MathUtils.clamp(goal.radius * factor, 5.5, 320);
@@ -30,7 +31,8 @@ export function createFarmCamera(canvas: HTMLCanvasElement, camera: PerspectiveC
 
   function reset() {
     goal.copy(HOME);
-    current.copy(HOME);
+    if (touring) goal.set(22, 0.76, 0.44);
+    current.copy(goal);
   }
 
   function press(e: PointerEvent) {
@@ -115,6 +117,7 @@ export function createFarmCamera(canvas: HTMLCanvasElement, camera: PerspectiveC
 
   return {
     reset,
+    tour(enabled: boolean) { touring = enabled; clear(); reset(); },
     update(player: Vector3, groundHeight: number, dt: number, keyTurn: number) {
       if (farmInput.blocked && contacts.size > 0) clear();
       goal.theta += keyTurn * dt * 1.8;

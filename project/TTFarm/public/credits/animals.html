@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>动物模型署名与许可 · TT 农场</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #faf7ed; color: #302f23; font: 1rem/1.7 system-ui, sans-serif; }
+    main { max-width: 48rem; margin: 0 auto; padding: clamp(1rem, 4vw, 3rem) 1rem 3rem; }
+    h1, h2 { color: #31543b; line-height: 1.3; }
+    h1 { font-size: clamp(1.6rem, 5vw, 2.3rem); }
+    h2 { font-size: 1.25rem; margin-top: 2rem; }
+    a { color: #306440; text-underline-offset: .16em; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: .45rem .35rem; border-bottom: 1px solid #d6d8c6; }
+    thead { background: #e9eddf; }
+    th[scope="row"] { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>动物模型署名与许可</h1>
+    <p>TT 农场的以下 14 种动物改编自《0 A.D.》。原始模型、贴图及随附动画的美术署名为 © 2009 <a href="https://www.wildfiregames.com/">Wildfire Games</a>。</p>
+    <p>TT 农场使用 codepawl 转换的 12 份 engine 版 GLB 制作了 13 种动物。棕熊与大熊猫共用同一上游素材。制作大熊猫时，农场保留棕熊的网格和骨骼结构，重塑头部与躯干比例，并在原有毛皮纹理上重绘黑白被毛。<a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/tree/004bd97054a513db8880040b67f8037c55096d8b">查看 codepawl 的 GLB 发行版本</a>。</p>
+    <p>梅花鹿直接取自 Wildfire Games 的 COLLADA 源文件，重新绑定了身体与鹿角，并从原始骨骼动画导出了站立、行走、奔跑三个动作。TT 农场对这些模型进行了网格细分、动画裁剪和贴图压缩，在游戏中加入了材质效果与坐骑马具。</p>
+    <p>这些动物美术及 TT 农场对它们的改编均按 <a href="https://creativecommons.org/licenses/by-sa/3.0/">Creative Commons Attribution-ShareAlike 3.0 Unported（署名—相同方式共享 3.0）</a> 发布。再分发时须保留原作者与许可信息、标明改动，并按相同许可分享改编作品。<a href="CC-BY-SA-3.0.txt">完整许可条款</a> · <a href="0ad-art-license.txt">上游版权声明</a></p>
+    <p>据 Wildfire Games 的说明，《0 A.D.》的部分贴图使用了 CGTextures 的素材。CGTextures 特别授权将经过修改的贴图以同一许可分发。<a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/LICENSE.txt">查看原始美术声明</a>。</p>
+    <h2 id="models">模型来源</h2>
+    <table aria-labelledby="models">
+      <thead><tr><th scope="col">游戏动物</th><th scope="col">0 A.D. 源文件</th><th scope="col">模型与动画来源</th></tr></thead>
+      <tbody>
+          <tr><th scope="row">灰狼</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/wolf.xml">wolf.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-wolf/fauna-wolf.glb">fauna-wolf</a></td></tr>
+          <tr><th scope="row">棕熊</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/bear_brown.xml">bear_brown.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-bear-brown/fauna-bear-brown.glb">fauna-bear-brown</a></td></tr>
+          <tr><th scope="row">大熊猫</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/bear_brown.xml">棕熊源文件</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-bear-brown/fauna-bear-brown.glb">fauna-bear-brown（改编）</a></td></tr>
+          <tr><th scope="row">老虎</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/tiger.xml">tiger.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-tiger/fauna-tiger.glb">fauna-tiger</a></td></tr>
+          <tr><th scope="row">狮子</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/lion.xml">lion.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-lion/fauna-lion.glb">fauna-lion</a></td></tr>
+          <tr><th scope="row">大象</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/elephant_asian.xml">elephant_asian.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-elephant-asian/fauna-elephant-asian.glb">fauna-elephant-asian</a></td></tr>
+          <tr><th scope="row">赤狐</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/fox_red.xml">fox_red.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-fox-red/fauna-fox-red.glb">fauna-fox-red</a></td></tr>
+          <tr><th scope="row">野兔</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/rabbit1.xml">rabbit1.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-rabbit1/fauna-rabbit1.glb">fauna-rabbit1</a></td></tr>
+          <tr><th scope="row">梅花鹿</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/deer.xml">鹿与毛皮</a> · <a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/props/fauna/deer_antlers.xml">鹿角与贴图</a></td><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/meshes/skeletal/deer_mesh.dae">身体</a> · <a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/meshes/props/deer_antlers.dae">鹿角</a> · <a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/animation/quadraped/deer_idle_01.dae">站立</a> · <a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/animation/quadraped/deer_walk_01.dae">步行</a> · <a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/animation/quadraped/deer_run_01.dae">奔跑</a></td></tr>
+          <tr><th scope="row">野猪</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/boar.xml">boar.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-boar/fauna-boar.glb">fauna-boar</a></td></tr>
+          <tr><th scope="row">山羊</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/goat.xml">goat.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-goat/fauna-goat.glb">fauna-goat</a></td></tr>
+          <tr><th scope="row">绵羊</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/sheep1.xml">sheep1.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-sheep1/fauna-sheep1.glb">fauna-sheep1</a></td></tr>
+          <tr><th scope="row">野马</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/horse_bay_01.xml">horse_bay_01.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-horse-bay-01/fauna-horse-bay-01.glb">fauna-horse-bay-01</a></td></tr>
+          <tr><th scope="row">花牛</th><td><a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/actors/fauna/cow.xml">cow.xml</a></td><td><a href="https://huggingface.co/datasets/codepawl/0ad-art-glb/blob/004bd97054a513db8880040b67f8037c55096d8b/engine/fauna-cow/fauna-cow.glb">fauna-cow</a></td></tr>
+      </tbody>
+    </table>
+    <p>梅花鹿保留了原作的<a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/textures/skins/skeletal/animal_deer_03.png">鹿身贴图</a>与<a href="https://gitea.wildfiregames.com/0ad/0ad/src/commit/61a3b9507d974084e6badb88a0826bd89a6d5b8b/binaries/data/mods/public/art/textures/skins/skeletal/animal_deer_01.png">鹿角贴图</a>。</p>
+  </main>
+</body>
+</html>

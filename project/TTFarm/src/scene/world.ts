@@ -2,13 +2,15 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { buildWaterSurface } from "./riverWater";
 import { buildSubmergedDetails } from "./riverBed";
-import { buildRain, type SkyWeather } from "./atmosphere";
+import { buildRain, buildWindAndSnow, type SkyWeather } from "./atmosphere";
+import { isRainy } from "../game/weather";
 import { bakeScenery } from "./scenery";
-import { meadowGround } from "./grassGround";
+import { meadowGround, withSnow } from "./grassGround";
 import { buildWindmill } from "./windmill";
 import { createFarmDecor } from "./farmDecor";
 import type { FarmDecor } from "../game/decor";
 import { WorldObstacles } from "./obstacles";
+import { onRanchReserve } from "./ranchLayout";
 import { PALETTE, clay } from "./materials";
 import {
   BRIDGE,
@@ -481,6 +483,7 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
 
   /** 院子里、河道里、桥位附近、土路上都留空 */
   const blocked = (x: number, z: number): boolean => {
+    if (onRanchReserve(x, z)) return true;
     if (Math.abs(x) < FENCE_X + 2 && Math.abs(z) < FENCE_Z + 2) return true;
     if (riverInfo(x, z).dist < RIVER_BED.shoulder) return true;
     if (Math.hypot(x - BRIDGE.x, z - BRIDGE.z) < 14) return true;
@@ -687,7 +690,8 @@ export function createWorld(initialDecor?: FarmDecor): World {
 
   const groundGeo = new THREE.ShapeGeometry(groundShape);
   groundGeo.rotateX(-Math.PI / 2);
-  const ground = new THREE.Mesh(groundGeo, meadowGround());
+  const snowCover = { value: 0 };
+  const ground = new THREE.Mesh(groundGeo, withSnow(meadowGround(), snowCover));
   ground.receiveShadow = true;
   group.add(ground);
 
@@ -696,7 +700,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
   // 6×5 的地块占 15.6×13，草台各边再留 0.7 走脚
   const field = new THREE.Mesh(
     new RoundedBoxGeometry(17.0, 0.2, 14.4, 3, 0.06),
-    clay(PALETTE.grassLight, { roughness: 0.95 })
+    withSnow(clay(PALETTE.grassLight, { roughness: 0.95 }).clone(), snowCover)
   );
   field.position.set(0, 0.1, 0);
   field.receiveShadow = true;
@@ -720,6 +724,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
   const barrel = barn.localToWorld(new THREE.Vector3(1.95, 0, 0.8));
   obstacles.addCircle(barrel.x, barrel.z, 0.28);
   const barnMesh = bakeScenery(barn);
+  barnMesh.material = withSnow(barnMesh.material.clone(), snowCover);
   barnMesh.name = "farm-barn";
   group.add(barnMesh);
   const mill = buildWindmill();
@@ -773,6 +778,8 @@ export function createWorld(initialDecor?: FarmDecor): World {
   group.add(dust.points);
   const rain = buildRain();
   group.add(rain.mesh);
+  const flurries = buildWindAndSnow();
+  group.add(flurries.mesh);
 
   const trees: Array<[number, number, number]> = [
     [-15.4, -8.6, 1.25],
@@ -862,7 +869,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
     group.add(bakeScenery(flower));
   });
 
-  let lastTime = 0;
+  let lastTime = 0, grassTime = 0;
   return {
     group,
     ground,
@@ -891,15 +898,19 @@ export function createWorld(initialDecor?: FarmDecor): World {
     },
     update(t, weather = "sunny", player, swimAmount = 0) {
       decor.update(t);
-      const raining = weather === "rain";
-      updateGrassWind(t);
+      const raining = isRainy(weather);
+      const dt = Math.min(0.1, Math.max(0, t - lastTime));
+      snowCover.value = THREE.MathUtils.damp(snowCover.value, weather === "snow" ? 1 : 0, .8, dt);
+      grassTime += dt * (weather === "gale" ? 3.3 : weather === "storm" ? 2.2 : 1);
+      updateGrassWind(grassTime);
       dust.points.visible = weather === "sunny";
       if (dust.points.visible) dust.update(t);
       rain.mesh.visible = raining;
-      if (raining) rain.update(t, player);
+      if (raining) rain.update(t, player, weather === "storm" ? 2.25 : 1);
+      flurries.mesh.visible = weather === "gale" || weather === "snow";
+      if (flurries.mesh.visible) flurries.update(t, weather === "gale", player);
       river.update(t, weather, player, swimAmount);
-      const dt = Math.min(0.1, Math.max(0, t - lastTime));
-      mill.rotor.rotation.z += dt * (raining ? 0.85 : weather === "cloudy" ? 0.53 : 0.28);
+      mill.rotor.rotation.z += dt * (weather === "gale" ? 2.1 : weather === "storm" ? 1.55 : raining ? .85 : weather === "cloudy" ? .53 : .28);
       lastTime = t;
     },
   };

@@ -14,6 +14,8 @@ export interface AvatarMotion {
   swimming: number;
   /** One full breaststroke or sculling cycle. */
   swimPhase: number;
+  /** Height of the saddle above the actor's root, zero while on foot. */
+  saddleHeight?: number;
   /** Submerged terrain beneath each shoe, including sloping banks. */
   waterFloor?: (x: number, z: number) => number;
 }

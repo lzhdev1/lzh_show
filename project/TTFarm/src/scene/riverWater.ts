@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { WEATHER, isRainy, type WeatherKind } from "../game/weather";
 import { RIVER_BED, RIVER_POINTS } from "./layout";
 
 // Metres in river coordinates (downstream, across). Values are height and its two
@@ -184,11 +185,11 @@ export function buildWaterSurface() {
     tiles,
     time,
     cloud,
-    update(t: number, weather: "sunny" | "cloudy" | "rain", player?: THREE.Vector3, swimAmount = 0) {
+    update(t: number, weather: WeatherKind, player?: THREE.Vector3, swimAmount = 0) {
       const dt = Math.max(0, Math.min(.15, t - time.value));
       time.value = t;
-      rain.value = THREE.MathUtils.damp(rain.value, weather === "rain" ? 1 : 0, 2.4, dt);
-      const overcast = weather === "sunny" ? 0 : weather === "cloudy" ? .55 : 1;
+      rain.value = THREE.MathUtils.damp(rain.value, isRainy(weather) ? 1 : 0, 2.4, dt);
+      const overcast = WEATHER[weather].cover;
       cloud.value = THREE.MathUtils.damp(cloud.value, overcast, 1.6, dt);
       if (player && swimAmount > .12) {
         const previous = strokes[(nextStroke + strokes.length - 1) % strokes.length];

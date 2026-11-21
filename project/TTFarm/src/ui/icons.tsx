@@ -95,6 +95,37 @@ export function WaterIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+export function SowIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" strokeLinejoin="round" aria-hidden="true">
+      <g transform="rotate(32 14 12)">
+        <path d="M7 4h13v14l-3 2H7z" fill="#ead19c" stroke="#816943" strokeWidth="1.5"/>
+        <path d="M7 7h13" stroke="#aa8751" strokeWidth="1.3"/>
+        <path d="M13 16c.1-3.8 1.6-5.6 4.7-6.5.1 3.7-1.7 6.1-4.7 6.5Z" fill="#5c904a"/>
+        <path d="M13 15c-2.4-.4-3.6-1.8-3.5-4.4 2.4.4 3.6 1.9 3.5 4.4Z" fill="#8bb960"/>
+      </g>
+      <g fill="#cc994a" stroke="#8b6939" strokeWidth="1">
+        <ellipse cx="18" cy="23" rx="1.2" ry="1.9" transform="rotate(-30 18 23)"/>
+        <ellipse cx="23.5" cy="24.5" rx="1.2" ry="1.9" transform="rotate(-47 23.5 24.5)"/>
+        <ellipse cx="19.5" cy="28.5" rx="1.2" ry="1.6" transform="rotate(-18 19.5 28.5)"/>
+      </g>
+    </svg>
+  );
+}
+
+export function WateringCanIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 10.5c.7-6.6 8.4-6.5 8.4.3 0 4.1-2.5 6.6-5.8 7.7" stroke="#406d76" strokeWidth="2.5"/>
+      <path d="m13.3 17.5-6-4-2.1 2.2 8.4 8.1z" fill="#8cc2bd" stroke="#406d76" strokeWidth="1.4"/>
+      <path d="M13.3 12.2h9.6l1.3 10c.2 1.6-1.2 2.8-2.7 2.8h-6.1c-1.7 0-3-1.3-2.8-3z" fill="#76aaa9" stroke="#406d76" strokeWidth="1.5"/>
+      <path d="M13.4 13.1h9.5M16 16.8l-.4 4.4" stroke="#d0e8dc" strokeWidth="1.5"/>
+      <path d="m3.6 15.9 4.3-4.3" stroke="#406d76" strokeWidth="2.8"/>
+      <path d="m2.8 20.5-1 1.8m5-.7-1 2m5-.1-1.1 2.1" stroke="#5a9bbe" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
 export function HarvestIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>

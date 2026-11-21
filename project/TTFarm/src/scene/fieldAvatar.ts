@@ -124,7 +124,7 @@ export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId
     { bone: l.shoe, local: new THREE.Vector3(0, -0.080, -0.032) },
     { bone: l.shoe, local: new THREE.Vector3(0, -0.072, 0.091) },
   ]);
-  const align = alignAvatar(visual, soles, head);
+  const align = alignAvatar(visual, soles, head, body);
   return {
     visual,
     animate: (_dt, _t, m) => {

@@ -99,14 +99,26 @@ export class WorldObstacles {
       xmin = Math.min(xmin, a.x); xmax = Math.max(xmax, a.x);
       zmin = Math.min(zmin, a.z); zmax = Math.max(zmax, a.z);
     }
-    this.add({x: 0, z: 0, radius: 0, edges, layer, xmin: xmin - PLAYER_RADIUS,
-      xmax: xmax + PLAYER_RADIUS, zmin: zmin - PLAYER_RADIUS, zmax: zmax + PLAYER_RADIUS, stamp: 0});
+    const shape = {x: 0, z: 0, radius: 0, edges, layer, xmin: xmin - PLAYER_RADIUS,
+      xmax: xmax + PLAYER_RADIUS, zmin: zmin - PLAYER_RADIUS, zmax: zmax + PLAYER_RADIUS, stamp: 0};
+    this.add(shape);
+    return shape;
   }
 
   addBox(x: number, z: number, halfX: number, halfZ: number, yaw = 0, layer?: CollisionLayer) {
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
-    this.addPolygon([[-halfX,-halfZ],[halfX,-halfZ],[halfX,halfZ],[-halfX,halfZ]].map(([u,v]) =>
+    const shape = this.addPolygon([[-halfX,-halfZ],[halfX,-halfZ],[halfX,halfZ],[-halfX,halfZ]].map(([u,v]) =>
       ({x: x + cos*u + sin*v, z: z - sin*u + cos*v})), layer);
+    return () => {
+      if (!shape) return;
+      for (let row = bin(shape.zmin); row <= bin(shape.zmax); row++) {
+        for (let col = bin(shape.xmin); col <= bin(shape.xmax); col++) {
+          const cell = this.bins[row * BINS + col];
+          const index = cell.indexOf(shape);
+          if (index >= 0) cell.splice(index, 1);
+        }
+      }
+    };
   }
 
   /** Each peak and foothill is star-shaped. Slice its actual transformed triangles at

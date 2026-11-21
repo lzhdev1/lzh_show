@@ -3,6 +3,7 @@
 
 import type { CropId } from "../game/crops";
 import type { FarmDecor } from "../game/decor";
+import type { RanchState } from "../game/ranch";
 
 const BASE = "/api/ttfarm";
 
@@ -31,6 +32,8 @@ export interface RemotePlot {
 }
 
 export interface RemoteState {
+  revision?: number;
+  saveVersion?: number;
   coins: number;
   xp: number;
   plots: RemotePlot[];
@@ -42,12 +45,17 @@ export interface RemoteState {
   outfitId?: string;
   bottomId?: string;
   decor?: FarmDecor;
+  ranch?: RanchState;
 }
 
 export interface AuthResult {
   token: string;
   user: AccountUser;
   state: RemoteState;
+  needsNickname: boolean;
+}
+export class FarmApiError extends Error {
+  constructor(message: string, readonly status: number, readonly state?: RemoteState, readonly code?: string) { super(message); }
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
@@ -70,10 +78,13 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   if (!res.ok) {
     const message =
       (payload as { error?: string } | null)?.error ?? `请求失败（${res.status}）`;
-    throw new Error(message);
+    const data = payload as { state?: RemoteState; code?: string } | null;
+    throw new FarmApiError(message, res.status, data?.state, data?.code);
   }
   return payload as T;
 }
+
+export { request as requestFarm };
 
 export const ttfarmApi = {
   leaderboard: (token: string, signal?: AbortSignal) =>
@@ -87,20 +98,24 @@ export const ttfarmApi = {
   login: (username: string) =>
     request<AuthResult>("/login", { method: "POST", body: JSON.stringify({ username }) }),
 
-  register: (username: string) =>
-    request<AuthResult>("/register", { method: "POST", body: JSON.stringify({ username }) }),
+  register: (username: string, nickname: string) =>
+    request<AuthResult>("/register", { method: "POST", body: JSON.stringify({ username, nickname }) }),
+
+  setNickname: (token: string, nickname: string) =>
+    request<{user:AccountUser; state:RemoteState}>("/nickname", {method:"PUT",
+      headers:{Authorization:`Bearer ${token}`}, body:JSON.stringify({ nickname })}),
 
   loadState: (token: string) =>
-    request<{ state: RemoteState }>("/state", {
+    request<{ state: RemoteState; user:AccountUser; needsNickname:boolean }>("/state", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     }),
 
-  saveState: (token: string, state: unknown) =>
-    request<{ ok: boolean }>("/state", {
+  saveState: (token: string, state: unknown, writeId?:string) =>
+    request<{ ok: boolean; revision: number }>("/state", {
       method: "PUT",
       keepalive: true,
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ state }),
+      body: JSON.stringify({ state, writeId }),
     }),
 };

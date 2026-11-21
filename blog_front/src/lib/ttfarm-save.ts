@@ -1,16 +1,13 @@
-import type { Pool } from "pg";
+import type { Queryable } from "./ttfarm-auth";
+import { CROPS } from "@farm-rules/crops";
+import { MAX_WATER, PLOT_COUNT, START_UNLOCKED } from "@farm-rules/growth";
+import { normalizeRanch as readRanch } from "@farm-rules/ranch";
+import { MUTATIONS as CROP_MUTATIONS } from "@farm-rules/weather";
 
-// 与前端 game/state.ts 保持一致的常量：格子是 6×5=30，开局最前面一排 6 块已开垦
-export const PLOT_COLS = 6;
-export const PLOT_ROWS = 5;
-export const PLOT_COUNT = PLOT_COLS * PLOT_ROWS;
-export const START_UNLOCKED = PLOT_COLS;
 /** 测试期金币：新号直接给一大笔，方便试扩建 */
 export const START_COINS = 99_999_999;
-/** 每块地每天最多浇几次水，服务端也卡一遍 */
-const MAX_WATER = 3;
-const CROP_IDS = ["radish", "cabbage", "tomato", "corn", "strawberry", "pumpkin"];
-const MUTATIONS = ["amber", "mist", "pearl"];
+const CROP_IDS = Object.keys(CROPS);
+const MUTATIONS = Object.keys(CROP_MUTATIONS);
 const HARVEST_KEYS = CROP_IDS.flatMap((crop) => [crop, ...MUTATIONS.map((m) => `${crop}:${m}`)]);
 const isBasicOutfit = (value: unknown): value is "field" | "raincoat" | "ranger" =>
   value === "field" || value === "raincoat" || value === "ranger";
@@ -55,14 +52,8 @@ export interface FarmSave {
   outfitId: string;
   bottomId: string;
   decor: ReturnType<typeof readDecor>;
+  ranch: ReturnType<typeof readRanch>;
   selectedSeed: string;
-}
-
-export interface UserRow {
-  id: number;
-  username: string;
-  nickname: string;
-  avatar_id: string;
 }
 
 export function initialSave(nickname = "农场主"): FarmSave {
@@ -89,6 +80,7 @@ export function initialSave(nickname = "农场主"): FarmSave {
     outfitId: "field",
     bottomId: "field",
     decor: readDecor(null),
+    ranch: readRanch(null),
     selectedSeed: "radish",
   };
 }
@@ -115,7 +107,7 @@ function record(raw: unknown, fallback: Record<string, number>, keys: string[]):
  * 客户端送上来的存档一律在这里重新拼一遍：
  * 数值范围、字段白名单、地块数量都由服务端说了算，避免脏数据或超大 JSON 直接入库
  */
-export function normalizeSave(raw: unknown, fallbackNick: string): FarmSave | null {
+export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
   if (!raw || typeof raw !== "object") return null;
   const src = raw as Partial<FarmSave>;
 
@@ -134,7 +126,7 @@ export function normalizeSave(raw: unknown, fallbackNick: string): FarmSave | nu
     });
   }
 
-  const base = initialSave(fallbackNick);
+  const base = initialSave(nickname);
   const avatarId = src.avatarId === "qinghe" ? "qinghe" : "xiaosui";
   const selected = src.outfitId;
   const stageSet = avatarId === "xiaosui" && typeof selected === "string" && COUTURE_IDS.has(selected);
@@ -145,55 +137,19 @@ export function normalizeSave(raw: unknown, fallbackNick: string): FarmSave | nu
     plots,
     seeds: record(src.seeds, base.seeds, CROP_IDS),
     harvest: record(src.harvest, base.harvest, HARVEST_KEYS),
-    nickname: displayText(src.nickname, 12, fallbackNick),
+    nickname,
     avatarId,
     outfitId,
     bottomId: stageSet || !isBasicOutfit(src.bottomId) ? outfitId : src.bottomId,
     decor: readDecor(src.decor),
+    ranch: readRanch(src.ranch),
     selectedSeed: typeof src.selectedSeed === "string" && CROP_IDS.includes(src.selectedSeed)
       ? src.selectedSeed
       : "radish",
   };
 }
 
-/** 按用户名找账号，没有就建一个（前期「一个账号直接登录」就靠这一步兜底） */
-export async function findOrCreateUser(pool: Pool, username: string): Promise<UserRow> {
-  const found = await pool.query<UserRow>(
-    "SELECT id, username, nickname, avatar_id FROM users WHERE username = $1",
-    [username]
-  );
-  if (found.rows.length > 0) {
-    await pool.query("UPDATE users SET last_login_at = now() WHERE id = $1", [found.rows[0].id]);
-    return found.rows[0];
-  }
-
-  const created = await pool.query<UserRow>(
-    `INSERT INTO users (username, nickname, avatar_id, last_login_at)
-     VALUES ($1, $1, 'xiaosui', now())
-     RETURNING id, username, nickname, avatar_id`,
-    [username]
-  );
-  const user = created.rows[0];
-
-  const save = initialSave(user.username);
-  await pool.query(
-    `INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed)
-     VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7)
-     ON CONFLICT (user_id) DO NOTHING`,
-    [
-      user.id,
-      save.coins,
-      save.xp,
-      JSON.stringify(save.plots),
-      JSON.stringify(save.seeds),
-      JSON.stringify(save.harvest),
-      save.selectedSeed,
-    ]
-  );
-  return user;
-}
-
-export async function loadSave(pool: Pool, userId: number, nickname: string): Promise<FarmSave> {
+export async function loadSave(pool: Queryable, userId: number, nickname: string): Promise<FarmSave & { saveVersion: number; revision: number }> {
   const res = await pool.query<{
     coins: string;
     xp: number;
@@ -206,9 +162,12 @@ export async function loadSave(pool: Pool, userId: number, nickname: string): Pr
     outfit_id: string;
     bottom_id: string | null;
     decor: FarmSave["decor"];
+    ranch: FarmSave["ranch"];
+    save_version: number;
+    revision: number;
   }>(
-    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor,
-            u.nickname, u.avatar_id
+    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.save_version, s.revision,
+            CASE WHEN u.nickname_key IS NULL THEN '' ELSE u.nickname END AS nickname, u.avatar_id
        FROM farm_states s JOIN users u ON u.id = s.user_id WHERE s.user_id = $1`,
     [userId]
   );
@@ -216,12 +175,14 @@ export async function loadSave(pool: Pool, userId: number, nickname: string): Pr
   if (res.rows.length === 0) {
     // 账号在、存档丢了（比如手工清过表）：按初始档补一份，别让人卡在空白农场
     const fresh = initialSave(nickname);
-    await saveState(pool, userId, fresh);
-    return fresh;
+    await pool.query(`INSERT INTO farm_states(user_id,coins,xp,plots,seeds,harvest,selected_seed)
+      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (user_id) DO NOTHING`,
+      [userId, fresh.coins, fresh.xp, JSON.stringify(fresh.plots), fresh.seeds, fresh.harvest, fresh.selectedSeed]);
+    return loadSave(pool, userId, nickname);
   }
 
   const row = res.rows[0];
-  return normalizeSave(
+  const state = normalizeSave(
     {
       coins: Number(row.coins),
       xp: row.xp,
@@ -234,20 +195,20 @@ export async function loadSave(pool: Pool, userId: number, nickname: string): Pr
       outfitId: row.outfit_id,
       bottomId: row.bottom_id,
       decor: row.decor,
+      ranch: row.ranch,
     },
-    nickname
+    row.nickname
   ) ?? initialSave(nickname);
+  return { ...state, saveVersion: row.save_version, revision: row.revision };
 }
 
-export async function saveState(pool: Pool, userId: number, save: FarmSave,
-                                includeWardrobe = true, includeDecor = true, includeBottom = true): Promise<void> {
-  await pool.query(
-    `WITH profile AS (
-       UPDATE users SET nickname = $8, avatar_id = CASE WHEN $12 THEN $9 ELSE avatar_id END
-       WHERE id = $1 RETURNING id
-     )
-     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, updated_at)
-     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $10, $11::jsonb, $14, now() FROM profile
+export async function saveState(pool: Queryable, userId: number, save: FarmSave,
+                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, expectedRevision: number | null = null): Promise<number | null> {
+  const result = await pool.query(
+    `WITH written AS (
+     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, save_version, revision, updated_at)
+     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb,
+            CASE WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
      ON CONFLICT (user_id) DO UPDATE SET
        coins = EXCLUDED.coins,
        xp = EXCLUDED.xp,
@@ -255,15 +216,22 @@ export async function saveState(pool: Pool, userId: number, save: FarmSave,
        seeds = EXCLUDED.seeds,
        harvest = EXCLUDED.harvest,
        selected_seed = EXCLUDED.selected_seed,
-       outfit_id = CASE WHEN $12 THEN EXCLUDED.outfit_id ELSE farm_states.outfit_id END,
+       outfit_id = CASE WHEN $11 THEN EXCLUDED.outfit_id ELSE farm_states.outfit_id END,
        bottom_id = CASE
-         WHEN NOT $12 THEN farm_states.bottom_id
-         WHEN $15 THEN EXCLUDED.bottom_id
+         WHEN NOT $11 THEN farm_states.bottom_id
+         WHEN $14 THEN EXCLUDED.bottom_id
          WHEN farm_states.outfit_id IS DISTINCT FROM EXCLUDED.outfit_id THEN NULL
          ELSE farm_states.bottom_id
        END,
-       decor = CASE WHEN $13 THEN EXCLUDED.decor ELSE farm_states.decor END,
-       updated_at = now()`,
+       decor = CASE WHEN $12 THEN EXCLUDED.decor ELSE farm_states.decor END,
+       ranch = CASE WHEN $16 THEN EXCLUDED.ranch ELSE farm_states.ranch END,
+       save_version = GREATEST(farm_states.save_version, EXCLUDED.save_version),
+       revision = farm_states.revision + 1, updated_at = now()
+     WHERE ($16 OR farm_states.save_version < 2)
+       AND (farm_states.revision = $17 OR ($17 IS NULL AND farm_states.save_version < 3))
+     RETURNING user_id,revision)
+     UPDATE users SET avatar_id = CASE WHEN $11 THEN $8 ELSE avatar_id END
+     FROM written WHERE users.id = written.user_id RETURNING written.revision`,
     [
       userId,
       save.coins,
@@ -272,7 +240,6 @@ export async function saveState(pool: Pool, userId: number, save: FarmSave,
       JSON.stringify(save.seeds),
       JSON.stringify(save.harvest),
       save.selectedSeed,
-      save.nickname,
       save.avatarId,
       save.outfitId,
       JSON.stringify(save.decor),
@@ -280,6 +247,10 @@ export async function saveState(pool: Pool, userId: number, save: FarmSave,
       includeDecor,
       save.bottomId === save.outfitId ? null : save.bottomId,
       includeBottom,
+      JSON.stringify(save.ranch),
+      includeRanch,
+      expectedRevision,
     ]
   );
+  return result.rows[0]?.revision ?? null;
 }

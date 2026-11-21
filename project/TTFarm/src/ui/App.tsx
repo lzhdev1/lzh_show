@@ -1,19 +1,27 @@
 import { useEffect, useState } from "react";
 import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
-import { useAccount } from "../game/account";
+import { observeHomeRevision, useAccount } from "../game/account";
+import { startSocialSync, useSocial } from "../game/social";
 import { LoginPage } from "./LoginPage";
 import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
+import { PlotAction } from "./PlotAction";
 import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
 import { farmInput, releaseTouchInput } from "../game/input";
-import { ControlGuide, TouchControls, WeatherBadge } from "./FieldControls";
+import { ControlGuide, ReturnToLoginButton, TouchControls, WeatherBadge } from "./FieldControls";
 import { FarmPanel } from "./FarmPanel";
+import { RanchPanel, RanchTrigger, RanchHUD } from "./RanchPanel";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
+import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
+import { FarmGuests, VisitHUD } from "./VisitHUD";
+import "./social.css";
 
 export function App() {
-  const token = useAccount((s) => s.token);
+  const token = useAccount(s => s.identityChecked && s.user?.nickname ? s.token : null);
+  const nickname = useAccount(s => s.user?.nickname);
+  const visit = useSocial(s => s.visit);
   const [touchActive, setTouchActive] = useState(() => matchMedia("(pointer: coarse)").matches);
   useEffect(() => {
     const pointer = (event: PointerEvent) => setTouchActive(event.pointerType !== "mouse");
@@ -30,14 +38,23 @@ export function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [farmOpen, setFarmOpen] = useState(false);
+  const [ranchOpen, setRanchOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const friendRoster = useFriendRoster(token, friendsOpen);
+  useEffect(() => startSocialSync(observeHomeRevision), []);
+  const away = !!visit;
+  useEffect(() => {
+    if (!away && token) return;
+    setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
+    setProfileOpen(false); setFarmOpen(false); setRanchOpen(false);
+  }, [away, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
   useEffect(() => {
     void useAccount.getState().refresh();
   }, []);
 
-  const nickname = useGame((s) => s.nickname);
   const avatarId = useGame((s) => s.avatarId);
   const coins = useGame((s) => s.coins);
   const xp = useGame((s) => s.xp);
@@ -47,12 +64,13 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
-  const panelOpen = shopOpen || profileOpen || farmOpen || rankingOpen;
+  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen);
   useEffect(() => {
     if (!panelOpen) return;
     const dismiss = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return;
       setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
+      setRanchOpen(false); setFriendsOpen(false);
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -61,7 +79,7 @@ export function App() {
     farmInput.blocked = !token || panelOpen;
     releaseTouchInput();
     return () => { farmInput.blocked = true; };
-  }, [token, panelOpen]);
+  }, [token, panelOpen, away]);
 
   const level = levelFromXp(xp);
   const nextXp = nextLevelXp(level);
@@ -74,6 +92,7 @@ export function App() {
 
   return (
     <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
+      {visit ? <VisitHUD visit={visit}/> : <>
       <header className="topbar">
         <button className="profile-chip" onClick={() => setProfileOpen(true)} aria-label="查看农场主资料">
           <img src={avatar.portrait} alt="" />
@@ -106,12 +125,21 @@ export function App() {
         </div>
       </header>
 
-      {selectedPlot === null && (
-        <>
-          <div className="field-status"><WeatherBadge onOpen={() => setFarmOpen(true)} /><ControlGuide /></div>
-          {!panelOpen && <TouchControls />}
-        </>
-      )}
+      <div className="field-status">
+        {selectedPlot === null && <>
+          <WeatherBadge onOpen={() => setFarmOpen(true)} />
+          <ControlGuide />
+          <RanchTrigger onClick={() => setRanchOpen(true)} />
+          <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
+        </>}
+        <ReturnToLoginButton />
+      </div>
+      {selectedPlot === null && !panelOpen && <>
+        <FarmGuests/>
+        <TouchControls />
+        <PlotAction onOpenShop={() => setShopOpen(true)} />
+        <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
+      </>}
 
       <div className="dock">
         <div className="dock-label">
@@ -146,11 +174,14 @@ export function App() {
         </button>
       </div>
 
-      <PlotSheet onOpenShop={() => setShopOpen(true)} />
+      {!panelOpen && <PlotSheet onOpenFarm={() => setFarmOpen(true)} />}
       {shopOpen && <ShopPanel onClose={() => setShopOpen(false)} />}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {farmOpen && <FarmPanel onClose={() => setFarmOpen(false)} />}
+      {ranchOpen && <RanchPanel onClose={() => setRanchOpen(false)} />}
       {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
+      {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
+      </>}
 
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { PLOT_COUNT, landPriceOf, useGame } from "../game/state";
 import { CloseIcon, CoinIcon, LandIcon } from "./icons";
 import { useClock } from "../game/clock";
-import { MUTATIONS, WEATHER, weatherAt, weatherEndsAt } from "../game/weather";
+import { ELEMENTS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
 import { formatRemain } from "../game/growth";
 import { FarmDecorPanel } from "./FarmDecorPanel";
 
@@ -17,7 +17,6 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
   const now = useClock((s) => s.now);
   const weatherKind = weatherAt(now);
   const weather = WEATHER[weatherKind];
-  const variety = MUTATIONS[weather.mutation];
   const next = WEATHER[weatherAt(weatherEndsAt(now))];
 
   const unlocked = plots.filter((p) => p.unlocked).length;
@@ -58,12 +57,18 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
           <div className="row-main">
             <strong>{weather.label} · {formatRemain(weatherEndsAt(now) - now)}后转为{next.label}</strong>
             <span className="muted small">
-              此时播种有 {Math.round(weather.chance * 100)}% 概率培育出{variety.label}变异，售价 ×{variety.multiplier}。
-              {weatherKind === "rain" ? "雨水会替新种下的作物浇一次水。" : ""}
+              播种有 {Math.round(weather.chance * 100)}% 概率发生变异。更容易出现{weather.affinity.map(id => MUTATIONS[id].label).join("和")}。
+              {isRainy(weatherKind) ? "雨水会替新种下的作物浇一次水。" : ""}
             </span>
           </div>
         </div>
 
+        <details className="crop-almanac">
+          <summary>作物变异图鉴</summary>
+          <ul>{ELEMENTS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
+          <p>变异中有 {Math.round(SPIRIT_SHARE * 100)}% 会长成精灵。五位精灵在各种天气中都有机会出现，出售每份收成可得八倍金币。</p>
+          <ul>{SPIRITS.map(id => <li key={id}>{MUTATIONS[id].label}</li>)}</ul>
+        </details>
         <h3 className="section-title">扩建</h3>
         {locked.length > 0 ? (
           <>

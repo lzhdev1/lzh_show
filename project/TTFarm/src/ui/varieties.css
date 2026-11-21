@@ -6,3 +6,15 @@
 .variety-mark.amber { color: #885717; }
 .variety-mark.mist { color: #735093; }
 .variety-mark.pearl { color: #20756e; }
+.variety-mark.thunder, .variety-mark.nocturne { color: #7654a5; }
+.variety-mark.frost, .variety-mark.coral { color: #337287; }
+.variety-mark.flame, .variety-mark.rosette { color: #ac5554; }
+.variety-mark.gold, .variety-mark.orbit { color: #8f621b; }
+.variety-mark.earth, .variety-mark.bamboo { color: #567343; }
+.variety-mark.wind { color: #287b6e; }
+.crop-almanac { margin: 10px 0; padding: 10px 12px; background: #f5f1e6; border-radius: 12px; font-size: .85rem; }
+.crop-almanac summary { cursor: pointer; color: #526744; font-weight: 700; }
+.crop-almanac p { line-height: 1.6; margin: 10px 0; }
+.crop-almanac ul { display: flex; flex-wrap: wrap; gap: 5px; padding: 0; margin: 10px 0 0; list-style: none; }
+.crop-almanac li { background: #fffaf0; border: 1px solid #e1d9c5; border-radius: 8px; padding: 3px 7px; }
+.crop-almanac li b { margin-left: 4px; color: #8a6829; }

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { AvatarId, OutfitId } from "../game/appearance";
+import { HORSE_SPEED_FACTOR, type AnimalSpecies } from "../game/ranch";
 import { walkingRoute } from "../game/walkingRoute";
 import type { AvatarMotion, AvatarRig } from "./rig";
 import { builtinModelUrl, getCustomModel, onCustomModelChange } from "./avatarModel";
@@ -7,6 +8,8 @@ import { createFieldAvatar } from "./fieldAvatar";
 import { advanceBridge, sampleTravelSurface } from "../game/waterTravel";
 import type { WorldObstacles } from "./obstacles";
 import { riverBedHeight, riverInfo } from "./layout";
+
+const RIDING_SPEED_MULTIPLIER = 2.05;
 
 function waterFloorAt(x: number, z: number) {
   return riverBedHeight(riverInfo(x, z).dist);
@@ -23,10 +26,12 @@ export class Player {
   private readonly previous = new THREE.Vector3();
   private onDeck = false;
   private target: THREE.Vector3 | null = null;
+  private runToTarget = false;
   private waypoints: THREE.Vector3[] = [];
   private onArrive: (() => void) | null = null;
   private facing = Math.PI;
   private speed = 0;
+  private mountSpeedFactor = 1;
   private moving = false;
   private readonly direction = new THREE.Vector3();
   private jumpHeight = 0;
@@ -34,8 +39,12 @@ export class Player {
   private motion: AvatarMotion = {
     phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0, swimming: 0, swimPhase: 0,
   };
-  private static readonly WALK_SPEED = 1.24;
-  private static readonly RUN_SPEED = 2.75;
+  private static readonly WALK_SPEED = 1.72;
+  private static readonly RUN_SPEED = 3.82;
+
+  static maxMountedRunSpeed(species: AnimalSpecies) {
+    return Player.RUN_SPEED * RIDING_SPEED_MULTIPLIER * (species === "horse" ? HORSE_SPEED_FACTOR : 1);
+  }
   /** 脚下地面高度：田埂草台和地块都是抬起来的，人物要跟着抬起来 */
   private groundY = 0;
   private cameraFloorY = 0;
@@ -45,7 +54,8 @@ export class Player {
 
   constructor(avatarId: AvatarId, private readonly obstacles: WorldObstacles,
               private readonly fieldHeightAt: (x: number, z: number) => number,
-              outfitId: OutfitId = "field", bottomId: OutfitId = outfitId) {
+              outfitId: OutfitId = "field", bottomId: OutfitId = outfitId, private readonly remote = false,
+              private readonly detailed = true) {
     this.avatarId = avatarId;
     this.outfitId = outfitId;
     this.bottomId = bottomId;
@@ -56,7 +66,7 @@ export class Player {
     this.root.rotation.y = this.facing;
 
     // 资料面板导入本地 VRM 时，立即替换当前形象
-    this.offCustomModel = onCustomModelChange(() => {
+    this.offCustomModel = remote ? () => {} : onCustomModelChange(() => {
       void this.loadModelFor(this.avatarId);
     });
     void this.loadModelFor(avatarId);
@@ -69,10 +79,36 @@ export class Player {
   get isMoving(): boolean {
     return this.moving;
   }
+  get isRunning() { return this.motion.running > 0.45 && this.moving; }
+  get isJumping() { return this.jumpTime >= 0; }
+
+  relocate(x: number, z: number, yaw: number, onDeck = false): void {
+    this.cancelTarget();
+    this.position.set(x, 0, z);
+    this.onDeck = onDeck;
+    this.facing = yaw;
+    this.speed = this.jumpHeight = 0;
+    this.jumpTime = -1;
+    this.moving = false;
+    const surface = sampleTravelSurface(x, z, onDeck, this.fieldHeightAt);
+    this.motion = { phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0,
+      swimming: THREE.MathUtils.smoothstep(surface.depth, 0.52, 1), swimPhase: 0 };
+    this.cameraFloorY = Math.max(surface.floorY, surface.waterY);
+    this.groundY = THREE.MathUtils.lerp(surface.floorY, surface.waterY, this.motion.swimming);
+    this.root.position.set(x, this.groundY, z);
+    this.root.rotation.y = yaw;
+  }
 
   get onBridgeDeck() { return this.onDeck; }
+  get isOnFoot() { return !this.motion.saddleHeight && !this.onDeck && this.jumpHeight === 0 && this.swimAmount === 0; }
   get swimAmount() { return this.motion.swimming; }
   get cameraGroundY() { return this.cameraFloorY; }
+  setSaddleHeight(height: number, species?: AnimalSpecies) {
+    const factor = height > 0 && species === "horse" ? HORSE_SPEED_FACTOR : 1;
+    this.speed *= factor / this.mountSpeedFactor;
+    this.mountSpeedFactor = factor;
+    this.motion.saddleHeight = height;
+  }
 
   setAvatar(avatarId: AvatarId): void {
     this.setAppearance(avatarId, this.outfitId, this.bottomId);
@@ -83,7 +119,7 @@ export class Player {
     this.avatarId = avatarId;
     this.outfitId = outfitId;
     this.bottomId = bottomId;
-    if (getCustomModel().url) return;
+    if (!this.remote && getCustomModel().url) return;
     if (this.rig.setAppearance) this.rig.setAppearance(avatarId, outfitId, bottomId);
     else {
       this.applyRig(createFieldAvatar(avatarId, outfitId, bottomId));
@@ -105,9 +141,9 @@ export class Player {
    */
   private async loadModelFor(avatarId: AvatarId): Promise<void> {
     const token = ++this.modelToken;
-    const custom = getCustomModel().url;
+    const custom = this.remote ? null : getCustomModel().url;
     const url = custom ?? builtinModelUrl(avatarId);
-    if (!url) return;
+    if (!url || !this.detailed) return;
     try {
       // VRM 运行库单独成块：不用 VRM 形象时不下载这 ~220KB
       const { loadVrmRig } = await import("./vrmAvatar");
@@ -133,9 +169,14 @@ export class Player {
     this.rig.dispose();
   }
 
-  moveTo(point: THREE.Vector3, onArrive?: () => void, targetDeck = false): void {
+  animatePeer(dt: number, time: number, motion: AvatarMotion): void {
+    this.rig.animate?.(dt, time, motion);
+  }
+
+  moveTo(point: THREE.Vector3, onArrive?: () => void, targetDeck = false, runToTarget = false): void {
     this.waypoints = walkingRoute(this.position, point, this.obstacles, this.onDeck, targetDeck);
     this.target = this.waypoints.shift() ?? null;
+    this.runToTarget = runToTarget;
     this.onArrive = this.target ? onArrive ?? null : null;
   }
 
@@ -143,6 +184,14 @@ export class Player {
     this.target = null;
     this.waypoints.length = 0;
     this.onArrive = null;
+  }
+
+  /** Upgrading the ranch may place a new rail or stable divider under the rider. */
+  adjustToChangedFences(): void {
+    this.cancelTarget();
+    const free = this.obstacles.project(this.position, this.onDeck ? "deck" : "terrain");
+    this.position.x = this.root.position.x = free.x;
+    this.position.z = this.root.position.z = free.z;
   }
 
   /** 键盘/虚拟摇杆输入：直接位移，并取消点选目标 */
@@ -168,21 +217,27 @@ export class Player {
       dir.set(inputDir.x, 0, inputDir.z);
       strength = Math.min(1, dir.length());
     } else if (this.target) {
+      running ||= this.runToTarget;
       dir.subVectors(this.target, this.position);
       dir.y = 0;
       distanceLeft = dir.length();
       strength = 1;
     }
-    const maxSpeed = THREE.MathUtils.lerp(running ? Player.RUN_SPEED : Player.WALK_SPEED,
+    const riding = !!this.motion.saddleHeight;
+    const gaitScale = riding ? RIDING_SPEED_MULTIPLIER * this.mountSpeedFactor : 1;
+    const landSpeed = (running ? Player.RUN_SPEED : Player.WALK_SPEED) * gaitScale;
+    const maxSpeed = THREE.MathUtils.lerp(landSpeed,
       running ? 1.45 : 0.94, this.swimAmount);
     const lastFacing = this.facing;
     const remainingTurn = strength > 0 ? this.applyFacing(dir, dt) : 0;
     const alignment = THREE.MathUtils.lerp(Math.max(0, Math.cos(remainingTurn)), 1, this.swimAmount);
     const previousSpeed = this.speed;
-    const stoppingSpeed = this.target && this.waypoints.length === 0 ? Math.sqrt(2 * 18 * distanceLeft) : Infinity;
+    // Matching the stopping distance keeps the faster horse controllable near a gate or a plot.
+    const brake = 18 * this.mountSpeedFactor ** 2;
+    const stoppingSpeed = this.target && this.waypoints.length === 0 ? Math.sqrt(2 * brake * distanceLeft) : Infinity;
     const goalSpeed = Math.min(strength * maxSpeed * alignment, stoppingSpeed);
     if (strength > 0) this.speed = THREE.MathUtils.damp(previousSpeed, goalSpeed, 16, dt);
-    else this.speed = Math.max(0, previousSpeed - 18 * dt) * (1 - this.swimAmount);
+    else this.speed = Math.max(0, previousSpeed - brake * dt) * (1 - this.swimAmount);
     const speedForStep = strength === 0 && this.swimAmount === 1 ? 0 : (previousSpeed + this.speed) * 0.5;
 
     this.previous.copy(this.position);
@@ -222,12 +277,12 @@ export class Player {
       motion.jumpWeight = 0;
     }
     motion.running = THREE.MathUtils.damp(motion.running,
-      THREE.MathUtils.smoothstep(speed, Player.WALK_SPEED, Player.RUN_SPEED), 12, dt);
+      THREE.MathUtils.smoothstep(speed / gaitScale, Player.WALK_SPEED, Player.RUN_SPEED), 12, dt);
     motion.moving = THREE.MathUtils.damp(motion.moving, Math.min(1, speed / 0.85), 20, dt);
     // Blending toward idle shortens each planted leg's backward sweep. Shorten
     // the distance per cycle by the same proportion for analog steps.
-    const stride = THREE.MathUtils.lerp(1.09, 1.66, motion.running) * Math.max(0.16, motion.moving);
-    motion.phase = (motion.phase + distance / stride) % 1;
+    const stride = THREE.MathUtils.lerp(1.32, 1.97, motion.running) * Math.max(0.16, motion.moving);
+    motion.phase = (motion.phase + distance / (stride * gaitScale)) % 1;
 
     // Capture frames 32–108 gather and extend, 108–178 are airborne,
     // then 178–248 absorb impact and recover. The parabola starts at toe-off.

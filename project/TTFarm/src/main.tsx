@@ -43,6 +43,6 @@ const welcomed = window.localStorage.getItem("ttfarm-welcome");
 if (!welcomed) {
   window.localStorage.setItem("ttfarm-welcome", "1");
   window.setTimeout(() => {
-    useGame.getState().notify("走到地块旁边，点它就能种菜");
+    useGame.getState().notify("选好种子，走上菜地，点「撒种」种下第一株菜");
   }, 900);
 }

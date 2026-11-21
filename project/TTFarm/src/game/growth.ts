@@ -1,6 +1,19 @@
 import { CROPS, type CropId } from "./crops";
 import type { Mutation } from "./weather";
 
+export const PLOT_COLS = 6;
+export const PLOT_ROWS = 5;
+export const PLOT_COUNT = PLOT_COLS * PLOT_ROWS;
+export const START_UNLOCKED = PLOT_COLS;
+export const PLOT_SPACING = 2.6;
+
+export function plotIdAt(x: number, z: number): number | null {
+  const col = Math.floor(x / PLOT_SPACING + PLOT_COLS / 2);
+  const row = Math.floor(-z / PLOT_SPACING + PLOT_ROWS / 2);
+  if (col < 0 || col >= PLOT_COLS || row < 0 || row >= PLOT_ROWS) return null;
+  return row * PLOT_COLS + col;
+}
+
 export interface PlotState {
   id: number;
   unlocked: boolean;

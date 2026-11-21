@@ -999,6 +999,7 @@ button {
   place-items: center;
   padding: 24px;
   pointer-events: auto;
+  overflow: auto;
   background: radial-gradient(120% 90% at 50% 0%, rgba(255, 248, 226, 0.5) 0%, rgba(58, 51, 39, 0.3) 100%);
   backdrop-filter: blur(7px);
 }
@@ -1124,6 +1125,11 @@ button {
 }
 
 .login-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 16px;
   margin-top: 14px;
   text-align: center;
   font-size: 13px;
@@ -1131,8 +1137,8 @@ button {
 }
 
 .login-switch button {
-  margin-left: 4px;
   padding: 2px 4px;
+  min-height: 44px;
   border: none;
   background: none;
   color: var(--leaf-deep);
@@ -1143,6 +1149,23 @@ button {
   text-underline-offset: 3px;
 }
 
+.login-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf6;
+  color: var(--leaf-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-home:hover { background: var(--cream-soft); }
+.login-home:focus-visible { outline: 2px solid var(--leaf-deep); outline-offset: 2px; }
+
 .login-note {
   margin: 16px 0 0;
   padding-top: 12px;
@@ -1150,23 +1173,4 @@ button {
   font-size: 11.5px;
   line-height: 1.6;
   color: #a2967f;
-}
-
-/* ===== 资料面板里的账号行 ===== */
-.account-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--cream-soft);
-  border: 1px solid var(--line);
-}
-
-.account-name {
-  font-weight: 600;
-}
-
-.account-row .btn {
-  margin-left: auto;
 }

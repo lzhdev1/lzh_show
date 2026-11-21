@@ -27,6 +27,7 @@
 .weather-badge b { font-size: 13px; line-height: 1.15; }
 .weather-badge small { font-size: 11px; font-variant-numeric: tabular-nums; color: #66725c; }
 .control-guide { position: relative; pointer-events: auto; }
+.login-return { white-space: nowrap; font-weight: 600; }
 .guide-trigger {
   width: 44px;
   height: 44px;
@@ -82,6 +83,48 @@
 .modal { max-height: 100%; overscroll-behavior: contain; }
 .toasts { z-index: 5; pointer-events: none; }
 .sheet { z-index: 1; }
+
+.plot-action {
+  --action-tint: #e3efcf;
+  --action-ink: #36572e;
+  position: fixed;
+  left: 50%;
+  bottom: calc(97px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 53px;
+  padding: 5px 15px 5px 6px;
+  border: 1px solid #d5c4a5;
+  border-radius: 28px;
+  background: #fff9ec;
+  color: var(--action-ink);
+  box-shadow: 0 4px 12px #382d2438, inset 0 1px 0 #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.plot-action[data-action="water"] { --action-tint: #dceeed; --action-ink: #355e61; }
+.plot-action[data-action="harvest"] { --action-tint: #fae7bd; --action-ink: #745321; }
+.plot-action[data-action="shop"] { --action-tint: #f0e5d0; --action-ink: #68563b; }
+.plot-action-icon {
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 39px;
+  background: var(--action-tint);
+  border-radius: 50%;
+}
+.plot-action-copy { display: grid; gap: 2px; text-align: left; line-height: 1.15; white-space: nowrap; }
+.plot-action-copy strong { font-size: 15px; }
+.plot-action-copy small { color: #6b6254; font-size: 11px; font-variant-numeric: tabular-nums; }
+.plot-action:focus-visible { outline: 3px solid var(--action-ink); outline-offset: 3px; }
+.plot-action:active:enabled { background: var(--action-tint); }
+.plot-action:disabled { cursor: default; color: #656960; }
+.plot-action:disabled .plot-action-icon { filter: grayscale(.75); }
+
 .login-layer { overflow-y: auto; overscroll-behavior: contain; }
 .login-card { margin: auto; }
 .login-field input { font-size: 16px; }
@@ -136,6 +179,12 @@
     font-weight: 700;
   }
   .jump-control:active { background: #4e7054; }
+  .plot-action {
+    left: auto;
+    right: max(20px, env(safe-area-inset-right));
+    bottom: calc(163px + env(safe-area-inset-bottom));
+    transform: none;
+  }
   .dock { bottom: calc(8px + env(safe-area-inset-bottom)); }
   .sheet { bottom: calc(80px + env(safe-area-inset-bottom)); max-height: 60dvh; overflow-y: auto; }
   .seed-scroll { overscroll-behavior-x: contain; }
@@ -151,15 +200,27 @@
   .profile-name { max-width: 7ch; }
   .coin-pill { padding: 0 7px; gap: 3px; }
   .coin-pill b { font-size: 13px; }
-  .field-status { top: calc(60px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); }
+  .field-status { top: calc(60px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); gap: 4px; }
+  .ranch-trigger.login-return { flex-direction: column; justify-content: center; gap: 1px; min-width: 44px; padding: 3px 4px; font-size: 10px; line-height: 1.1; }
+  .login-return .return-verb { display: none; }
   .dock-shop { display: none; }
   .toasts { top: calc(114px + env(safe-area-inset-top)); }
   .modal .row { flex-wrap: wrap; }
+}
+@media (max-width: 360px) {
+  .field-status { gap: 3px; }
+  .field-status .ranch-trigger { padding-inline: 6px; }
+  .field-status .weather-badge { gap: 4px; padding-inline: 6px; }
+}
+/* 长名字的作物在窄屏上会跨过摇杆上缘，操作行整行放到摇杆之上。 */
+@media (max-width: 390px) and (orientation: portrait) {
+  .hud[data-input="touch"] .plot-action { bottom: calc(195px + env(safe-area-inset-bottom)); }
 }
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
   .dock { width: min(55vw, 580px); }
   .hud[data-input='touch'] :is(.touch-stick, .jump-control) { bottom: max(14px, env(safe-area-inset-bottom)); }
   .hud[data-input='touch'] .touch-stick { width: 88px; height: 88px; }
+  .hud[data-input='touch'] .plot-action { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 78px); }
   .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 146px); }
   .modal { max-height: 100%; }
 }

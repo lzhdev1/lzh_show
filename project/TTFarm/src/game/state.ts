@@ -1,17 +1,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CROPS, CROP_LIST, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
-import { isMutation, rollMutation, weatherAt } from "./weather";
-import { MAX_WATER, isReady, type PlotState } from "./growth";
+import { isMutation, isRainy, rollMutation, weatherAt } from "./weather";
+import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
+import { normalizeRanch, type RanchState } from "./ranch";
+import { createRanchActions, type RanchActions } from "./ranchActions";
 export { AVATARS, type AvatarId } from "./appearance";
 
-export const PLOT_COLS = 6;
-export const PLOT_ROWS = 5;
-export const PLOT_COUNT = PLOT_COLS * PLOT_ROWS;
-/** 初始已开垦的地块数量（最靠前的一排） */
-export const START_UNLOCKED = PLOT_COLS;
+export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
 /** 扩建价目：从第 7 块到最后一块，越往后越贵 */
 export const LAND_PRICES = [
   150, 220, 300, 420, 560, 720, 900, 1100, 1320, 1580, 1860, 2180, 2520, 2900,
@@ -42,10 +40,11 @@ interface GameData {
   outfitId: OutfitId;
   bottomId: OutfitId;
   decor: FarmDecor;
+  ranch: RanchState;
   selectedSeed: CropId;
 }
 
-interface GameActions {
+interface GameActions extends RanchActions {
   selectSeed: (crop: CropId) => void;
   selectPlot: (id: number | null) => void;
   buySeed: (crop: CropId, qty?: number) => void;
@@ -56,7 +55,7 @@ interface GameActions {
   expand: () => void;
   /** 一次扩建 count 块地（金币不够或没有空地时返回失败原因） */
   expandBy: (count: number) => boolean;
-  setProfile: (nickname: string, avatarId: AvatarId, outfitId: OutfitId, bottomId: OutfitId) => void;
+  setAppearance: (avatarId: AvatarId, outfitId: OutfitId, bottomId: OutfitId) => void;
   setDecor: (decor: FarmDecor) => void;
   resetSave: () => void;
   notify: (text: string, tone?: "ok" | "warn") => void;
@@ -99,6 +98,7 @@ export function initialData(): GameData {
     outfitId: "field",
     bottomId: "field",
     decor: { ...DEFAULT_DECOR },
+    ranch: normalizeRanch(undefined),
     selectedSeed: "radish",
   };
 }
@@ -109,6 +109,7 @@ export const useGame = create<GameStore>()(
   persist(
     (set, get) => ({
       ...initialData(),
+      ...createRanchActions(set, get),
       selectedPlot: null,
       toasts: [],
 
@@ -173,7 +174,7 @@ export const useGame = create<GameStore>()(
         const now = Date.now();
         const weather = weatherAt(now);
         const mutation = rollMutation(weather);
-        const watered = weather === "rain" ? 1 : 0;
+        const watered = isRainy(weather) ? 1 : 0;
         set((s) => ({
           seeds: { ...s.seeds, [selectedSeed]: s.seeds[selectedSeed] - 1 },
           plots: s.plots.map((p) =>
@@ -283,10 +284,9 @@ export const useGame = create<GameStore>()(
         return true;
       },
 
-      setProfile: (nickname, avatarId, outfitId, bottomId) => {
-        const trimmed = nickname.trim().slice(0, 12) || "农场主";
-        set({ nickname: trimmed, ...normalizeAppearance(avatarId, outfitId, bottomId) });
-        get().notify("资料已保存");
+      setAppearance: (avatarId, outfitId, bottomId) => {
+        set(normalizeAppearance(avatarId, outfitId, bottomId));
+        get().notify("穿搭已保存");
       },
 
       setDecor: (decor) => {
@@ -295,7 +295,7 @@ export const useGame = create<GameStore>()(
       },
 
       resetSave: () => {
-        set({ ...initialData(), selectedPlot: null, toasts: [] });
+        set({ ...initialData(), nickname: get().nickname, selectedPlot: null, toasts: [] });
         get().notify("存档已重置");
       },
     }),
@@ -314,6 +314,7 @@ export const useGame = create<GameStore>()(
         outfitId: s.outfitId,
         bottomId: s.bottomId,
         decor: s.decor,
+        ranch: s.ranch,
         selectedSeed: s.selectedSeed,
       }),
       // 兼容字段缺失（版本升级、新增作物）的情况
@@ -335,6 +336,7 @@ export const useGame = create<GameStore>()(
           coins: saved.coins ?? base.coins,
           ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
           decor: normalizeDecor(saved.decor),
+          ranch: normalizeRanch(saved.ranch),
           plots,
           seeds: { ...base.seeds, ...saved.seeds },
           harvest: { ...base.harvest, ...saved.harvest },

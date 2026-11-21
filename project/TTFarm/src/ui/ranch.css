@@ -1,0 +1,112 @@
+.ranch-trigger, .riding-action, .wild-encounter, .ranch-gate-action {
+  background: #fcf8eef7;
+  color: #34513e;
+  border: 1px solid #d8d3b7;
+  box-shadow: 0 3px 12px #293f2e24;
+  pointer-events: auto;
+}
+.ranch-trigger, .riding-action {
+  min-height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.riding-action {
+  position: fixed;
+  top: calc(128px + env(safe-area-inset-top));
+  left: max(17px, env(safe-area-inset-left));
+  min-height: 44px;
+}
+.wild-encounter, .ranch-gate-action {
+  position: fixed;
+  left: 50%;
+  bottom: calc(97px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+}
+.wild-encounter {
+  display: grid;
+  gap: 7px;
+  width: min(215px, 67vw);
+  border-radius: 16px;
+  padding: 9px;
+}
+.wild-encounter-head, .ranch-capacity, .ranch-upgrade, .ranch-directions, .resident-actions, .ranch-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wild-encounter-head > div, .resident-name { display: grid; gap: 2px; }
+.wild-encounter-head strong, .resident-name strong { font-size: 14px; }
+.wild-encounter-head small, .resident-name small { color: #665f50; font-size: 11px; }
+.animal-portrait {
+  flex: 0 0 37px;
+  width: 37px;
+  height: 37px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  border: 1px solid var(--animal-tint);
+  background: linear-gradient(145deg, #fffbee 12%, var(--animal-tint));
+  font-size: 23px;
+}
+.wild-encounter select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 7px;
+  background: #fffdf6;
+  color: #514937;
+  border: 1px solid #d8cfb6;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.wild-encounter .btn { padding: 0 9px; font-size: 13px; }
+.hud[data-input="touch"] :is(.wild-encounter, .ranch-gate-action) {
+  left: auto;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: calc(163px + env(safe-area-inset-bottom));
+  transform: none;
+}
+.ranch-panel { width: min(482px, 100%); }
+.ranch-overview {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 13px;
+  border: 1px solid #cdd8b7;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #eff2d9, #f7f0da);
+}
+.ranch-capacity, .ranch-upgrade { justify-content: space-between; }
+.ranch-capacity span { font-size: 13px; color: #4c6444; font-variant-numeric: tabular-nums; }
+.ranch-upgrade { font-size: 13px; }
+.ranch-upgrade .btn { flex-shrink: 0; background: #faf6e9; }
+.ranch-overview meter { width: 100%; height: 9px; appearance: none; background: #d9dfc3; border-radius: 6px; border: 0; }
+.ranch-overview meter::-webkit-meter-bar { height: 9px; background: #d9dfc3; border: 0; border-radius: 6px; }
+.ranch-overview meter::-webkit-meter-optimum-value { background: #77a063; border-radius: 6px; }
+.ranch-overview meter::-moz-meter-bar { background: #77a063; border-radius: 6px; }
+.ranch-directions { margin: 12px 0; }
+.ranch-directions .btn { padding: 0 8px; flex: 1; font-size: 13px; }
+.ranch-empty { margin: 9px 1px 2px; line-height: 1.7; color: #635e50; font-size: 13px; }
+.ranch-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.ranch-list li { flex-wrap: wrap; padding: 7px; background: #fffaf0; border: 1px solid #e5ddca; border-radius: 11px; }
+.resident-name { flex: 1; min-width: 84px; }
+.resident-actions { margin-left: auto; gap: 3px; }
+.release-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #765f4b; }
+@media (max-width: 560px) {
+  .riding-action { top: calc(109px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); }
+}
+@media (max-width: 390px) and (orientation: portrait) {
+  .hud[data-input="touch"] .wild-encounter { bottom: calc(195px + env(safe-area-inset-bottom)); }
+}
+@media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
+  .hud[data-input="touch"] :is(.wild-encounter, .ranch-gate-action) { bottom: calc(89px + env(safe-area-inset-bottom)); }
+}
+@media (max-height: 380px) and (orientation: landscape) {
+  .wild-encounter { width: min(245px, 48vw); grid-template-columns: 1fr 1fr; }
+  .wild-encounter-head { grid-column: 1 / -1; }
+}

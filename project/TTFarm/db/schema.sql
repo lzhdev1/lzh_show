@@ -8,18 +8,56 @@
 --      读写，接口不接受客户端传入的 user_id，所以一个账号摸不到别人的存档。
 --   3. 地块、种子、收成这类每次整体读写的小结构放 JSONB：格子数量固定、字段会随玩法迭代，
 --      用 JSONB 不必每加一种作物就改表；金币、等级这种要查询/排序的数值单独成列。
---   4. password_hash 预留：当前阶段只用 username 登录，密码列留空不参与校验，
---      以后要开密码登录直接把这一列接上即可，不用改表结构。
+--   4. 登录名标识账号，昵称用于展示和查找好友，好友关系通过用户 ID 留存。
 
 CREATE TABLE IF NOT EXISTS users (
   id            BIGSERIAL PRIMARY KEY,
   username      VARCHAR(32)  NOT NULL UNIQUE,
   password_hash TEXT,
-  nickname      VARCHAR(32)  NOT NULL DEFAULT '农场主',
+  nickname      VARCHAR(32)  NOT NULL DEFAULT '',
   avatar_id     VARCHAR(32)  NOT NULL DEFAULT 'xiaosui',
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
   last_login_at TIMESTAMPTZ
 );
+
+-- PostgreSQL and all nickname lookup paths use the same Unicode comparison.
+BEGIN;
+ALTER TABLE users ALTER COLUMN nickname SET DEFAULT '';
+CREATE OR REPLACE FUNCTION farm_nickname_key(value text)
+RETURNS text LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+  SELECT NULLIF(lower(btrim(normalize(value, NFKC),
+    U&'\0009\000A\000B\000C\000D\0020\0085\1680\2028\2029\FEFF')), '');
+$$;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname_key text
+  GENERATED ALWAYS AS (farm_nickname_key(nickname)) STORED;
+
+-- On first upgrade the earliest account keeps the spelling. Other owners of the
+-- same nickname receive an available suffix and keep their farm, friends and session.
+DO $$
+DECLARE
+  duplicate record;
+  suffix integer;
+  candidate text;
+BEGIN
+  IF to_regclass('users_nickname_key_uq') IS NULL THEN
+    FOR duplicate IN
+      SELECT id, nickname FROM (
+        SELECT id, nickname, row_number() OVER (PARTITION BY nickname_key ORDER BY id) AS position
+        FROM users WHERE nickname_key IS NOT NULL
+      ) named WHERE position > 1 ORDER BY id
+    LOOP
+      suffix := 2;
+      LOOP
+        candidate := left(btrim(duplicate.nickname), 15 - length(suffix::text)) || '·' || suffix::text;
+        EXIT WHEN NOT EXISTS (SELECT 1 FROM users WHERE nickname_key = farm_nickname_key(candidate));
+        suffix := suffix + 1;
+      END LOOP;
+      UPDATE users SET nickname = candidate WHERE id = duplicate.id;
+    END LOOP;
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_key_uq ON users(nickname_key);
+COMMIT;
 
 CREATE TABLE IF NOT EXISTS farm_states (
   user_id       BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -38,7 +76,48 @@ CREATE TABLE IF NOT EXISTS farm_states (
 ALTER TABLE farm_states
   ADD COLUMN IF NOT EXISTS outfit_id VARCHAR(32) NOT NULL DEFAULT 'field',
   ADD COLUMN IF NOT EXISTS bottom_id VARCHAR(32),
-  ADD COLUMN IF NOT EXISTS decor JSONB NOT NULL DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS decor JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS ranch JSONB NOT NULL DEFAULT '{"level":1,"animals":[],"ridingId":null}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);
+
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS farm_owner_writes (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  write_id UUID NOT NULL,
+  revision INTEGER NOT NULL,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(user_id,write_id)
+);
+CREATE INDEX IF NOT EXISTS farm_owner_writes_age_idx ON farm_owner_writes(user_id,recorded_at);
+
+CREATE TABLE IF NOT EXISTS farm_sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  protected BOOLEAN NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS farm_sessions_user_idx ON farm_sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS farm_friendships (
+  lo BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  hi BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  requested_by BIGINT NOT NULL CHECK (requested_by IN (lo,hi)),
+  accepted BOOLEAN NOT NULL DEFAULT false,
+  lo_grants BOOLEAN NOT NULL DEFAULT false,
+  hi_grants BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY(lo,hi),
+  CHECK (lo < hi)
+);
+CREATE INDEX IF NOT EXISTS farm_friendships_hi_idx ON farm_friendships(hi);
+
+-- 每个玩家仅在一个房间。仅最近心跳有效，离开请求丢失时也会自然下线。
+CREATE TABLE IF NOT EXISTS farm_presence (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pose JSONB NOT NULL,
+  seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS farm_presence_room_idx ON farm_presence(owner_id,seen_at DESC);

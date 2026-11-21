@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CROPS, type CropId } from "../game/crops";
-import { MUTATIONS, type Mutation } from "../game/weather";
+import { MUTATIONS, isSpirit, type Mutation } from "../game/weather";
+import { addCropSpirit } from "./cropSpirits";
 
 type Point = [number, number, number];
 const TAU = Math.PI * 2;
@@ -77,7 +78,7 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     add(new THREE.SphereGeometry(1, 12, 8), color, pos, [0, 0, 0], scale);
   }
   function leaves(count: number, y: number, length: number, width: number, lift: number, tip: number, angle = 0, spread = 0, base = leaf) {
-    const ruffled = crop === "cabbage" || crop === "radish" || crop === "strawberry";
+    const ruffled = !(mutation && isSpirit(mutation)) && (crop === "cabbage" || crop === "radish" || crop === "strawberry");
     for (let i = 0; i < count; i++) {
       const a = i * TAU / count + angle + 0.055 * Math.sin(2.3 * i);
       const color = tint.setHex(base).offsetHSL(Math.sin(i) * 0.012, 0, 0.035 * Math.cos(i * 2.6)).getHex();
@@ -96,6 +97,9 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     stem([0, 0.094, 0], 0.19, 0.023);
     leaves(2, 0.16, 0.21, 0.083, 0.07, 0.035, 0.6);
     leaves(2, 0.19, 0.105, 0.048, 0.045, 0.08, 2);
+  } else if (stage === 3 && mutation && isSpirit(mutation)) {
+    leaves(8,.014,.31,.09,.04,.034,0,0,leaf);
+    addCropSpirit(mutation, add);
   } else {
     const ripe = stage === 3;
     switch (crop) {
@@ -182,10 +186,26 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
       }
     }
     if (mutation && ripe) {
-      // 在果实旁留下三枚有棱角的结晶，让异色作物在远处也有独特轮廓。
+      // 形状和发光纹样分别构建，日光下也能读出剪影。
       for (let i = 0; i < 3; i++) {
         const a = i * TAU / 3 + 0.4;
-        add(new THREE.OctahedronGeometry(0.064), variant!.fruit, [Math.cos(a) * 0.32, 0.26 + i % 2 * 0.1, Math.sin(a) * 0.32], [0.18, a, 0.2], [0.75, 1.85, 0.75]);
+        const x = Math.cos(a)*.30, z = Math.sin(a)*.30, y = .26 + i%2*.10;
+        if (mutation === "thunder") {
+          add(new THREE.TetrahedronGeometry(.10), 0xe7cbff, [x,y+.085,z],[.1,a,-.5],[.59,1.45,.6]);
+          add(new THREE.TetrahedronGeometry(.092), body,[x+.025,y-.025,z],[.2,a,2.6],[.61,1.45,.6]);
+        } else if (mutation === "flame") {
+          add(new THREE.ConeGeometry(.056,.24,7),0xffbd56,[x,y,z],[.22,a,-.28]);
+          add(new THREE.ConeGeometry(.036,.16,6),0xff6041,[x-.035,y-.042,z],[.14,a,.32]);
+        } else if (mutation === "wind") {
+          add(foldedLeaf(.32,.056,.18,.14),0xaeffdd,[x,y-.14,z],[.04,a,-.18]);
+        } else if (mutation === "gold") {
+          add(new THREE.TorusGeometry(.067,.014,5,12),0xffdb73,[x,y,z],[0,a,.19]);
+        } else if (mutation === "earth") {
+          add(new THREE.DodecahedronGeometry(.095),0xba8b57,[x,y-.16,z],[.3,a,.12]);
+          add(foldedLeaf(.15,.05,.04,.09),0xadce77,[x,y-.09,z],[.1,a,0]);
+        } else {
+          add(new THREE.OctahedronGeometry(.077), variant!.fruit,[x,y,z],[.18,a,.2],[.75,2,.75]);
+        }
       }
     }
   }
@@ -210,7 +230,8 @@ export function createCropLibrary() {
     material,
     wind,
     model(crop: CropId, stage: number, mutation: Mutation | null) {
-      const key = stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
+      const spirit = stage === 3 && mutation && isSpirit(mutation);
+      const key = spirit ? `spirit/${mutation}` : stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
       let geo = geometry.get(key);
       if (!geo) {
         geo = growModel(crop, stage, stage < 2 ? null : mutation);

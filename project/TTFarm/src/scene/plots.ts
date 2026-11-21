@@ -1,10 +1,10 @@
 import * as THREE from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { PLOT_COLS, PLOT_ROWS } from "../game/state";
 import type { CropId } from "../game/crops";
-import { cropStage, growthProgress } from "../game/growth";
+import { cropStage, growthProgress, PLOT_COLS, PLOT_ROWS, PLOT_SPACING } from "../game/growth";
+export { plotIdAt, PLOT_SPACING } from "../game/growth";
 import { createCropLibrary } from "./crops3d";
-import type { Mutation } from "../game/weather";
+import { isSpirit, type Mutation } from "../game/weather";
+import { createCropAuras } from "./cropAuras";
 import { PALETTE, clay } from "./materials";
 import { lumpy } from "./models";
 import type { PlotState } from "../game/growth";
@@ -15,7 +15,6 @@ function between(min: number, max: number): number {
   return min + (soilSeed / 2147483647) * (max - min);
 }
 
-export const PLOT_SPACING = 2.6;
 /** 地块之间不留缝：占地直接等于行距，相邻地块边缘正好接上 */
 export const PLOT_SIZE = PLOT_SPACING;
 /** 田垄中央比田埂高出的高度 */
@@ -108,7 +107,7 @@ export interface PlotVisual {
   stage: number;
   mutation: Mutation | null;
   tufts: THREE.InstancedMesh;
-  readyRing: THREE.Mesh;
+  readyMarker: THREE.Sprite;
   selectRing: THREE.Mesh;
 }
 
@@ -118,6 +117,38 @@ export interface Plots {
   meshes: THREE.Mesh[];
   library: ReturnType<typeof createCropLibrary>;
   materials: ReturnType<typeof createFieldMaterials>;
+  auras: ReturnType<typeof createCropAuras>;
+}
+
+/** 一张麦穗标记供所有成熟地块共用，尖端指向所属菜垄。 */
+function createHarvestMarkerMaterial(): THREE.SpriteMaterial {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(4, 4);
+  const pin = new Path2D("M16 2C23 2 28 7 28 14C28 20 24 24 20 25L16 30L12 25C8 24 4 20 4 14C4 7 9 2 16 2Z");
+  ctx.fillStyle = "#36573c";
+  ctx.fill(pin);
+  ctx.strokeStyle = "#fff4cf";
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  ctx.stroke(pin);
+
+  ctx.fillStyle = ctx.strokeStyle = "#ffdc83";
+  ctx.translate(16, 14);
+  ctx.rotate(0.34);
+  ctx.lineCap = "round";
+  ctx.lineWidth = 1.3;
+  ctx.stroke(new Path2D("M0 8V-6"));
+  ctx.fill(new Path2D("M0 -9Q-4 -5 0 -2Q4 -5 0 -9Z"));
+  const grains = new Path2D("M0 1Q-5 1 -5.5 -4Q-1 -4 0 1ZM0 1Q5 1 5.5 -4Q1 -4 0 1Z");
+  ctx.fill(grains);
+  ctx.translate(0, 4.4);
+  ctx.fill(grains);
+
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.SpriteMaterial({ map, depthWrite: false, toneMapped: false });
 }
 
 function createFieldMaterials() {
@@ -147,6 +178,7 @@ function createFieldMaterials() {
     dry: new THREE.MeshLambertMaterial({ color: 0xc28f6c, vertexColors: true, map: grain }),
     wet: new THREE.MeshLambertMaterial({ color: 0x936b54, vertexColors: true, map: grain }),
     foliage: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, vertexColors: true }),
+    harvestMarker: createHarvestMarkerMaterial(),
   };
 }
 
@@ -162,11 +194,6 @@ export function createPlots(): Plots {
 
   // 田垄：一整条土坡，中间高两侧塌，相邻地块边缘相接，看不到缝
   const materials = createFieldMaterials();
-  const arcs = Array.from({ length: 4 }, (_, i) =>
-    new THREE.RingGeometry(0.99, 1.02, 8, 1, Math.PI * (0.18 + i / 2), 0.46)
-  );
-  const readyGeo = mergeGeometries(arcs)!;
-  arcs.forEach((arc) => arc.dispose());
   const selectGeo = new THREE.RingGeometry(1.62, 1.68, 4);
   const tuftGeo = createGrassClump();
   const stamp = new THREE.Object3D();
@@ -193,20 +220,10 @@ export function createPlots(): Plots {
     }
     group.add(tufts);
 
-    const readyRing = new THREE.Mesh(
-      readyGeo,
-      new THREE.MeshBasicMaterial({
-        color: 0xffe3a3,
-        transparent: true,
-        opacity: 0.58,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      })
-    );
-    readyRing.rotation.x = -Math.PI / 2;
-    readyRing.position.set(pos.x, BED_HEIGHT + 0.06, pos.z);
-    readyRing.visible = false;
-    group.add(readyRing);
+    const readyMarker = new THREE.Sprite(materials.harvestMarker);
+    readyMarker.center.set(0.5, 0);
+    readyMarker.scale.set(0.65, 0.65, 1);
+    readyMarker.visible = false;
 
     const selectRing = new THREE.Mesh(
       selectGeo,
@@ -228,7 +245,7 @@ export function createPlots(): Plots {
     const holder = new THREE.Group();
     holder.position.copy(pos);
 
-    holder.add(soil);
+    holder.add(soil, readyMarker);
     group.add(holder);
 
     visuals.push({
@@ -242,7 +259,7 @@ export function createPlots(): Plots {
       mutation: null,
       stage: -1,
       tufts,
-      readyRing,
+      readyMarker,
       selectRing,
     });
     meshes.push(soil);
@@ -292,7 +309,9 @@ export function createPlots(): Plots {
   if (rim.instanceColor) rim.instanceColor.needsUpdate = true;
   group.add(rim);
 
-  return { group, visuals, meshes, library: createCropLibrary(), materials };
+  const auras = createCropAuras(visuals.map(v => v.group.position));
+  group.add(auras.points);
+  return { group, visuals, meshes, library: createCropLibrary(), materials, auras };
 }
 
 /** 每帧把 store 状态同步给 3D：结构变化才重建作物，其余只改显隐与颜色 */
@@ -304,6 +323,7 @@ export function updatePlots(
   t: number
 ): void {
   plots.library.wind.value = t;
+  plots.auras.setTime(t);
   for (let i = 0; i < plots.visuals.length; i += 1) {
     const visual = plots.visuals[i];
     const state = states[visual.id];
@@ -318,32 +338,37 @@ export function updatePlots(
       const geometry = plots.library.model(state.crop, stage, state.mutation);
       if (!visual.cropMesh) {
         const mesh = new THREE.InstancedMesh(geometry, plots.library.material, 4);
-        for (let k = 0; k < 4; k++) {
-          const x = k % 2 === 0 ? -0.49 : 0.49, z = k < 2 ? -0.49 : 0.49;
-          cropStamp.position.set(x, bedHeightAt(x * 2 / PLOT_SIZE, z * 2 / PLOT_SIZE), z);
-          cropStamp.rotation.y = (visual.id + k) * 1.8;
-          cropStamp.scale.setScalar(0.93 + (visual.id + k) % 3 * 0.055);
-          cropStamp.updateMatrix();
-          mesh.setMatrixAt(k, cropStamp.matrix);
-        }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         visual.group.add(mesh);
         visual.cropMesh = mesh;
       }
       visual.cropMesh.geometry = geometry;
+      const spirit = stage === 3 && state.mutation && isSpirit(state.mutation);
+      visual.cropMesh.count = spirit ? 1 : 4;
+      for (let k = 0; k < visual.cropMesh.count; k++) {
+        const x = spirit ? 0 : k % 2 === 0 ? -.49 : .49;
+        const z = spirit ? 0 : k < 2 ? -.49 : .49;
+        cropStamp.position.set(x, bedHeightAt(x * 2 / PLOT_SIZE, z * 2 / PLOT_SIZE), z);
+        cropStamp.rotation.y = spirit ? .48 : (visual.id + k) * 1.8;
+        cropStamp.scale.setScalar(spirit ? 1.32 : .93 + (visual.id + k) % 3 * .055);
+        cropStamp.updateMatrix();
+        visual.cropMesh.setMatrixAt(k, cropStamp.matrix);
+      }
+      visual.cropMesh.instanceMatrix.needsUpdate = true;
       visual.cropMesh.computeBoundingSphere();
+      if (stage === 3) {
+        visual.cropMesh.computeBoundingBox();
+        visual.readyMarker.position.y = visual.cropMesh.boundingBox!.max.y + 0.15;
+      }
     }
     if (visual.cropMesh) visual.cropMesh.visible = Boolean(state.crop);
+    if (stage !== visual.stage || state.mutation !== visual.mutation) plots.auras.setPlot(visual.id,state.mutation,stage);
     visual.cropId = state.crop;
     visual.mutation = state.mutation;
     visual.stage = stage;
 
-    const ready = stage === 3;
-    visual.readyRing.visible = ready;
-    if (ready) {
-      (visual.readyRing.material as THREE.MeshBasicMaterial).opacity = 0.48 + Math.sin(t * 1.8 + i * 0.6) * 0.08;
-    }
+    visual.readyMarker.visible = stage === 3;
 
     visual.selectRing.visible = selectedId === visual.id;
     if (visual.selectRing.visible) {
@@ -354,6 +379,7 @@ export function updatePlots(
 
 /** 释放所有地块资源（页面卸载时调用，demo 里主要防止热更新残留） */
 export function disposePlots(plots: Plots): void {
+  plots.auras.dispose();
   const geometries = new Set<THREE.BufferGeometry>();
   plots.group.traverse((obj) => {
     if (obj instanceof THREE.Mesh && obj.material !== plots.library.material) geometries.add(obj.geometry);
@@ -362,10 +388,10 @@ export function disposePlots(plots: Plots): void {
   plots.visuals.forEach(({ bed, meadow }) => { geometries.add(bed); geometries.add(meadow); });
   geometries.forEach((geo) => geo.dispose());
   plots.materials.dry.map?.dispose();
+  plots.materials.harvestMarker.map?.dispose();
   Object.values(plots.materials).forEach((material) => material.dispose());
   plots.library.dispose();
   plots.visuals.forEach((v) => {
-    (v.readyRing.material as THREE.Material).dispose();
     (v.selectRing.material as THREE.Material).dispose();
   });
 }

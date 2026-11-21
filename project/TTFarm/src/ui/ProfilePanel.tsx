@@ -14,14 +14,16 @@ const collectionIds = ["basic", "petal", "tide", "astral"] as const;
 type Collection = (typeof collectionIds)[number];
 
 export function ProfilePanel({ onClose }: { onClose: () => void }) {
-  const nickname = useGame((s) => s.nickname);
+  const nickname = useAccount(s => s.user?.nickname ?? "");
   const avatarId = useGame((s) => s.avatarId);
   const outfitId = useGame((s) => s.outfitId);
   const bottomId = useGame((s) => s.bottomId);
   const notify = useGame((s) => s.notify);
-  const user = useAccount((s) => s.user);
   const [tab, setTab] = useState<"closet" | "account">("closet");
-  const [draftName, setDraftName] = useState(nickname);
+  const [editedName, setEditedName] = useState<string | null>(null);
+  const draftName = editedName ?? nickname;
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState("");
   const [actor, setActor] = useState(avatarId);
   const [outfit, setOutfit] = useState(outfitId);
   const [bottom, setBottom] = useState(bottomId);
@@ -47,11 +49,23 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
       if (isCouture(outfit)) trySuit("field");
     }
   }
-  const save = () => {
-    if (tab === "closet" && modelLabel) setCustomModel(null);
-    useGame.getState().setProfile(tab === "account" ? draftName : nickname,
-      tab === "closet" ? actor : avatarId, tab === "closet" ? outfit : outfitId, tab === "closet" ? bottom : bottomId);
+  const saveOutfit = () => {
+    if (modelLabel) setCustomModel(null);
+    useGame.getState().setAppearance(actor, outfit, bottom);
     onClose();
+  };
+  const saveName = async () => {
+    if (savingName) return;
+    setSavingName(true);
+    setNameError("");
+    try {
+      await useAccount.getState().setNickname(draftName);
+      setEditedName(null);
+    } catch (error) {
+      setNameError(error instanceof Error ? error.message : "昵称保存失败，请重试");
+    } finally {
+      setSavingName(false);
+    }
   };
   const pickModel = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -73,7 +87,7 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
       </header>
       <div className="farm-tabs">
         <button aria-pressed={tab === "closet"} onClick={() => setTab("closet")}>角色衣橱</button>
-        <button aria-pressed={tab === "account"} onClick={() => setTab("account")}>账号资料</button>
+        <button aria-pressed={tab === "account"} onClick={() => setTab("account")}>个人资料</button>
       </div>
       {tab === "closet" ? <>
         <div className="closet-toolbar">
@@ -123,12 +137,20 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         {modelLabel && <p className="muted small">当前使用导入模型。穿戴后将切换为所选的内置角色。</p>}
-        <footer className="closet-footer"><button className="btn primary" onClick={save}
+        <footer className="closet-footer"><button className="btn primary" onClick={saveOutfit}
           disabled={actor === avatarId && outfit === outfitId && bottom === bottomId && !modelLabel}>穿戴并保存</button></footer>
       </> : <>
-        <label className="field"><span className="field-label">昵称</span>
-          <input value={draftName} maxLength={12} onChange={e => setDraftName(e.target.value)} />
-        </label>
+        <form id="farm-edit-nickname" onSubmit={event => { event.preventDefault(); void saveName(); }}>
+          <label className="field"><span className="field-label">昵称</span>
+            <input value={draftName} disabled={savingName} required aria-describedby="farm-nickname-hint"
+              aria-invalid={!!nameError} onChange={e => { setEditedName(e.target.value); setNameError(""); }} />
+          </label>
+          <p id="farm-nickname-hint" className="muted small">昵称全服唯一，好友可以用它找到你。</p>
+          {nameError && <p role="alert" className="social-alert">{nameError}</p>}
+          <button type="submit" className="btn primary" disabled={savingName || !draftName.trim() || draftName.trim() === nickname}>
+            {savingName ? "正在保存…" : "保存昵称"}
+          </button>
+        </form>
         <h3 className="section-title">本地 VRM 模型</h3>
         <div className="avatar-import">
           <p className="muted small">{modelLabel ?? "可导入 40 MB 以内的 .vrm 文件，仅在本次游玩中使用。"}</p>
@@ -136,16 +158,13 @@ export function ProfilePanel({ onClose }: { onClose: () => void }) {
             {modelLabel && <button className="btn plain" onClick={() => { setCustomModel(null); setModelLabel(null); }}>恢复内置形象</button>}</div>
           <input ref={fileRef} type="file" accept=".vrm" hidden onChange={pickModel}/>
         </div>
-        <h3 className="section-title">账号</h3>
-        <div className="account-row"><strong>{user?.username}</strong>
-          <button className="btn plain" onClick={() => { onClose(); useAccount.getState().signOut(); }}>退出登录</button></div>
         <div className="modal-actions">
+          <button className="btn plain" onClick={() => { onClose(); useAccount.getState().signOut(); }}>退出登录</button>
           <button className="btn plain" onClick={() => {
             if (window.confirm("重置会清空金币、地块、收成和装扮，确定要重来吗？")) {
               useGame.getState().resetSave(); onClose();
             }
           }}>重置存档</button>
-          <button className="btn primary" disabled={draftName.trim() === nickname} onClick={save}>保存昵称</button>
         </div>
       </>}
     </section>
