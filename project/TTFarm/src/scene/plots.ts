@@ -335,16 +335,18 @@ export function updatePlots(
     visual.tufts.visible = !state.unlocked;
     const stage = state.crop ? cropStage(growthProgress(state, now)) : -1;
     if (state.crop && (stage !== visual.stage || state.crop !== visual.cropId || state.mutation !== visual.mutation)) {
-      const geometry = plots.library.model(state.crop, stage, state.mutation);
+      const { geometry, material } = plots.library.model(state.crop, stage, state.mutation);
       if (!visual.cropMesh) {
-        const mesh = new THREE.InstancedMesh(geometry, plots.library.material, 4);
+        const mesh = new THREE.InstancedMesh(geometry, material, 4);
         mesh.castShadow = true;
-        mesh.receiveShadow = true;
         visual.group.add(mesh);
         visual.cropMesh = mesh;
       }
       visual.cropMesh.geometry = geometry;
+      visual.cropMesh.material = material;
       const spirit = stage === 3 && state.mutation && isSpirit(state.mutation);
+      // As on the playable avatars, keep the field's coarse moving shadow map off the painted face.
+      visual.cropMesh.receiveShadow = !spirit;
       visual.cropMesh.count = spirit ? 1 : 4;
       for (let k = 0; k < visual.cropMesh.count; k++) {
         const x = spirit ? 0 : k % 2 === 0 ? -.49 : .49;
@@ -381,8 +383,10 @@ export function updatePlots(
 export function disposePlots(plots: Plots): void {
   plots.auras.dispose();
   const geometries = new Set<THREE.BufferGeometry>();
+  const crops = new Set<THREE.Object3D>();
+  plots.visuals.forEach(({ cropMesh }) => { if (cropMesh) crops.add(cropMesh); });
   plots.group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh && obj.material !== plots.library.material) geometries.add(obj.geometry);
+    if (obj instanceof THREE.Mesh && !crops.has(obj)) geometries.add(obj.geometry);
     if (obj instanceof THREE.InstancedMesh) obj.dispose();
   });
   plots.visuals.forEach(({ bed, meadow }) => { geometries.add(bed); geometries.add(meadow); });

@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CROPS, type CropId } from "../game/crops";
-import { MUTATIONS, isSpirit, type Mutation } from "../game/weather";
-import { addCropSpirit } from "./cropSpirits";
+import { MUTATIONS, isSpirit, type Mutation, type Spirit } from "../game/weather";
+import { createCropSpiritGeometry, createCropSpiritMaterial } from "./cropSpirits";
 
 type Point = [number, number, number];
 const TAU = Math.PI * 2;
@@ -97,9 +97,6 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     stem([0, 0.094, 0], 0.19, 0.023);
     leaves(2, 0.16, 0.21, 0.083, 0.07, 0.035, 0.6);
     leaves(2, 0.19, 0.105, 0.048, 0.045, 0.08, 2);
-  } else if (stage === 3 && mutation && isSpirit(mutation)) {
-    leaves(8,.014,.31,.09,.04,.034,0,0,leaf);
-    addCropSpirit(mutation, add);
   } else {
     const ripe = stage === 3;
     switch (crop) {
@@ -216,6 +213,16 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
 
 export function createCropLibrary() {
   const geometry = new Map<string, THREE.BufferGeometry>();
+  const dolls = new Map<Spirit, { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial }>();
+  const warming = new Map<Spirit, number>();
+  function dollFor(id: Spirit) {
+    let doll = dolls.get(id);
+    if (!doll) {
+      doll = { geometry: createCropSpiritGeometry(id), material: createCropSpiritMaterial(id) };
+      dolls.set(id, doll);
+    }
+    return doll;
+  }
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   const wind = { value: 0 };
   material.onBeforeCompile = (shader) => {
@@ -227,20 +234,36 @@ export function createCropLibrary() {
     );
   };
   return {
-    material,
     wind,
     model(crop: CropId, stage: number, mutation: Mutation | null) {
-      const spirit = stage === 3 && mutation && isSpirit(mutation);
-      const key = spirit ? `spirit/${mutation}` : stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
+      if (mutation && isSpirit(mutation)) {
+        if (stage === 3) return dollFor(mutation);
+        // Mutation is known at planting time. Prepare only the figurines the
+        // farm will actually need, while the crop still has time to grow.
+        if (!dolls.has(mutation) && !warming.has(mutation) && typeof requestIdleCallback === "function") {
+          warming.set(mutation, requestIdleCallback(() => {
+            warming.delete(mutation);
+            dollFor(mutation);
+          }));
+        }
+      }
+      const key = stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
       let geo = geometry.get(key);
       if (!geo) {
         geo = growModel(crop, stage, stage < 2 ? null : mutation);
         geometry.set(key, geo);
       }
-      return geo;
+      return { geometry: geo, material };
     },
     dispose() {
+      warming.forEach(handle => cancelIdleCallback(handle));
+      warming.clear();
       geometry.forEach((geo) => geo.dispose());
+      dolls.forEach(doll => {
+        doll.geometry.dispose();
+        doll.material.map?.dispose();
+        doll.material.dispose();
+      });
       material.dispose();
     },
   };
