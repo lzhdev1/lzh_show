@@ -37,6 +37,9 @@ lzh_show/
 # 在已有 shared-postgres 中准备个人网站文章及只读连接配置
 python3 docker/migrate_articles.py
 
+# 在新的 Docker 主机上准备基金经理作品使用的专用网络
+docker network inspect quantlab-portfolio >/dev/null 2>&1 || docker network create quantlab-portfolio
+
 # 启动容器（首次构建较慢）
 docker compose up -d frontend
 
@@ -52,6 +55,8 @@ docker logs -f lzh_show_frontend
 - 生产镜像会把 `project/TTFarm` 构建进 `public/ttfarm`，随主站一起发布，不需要本地执行任何构建
 
 文章保存在共享 PostgreSQL 实例的独立数据库 `lzh_show_articles`。推送到 `main` 后，部署工作流在服务器运行同一迁移，再启动新版前端。新增或修订文章时，在 `blog_front/db/articles/` 添加下一个编号的 JSON 文件，同一篇文章沿用已有 slug。已应用的迁移带有校验和，重复部署会跳过。每个环境的只读连接保存在该目录下由脚本生成的 `.env`，请随数据库备份保管。
+
+基金经理工作台由独立的 QuantLab 项目部署。作品详情在 `/projects/fund-manager`，在线演示在 `/fund-manager`。主站容器通过 `quantlab-portfolio` 网络访问 `quantlab-portfolio-web:80`，转发页面、静态资源和工作台 API。[QuantLab 源码与部署说明](https://github.com/lzhdev1/AI_finance)
 
 ## 待确认决策点
 

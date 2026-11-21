@@ -51,6 +51,7 @@ services:
       # 外部网络 shared-db 是统一数据库实例所在的网络，加入后才能用容器名连库
       - default
       - shared-db
+      - quantlab-portfolio
     restart: unless-stopped
 
   # backend:
@@ -79,4 +80,6 @@ services:
 networks:
   # 统一数据库实例（shared-postgres）在它自己的 compose 里创建了这个网络
   shared-db:
+    external: true
+  quantlab-portfolio:
     external: true

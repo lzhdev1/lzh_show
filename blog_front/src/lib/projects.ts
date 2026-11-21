@@ -46,6 +46,46 @@ export interface Project {
 
 export const projects: Project[] = [
   {
+    slug: "fund-manager",
+    title: { zh: "QuantLab 基金经理 Agent", en: "QuantLab Fund Manager" },
+    summary: {
+      zh: "跟随一位模拟基金经理的交易日，查看它读了哪些新闻、如何判断板块资金流，以及为什么选择建仓、减仓或持有现金。",
+      en: "Follow a paper fund manager through the trading day. See the news it read, the sector flows it tracked, and why it bought, trimmed a position, or stayed in cash.",
+    },
+    techStack: ["Python", "FastAPI", "React", "PostgreSQL", "Docker"],
+    featured: true,
+    date: "2026-11",
+    cover: "/covers/fund-manager.png",
+    coverGradient: "from-emerald-950 to-lime-700",
+    links: { demo: "/fund-manager", source: "https://github.com/lzhdev1/AI_finance" },
+    content: {
+      zh: "从一份研究报告出发，可以核对经理当时能看到的数据、预计的涨跌和对应的模拟申赎。板块指数与基金单位净值分别预测，结果在公布后核验。",
+      en: "Open a research report to trace the data available when the manager made a call and the simulated orders that followed. Sector indices and fund unit values are forecast separately and checked against their published outcomes.",
+    },
+    details: [
+      {
+        label: { zh: "资金与行为", en: "Sector research" },
+        value: { zh: "查看板块资金流和量价证据、经理对交易行为的解释，以及哪些后续走势会推翻判断。", en: "Inspect sector flows, prices and volume alongside competing explanations and the observations that would overturn a call." },
+      },
+      {
+        label: { zh: "模拟申赎", en: "Paper portfolio" },
+        value: { zh: "经理在交易日收盘前制定计划，按真实公布的净值结算，同时考虑可赎份额和短期赎回费。", en: "The manager plans before the close and settles at published fund unit values, accounting for redeemable units and short-term fees." },
+      },
+      {
+        label: { zh: "预测与回放", en: "Forecasts and replay" },
+        value: { zh: "次日和五个交易日的预测保留首发记录。历史回放可以逐笔复核交易，并将收益与回撤和沪深 300 对照。", en: "One- and five-session forecasts retain their original calls. Historical replays show individual trades and compare returns and drawdowns with the CSI 300." },
+      },
+    ],
+    changelog: [{
+      version: "2026.11",
+      date: "2026-11",
+      changes: {
+        zh: ["上线模拟基金经理工作台，开放投研报告、模拟账本与历史回放。"],
+        en: ["Published the fund manager workbench with research reports, a paper ledger and historical replays."],
+      },
+    }],
+  },
+  {
     slug: "aftercare-agent",
     title: { zh: "售后工单 Agent", en: "Aftercare Agent" },
     summary: {

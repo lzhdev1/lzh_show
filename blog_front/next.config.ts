@@ -6,10 +6,16 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [{
-      source: "/aftercare/:path*",
-      destination: "http://aftercare-app:8000/aftercare/:path*",
-    }];
+    return [
+      {
+        source: "/aftercare/:path*",
+        destination: "http://aftercare-app:8000/aftercare/:path*",
+      },
+      {
+        source: "/fund-manager/:path*",
+        destination: "http://quantlab-portfolio-web:80/:path*",
+      },
+    ];
   },
   // The aftercare tool loop has a 35-second deadline; allow it to return its fallback.
   experimental: { proxyTimeout: 60_000 },

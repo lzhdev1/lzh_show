@@ -15,7 +15,7 @@ const STATIC_WORK_ENTRIES: Record<string, string> = {
 
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  if (pathname === "/aftercare" || pathname.startsWith("/aftercare/")) {
+  if (["/aftercare", "/fund-manager"].some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"))) {
     return NextResponse.next();
   }
   // 接口路由不参与语言路由：/api/ttfarm/* 是游戏的后端，直接交给 route handler

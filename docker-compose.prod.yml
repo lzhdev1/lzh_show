@@ -29,8 +29,11 @@ services:
       # 外部网络 shared-db 由统一数据库那套 compose 创建，加入后才能用容器名连库
       - default
       - shared-db
+      - quantlab-portfolio
     restart: unless-stopped
 
 networks:
   shared-db:
+    external: true
+  quantlab-portfolio:
     external: true
