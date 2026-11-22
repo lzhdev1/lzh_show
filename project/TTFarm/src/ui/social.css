@@ -162,6 +162,47 @@
   white-space: nowrap;
 }
 .farm-guests { top: calc(79px + env(safe-area-inset-top)); left: auto; right: max(16px, env(safe-area-inset-right)); }
+/* 在场访客：点开名单才能请离，默认只露一行名字 */
+.farm-guests-wrap {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  top: calc(79px + env(safe-area-inset-top));
+  z-index: 14;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+.farm-guests-wrap .farm-guests { position: static; top: auto; left: auto; right: auto; cursor: pointer; }
+.farm-guest-list {
+  display: grid;
+  gap: 4px;
+  min-width: 176px;
+  padding: 8px;
+  border: 1px solid #d7ccb0;
+  border-radius: 14px;
+  background: #fff9edf5;
+  box-shadow: 0 6px 18px #34432b26;
+}
+.farm-guest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: #3d513b;
+}
+.farm-guest-row button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d9b7a6;
+  border-radius: 9px;
+  background: #f7e5dd;
+  color: #8a4a33;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+} 
+.farm-guest-row button:disabled { opacity: 0.6; cursor: default; }
 .farm-guests span { overflow: hidden; text-overflow: ellipsis; }
 @media (min-width: 561px) and (max-width: 840px) {
   .farm-guests { top: calc(128px + env(safe-area-inset-top)); }
@@ -183,6 +224,21 @@
   cursor: pointer;
   pointer-events: auto;
 }
+/* 串门工具箱：动作 + 坐骑都收在右上角一列，避免和协作面板、摇杆打架 */
+.visit-tools {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  top: calc(124px + env(safe-area-inset-top));
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  z-index: 12;
+  pointer-events: auto;
+}
+.visit-tools .action-menu { justify-self: end; }
+.visit-tools .action-pop { left: auto; right: 0; }
+.visit-tools .visit-ride { position: static; max-width: min(210px, 46vw); }
+.visit-ride.empty { opacity: 0.62; }
 .visit-nav, .guest-action {
   position: fixed;
   left: 50%;
@@ -208,7 +264,12 @@
   .visit-header { inset: calc(8px + env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) auto max(9px, env(safe-area-inset-left)); }
   .visit-company, .visit-connection { top: calc(67px + env(safe-area-inset-top)); left: 9px; }
   .visit-ride { top: calc(60px + env(safe-area-inset-top)); right: max(9px, env(safe-area-inset-right)); }
+  .visit-tools { top: calc(116px + env(safe-area-inset-top)); right: max(9px, env(safe-area-inset-right)); gap: 6px; }
+  .visit-tools .visit-ride { max-width: 54vw; padding: 0 10px; font-size: 13px; }
+  .visit-tools .action-pop { width: min(210px, 62vw); }
   .farm-guests { top: calc(112px + env(safe-area-inset-top)); right: 9px; max-width: 50vw; }
+  .farm-guests-wrap { top: calc(112px + env(safe-area-inset-top)); right: 9px; }
+  .farm-guests-wrap .farm-guests { max-width: 62vw; }
   .hud[data-input="touch"] .visit-nav { right: max(12px, env(safe-area-inset-right)); left: auto; transform: none; }
   .visit-nav small { font-size: 10px; }
   .friend-search input { font-size: 16px; }

@@ -2,11 +2,15 @@ export const ELEMENTS = ["thunder", "frost", "flame", "gold", "earth", "wind"] a
 export const SPIRITS = ["rosette", "nocturne", "coral", "orbit", "bamboo"] as const;
 /** 野菜专属变异：阴阳与长生，各三级（星辰数 / 金龙数） */
 export const WILD_MUTATIONS = ["yinyang1", "yinyang2", "yinyang3", "longlife1", "longlife2", "longlife3"] as const;
+/** 草药专属：金木水火土五行 + 仙品 + 神品 */
+export const HERB_MUTATIONS = ["herbMetal", "herbWood", "herbWater", "herbFire", "herbEarth", "xianpin", "shenpin"] as const;
+export const HERB_ELEMENTS = ["herbMetal", "herbWood", "herbWater", "herbFire", "herbEarth"] as const;
 export type Spirit = typeof SPIRITS[number];
 type Element = typeof ELEMENTS[number];
 type Legacy = "amber" | "mist" | "pearl";
 export type WildMutation = typeof WILD_MUTATIONS[number];
-export type Mutation = Element | Spirit | Legacy | WildMutation;
+export type HerbMutation = typeof HERB_MUTATIONS[number];
+export type Mutation = Element | Spirit | Legacy | WildMutation | HerbMutation;
 
 export const MUTATIONS = {
   thunder: { label: "雷霆", multiplier: 2, fruit: 0x9d76ff, leaf: 0x6585d7 },
@@ -31,6 +35,14 @@ export const MUTATIONS = {
   longlife1: { label: "长生·一龙", multiplier: 5, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
   longlife2: { label: "长生·二龙", multiplier: 10, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
   longlife3: { label: "长生·三龙", multiplier: 20, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
+  // 草药专属：五行按「金木水火土」配色，仙品玉白、神品金黄。
+  herbMetal: { label: "金品", multiplier: 4, fruit: 0xffd76a, leaf: 0xd8b25c },
+  herbWood:  { label: "木品", multiplier: 4, fruit: 0x8fe07a, leaf: 0x5fa84a },
+  herbWater: { label: "水品", multiplier: 4, fruit: 0x7ad8e8, leaf: 0x4f9bb0 },
+  herbFire:  { label: "火品", multiplier: 5, fruit: 0xff7a4a, leaf: 0xc94f3f },
+  herbEarth: { label: "土品", multiplier: 5, fruit: 0xd9a05a, leaf: 0x9a7a3f },
+  xianpin:   { label: "仙品", multiplier: 15, fruit: 0xf4f0ff, leaf: 0xbfe8c8 },
+  shenpin:   { label: "神品", multiplier: 30, fruit: 0xffe066, leaf: 0xd8a63a },
 } as const;
 
 export const WEATHER = {
@@ -131,4 +143,21 @@ export function pickWildMutation(random = Math.random): WildMutation {
 export function rollWildMutation(random = Math.random): WildMutation | null {
   if (random() >= WILD_MUTATION_CHANCE) return null;
   return pickWildMutation(random);
+}
+
+export function isHerbMutation(value: Mutation): value is HerbMutation {
+  return (HERB_MUTATIONS as readonly Mutation[]).includes(value);
+}
+
+/** 草药播种抽签：12% 变异；其中仙品 0.8%、神品 0.2%，余下五行平分 */
+export const HERB_MUTATION_CHANCE = 0.12;
+export const HERB_XIANPIN_SHARE = 0.008;
+export const HERB_SHENPIN_SHARE = 0.002;
+export function rollHerbMutation(random = Math.random): HerbMutation | null {
+  if (random() >= HERB_MUTATION_CHANCE) return null;
+  const special = random();
+  if (special < HERB_XIANPIN_SHARE) return "xianpin";
+  if (special < HERB_XIANPIN_SHARE + HERB_SHENPIN_SHARE) return "shenpin";
+  const draw = Math.min(0.9999, Math.max(0, random()));
+  return HERB_ELEMENTS[Math.floor(draw * HERB_ELEMENTS.length)];
 }

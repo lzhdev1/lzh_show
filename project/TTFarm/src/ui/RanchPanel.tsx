@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { CROPS, harvestLots } from "../game/crops";
-import { animalName, ANIMALS, ANIMAL_ELEMENTS, baitCount, HORSE_SPEED_FACTOR, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, RANCH_MAX_LEVEL, type AnimalSpecies, type RanchAnimal, type WildAnimal } from "../game/ranch";
+import { animalName, animalValue, ANIMALS, ANIMAL_ELEMENTS, baitCount, HORSE_SPEED_FACTOR, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, RANCH_MAX_LEVEL, type AnimalSpecies, type RanchAnimal, type WildAnimal } from "../game/ranch";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { useGame } from "../game/state";
 import { CloseIcon, CoinIcon } from "./icons";
@@ -94,8 +94,10 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
   const upgrade = useGame((s) => s.upgradeRanch);
   const setRiding = useGame((s) => s.setRiding);
   const release = useGame((s) => s.releaseAnimal);
+  const sell = useGame((s) => s.sellAnimal);
   const [tab, setTab] = useState<"pasture" | "stable">("pasture");
   const [releasing, setReleasing] = useState<string | null>(null);
+  const [selling, setSelling] = useState<string | null>(null);
   const hasStable = ranch.level >= MOUNT_UNLOCK_LEVEL;
   const stable = hasStable ? ranch.animals.filter(isMountAnimal) : [];
   const residents = tab === "stable" ? stable : ranch.animals.filter((animal) => !hasStable || !isMountAnimal(animal));
@@ -124,8 +126,8 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
         <button className="btn soft" onClick={() => go("ttfarm:find-wildlife")}><PawIcon/>寻找野生动物</button>
       </div>
       <div className="farm-tabs">
-        <button aria-pressed={tab === "pasture"} onClick={() => { setTab("pasture"); setReleasing(null); }}>放牧区 · {ranch.animals.length - stable.length}</button>
-        <button aria-pressed={tab === "stable"} onClick={() => { setTab("stable"); setReleasing(null); }}>{hasStable ? `坐骑栏 · ${stable.length}` : "坐骑栏 · 3级开启"}</button>
+        <button aria-pressed={tab === "pasture"} onClick={() => { setTab("pasture"); setReleasing(null); setSelling(null); }}>放牧区 · {ranch.animals.length - stable.length}</button>
+        <button aria-pressed={tab === "stable"} onClick={() => { setTab("stable"); setReleasing(null); setSelling(null); }}>{hasStable ? `坐骑栏 · ${stable.length}` : "坐骑栏 · 3级开启"}</button>
       </div>
       {residents.length === 0 ? <p className="ranch-empty">{tab === "pasture"
         ? "带上收获的作物，靠近野生动物后投喂。收服的动物会自动回到牧场。"
@@ -138,8 +140,12 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
               {animal.element ? ANIMAL_ELEMENTS[animal.element].label + "系变异" : "普通动物"}
               {isMountAnimal(animal) && (ranch.ridingId === animal.id ? " · 骑乘中" : hasStable ? " · 可骑乘" : " · 3级可骑乘")}
               {animal.species === "horse" && ` · ${HORSE_SPEED_FACTOR} 倍移速`}
+              {` · 售价 ${animalValue(animal)}`}
             </small></div>
-            {releasing === animal.id ? <div className="resident-actions">
+            {selling === animal.id ? <div className="resident-actions">
+              <button className="btn mini danger" onClick={() => { sell(animal.id); setSelling(null); }}>确认卖出 +{animalValue(animal)}</button>
+              <button className="btn mini" onClick={() => setSelling(null)}>取消</button>
+            </div> : releasing === animal.id ? <div className="resident-actions">
               <button className="btn mini" onClick={() => { release(animal.id); setReleasing(null); }}>确认放归</button>
               <button className="btn mini" onClick={() => setReleasing(null)}>取消</button>
             </div> : <div className="resident-actions">
@@ -147,7 +153,9 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
                 if (ranch.ridingId === animal.id) setRiding(null);
                 else if (setRiding(animal.id)) onClose();
               }}>{ranch.ridingId === animal.id ? "下坐骑" : "骑乘"}</button>}
-              <button className="release-button" onClick={() => setReleasing(animal.id)} aria-label={`放归${animalName(animal)}`}>放归</button>
+              <button className="sell-button" onClick={() => { setSelling(animal.id); setReleasing(null); }}
+                aria-label={`卖出${animalName(animal)}，可得 ${animalValue(animal)} 金币`}>卖出</button>
+              <button className="release-button" onClick={() => { setReleasing(animal.id); setSelling(null); }} aria-label={`放归${animalName(animal)}`}>放归</button>
             </div>}
           </li>)}</ul>}
     </section>

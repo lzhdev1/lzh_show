@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
 import { observeHomeRevision, useAccount } from "../game/account";
 import { startSocialSync, useSocial } from "../game/social";
+import { startChatSync } from "../game/chat";
 import { LoginPage } from "./LoginPage";
 import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
@@ -12,6 +13,7 @@ import { ProfilePanel } from "./ProfilePanel";
 import { farmInput, releaseTouchInput } from "../game/input";
 import { ControlGuide, ReturnToLoginButton, TouchControls, WeatherBadge } from "./FieldControls";
 import { ActionTrigger } from "./ActionPanel";
+import { HudMenu } from "./HudMenu";
 import { FarmPanel } from "./FarmPanel";
 import { RanchPanel, RanchTrigger, RanchHUD } from "./RanchPanel";
 import { ForageHUD } from "./ForageHUD";
@@ -19,6 +21,7 @@ import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
 import { FarmGuests, VisitHUD } from "./VisitHUD";
+import { ChatDock } from "./ChatDock";
 import "./social.css";
 
 export function App() {
@@ -47,6 +50,7 @@ export function App() {
   const [codexOpen, setCodexOpen] = useState(false);
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
+  useEffect(() => startChatSync(), []);
   const away = !!visit;
   useEffect(() => {
     if (!away && token) return;
@@ -91,8 +95,33 @@ export function App() {
   const pct = nextXp ? Math.min(100, Math.max(0, ((xp - prevXp) / (nextXp - prevXp)) * 100)) : 100;
   const avatar = AVATARS.find((item) => item.id === avatarId) ?? AVATARS[0];
 
+  // 种子栏顺序：有种子且已解锁 → 有种子但未解锁 → 没有种子（含未解锁）；
+  // 第一组按数量从多到少，其余按解锁等级，最后按 id 保证刷新后顺序稳定。
+  const seedRows = useMemo(() => CROP_LIST
+    .filter((crop) => !crop.wild || (seeds[crop.id] ?? 0) > 0)
+    .sort((a, b) => {
+      const countA = seeds[a.id] ?? 0;
+      const countB = seeds[b.id] ?? 0;
+      const lockedA = level < a.unlockLevel;
+      const lockedB = level < b.unlockLevel;
+      const groupA = lockedA ? 2 : countA > 0 ? 0 : 1;
+      const groupB = lockedB ? 2 : countB > 0 ? 0 : 1;
+      if (groupA !== groupB) return groupA - groupB;
+      if (groupA === 0) return countB - countA || a.unlockLevel - b.unlockLevel || a.id.localeCompare(b.id);
+      return a.unlockLevel - b.unlockLevel || a.id.localeCompare(b.id);
+    }), [seeds, level]);
+
   // 没登录就先只给登录页：3D 场景照样在背后转，登录完直接就是农场
   if (!token) return <LoginPage />;
+
+  const menuItems = [
+    { key: "codex", label: "图鉴", icon: "📖", onClick: () => setCodexOpen(true) },
+    { key: "rank", label: "排行榜", icon: "🏆", onClick: () => setRankingOpen(true) },
+    { key: "shop", label: "商店", icon: "🏪", onClick: () => setShopOpen(true) },
+    { key: "friends", label: "好友", icon: "👥", onClick: () => setFriendsOpen(true),
+      hint: friendRoster.users?.filter(item => item.status === "incoming").length ? "有待处理" : undefined },
+    { key: "weather", label: "天气 / 农场", icon: "🌤️", onClick: () => setFarmOpen(true) },
+  ];
 
   return (
     <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
@@ -112,10 +141,12 @@ export function App() {
         </button>
 
         <div className="top-right">
-          <CodexTrigger onClick={() => setCodexOpen(true)} />
-          <button className="icon-btn rank-trigger" aria-label="金币排行榜" title="金币排行榜" onClick={() => setRankingOpen(true)}>
-            <TrophyIcon /><span>排行</span>
-          </button>
+          <div className="hud-compact-hide top-tools">
+            <CodexTrigger onClick={() => setCodexOpen(true)} />
+            <button className="icon-btn rank-trigger" aria-label="金币排行榜" title="金币排行榜" onClick={() => setRankingOpen(true)}>
+              <TrophyIcon /><span>排行</span>
+            </button>
+          </div>
           <div className="coin-pill" aria-label={`金币 ${coins}`}>
             <CoinIcon />
             <b>{coins.toLocaleString("zh-CN")}</b>
@@ -124,9 +155,14 @@ export function App() {
             <LandIcon />
             <span>农场</span>
           </button>
-          <button className="icon-btn solid" onClick={() => setShopOpen(true)} aria-label="打开商店">
+          <button className="icon-btn solid hud-compact-hide" onClick={() => setShopOpen(true)} aria-label="打开商店">
             <ShopIcon />
           </button>
+          {!away && <HudMenu items={menuItems}>
+            <div className="hud-menu-actions"><ActionTrigger /></div>
+            <ControlGuide />
+            <ReturnToLoginButton />
+          </HudMenu>}
         </div>
       </header>
 
@@ -155,7 +191,7 @@ export function App() {
         </div>
         <div className="seed-scroll">
           {/* 野菜种子只有捡到过才占格子，避免 20 个空位挤爆种子栏 */}
-          {CROP_LIST.filter((crop) => !crop.wild || (seeds[crop.id] ?? 0) > 0).map((crop) => {
+          {seedRows.map((crop) => {
             const locked = level < crop.unlockLevel;
             return (
               <button
@@ -191,6 +227,8 @@ export function App() {
       {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
       {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
       </>}
+
+      <ChatDock />
 
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (

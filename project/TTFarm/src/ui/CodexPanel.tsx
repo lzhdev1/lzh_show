@@ -26,11 +26,12 @@ export function CodexTrigger({ onClick }: { onClick: () => void }) {
 const TABS: { key: CodexTab; label: string }[] = [
   { key: "crop", label: "作物" },
   { key: "wild", label: "野菜" },
+  { key: "herb", label: "草药" },
   { key: "mutation", label: "变异" },
   { key: "animal", label: "动物" },
 ];
 
-const FAMILY_LABEL = { element: "元素变异", spirit: "精灵变异", legacy: "旧版变异", wild: "野菜变异" } as const;
+const FAMILY_LABEL = { element: "元素变异", spirit: "精灵变异", legacy: "旧版变异", wild: "野菜变异", herb: "草药变异" } as const;
 
 function seconds(ms: number) {
   const s = Math.round(ms / 1000);
@@ -48,7 +49,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
   // 有关键词时跨全部四类一起搜，免得用户还得先猜该切哪个页签
   const searching = q.length > 0;
   const plants = useMemo(() => CODEX_PLANTS
-    .filter((entry) => searching || (tab === "crop" ? entry.kind === "crop" : entry.kind === "wild"))
+    .filter((entry) => searching || (tab === "crop" || tab === "wild" || tab === "herb" ? entry.kind === tab : false))
     .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)), [tab, q, searching]);
   const mutations = useMemo(() => CODEX_MUTATIONS
     .filter((entry) => !q || entry.label.includes(q) || entry.blurb.includes(q)
@@ -92,8 +93,8 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
       <input className="codex-search" value={query} onChange={(event) => setQuery(event.target.value)}
         placeholder="搜名字或关键词，比如「坐骑」「阴阳」" aria-label="搜索图鉴"/>
 
-      {(tab === "crop" || tab === "wild" || searching) && <>
-        {searching && <h3 className="codex-group">作物与野菜 · {plants.length}</h3>}
+      {(tab === "crop" || tab === "wild" || tab === "herb" || searching) && <>
+        {searching && <h3 className="codex-group">作物、野菜与草药 · {plants.length}</h3>}
         <ul className="codex-list">
         {plants.map((entry) => {
           const def = CROPS[entry.crop];
@@ -103,7 +104,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
               <span className="codex-icon"><CropIcon crop={entry.crop} size={22}/></span>
               <div className="codex-title">
                 <strong>{def.name}</strong>
-                <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.yields} 份 · 生长 {seconds(def.growMs)}{def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
+                <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.yields} 份 · 生长 {seconds(def.growMs)}{def.herb ? " · 种子仅野外草药丛掉落" : def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
               </div>
               {owned ? <span className="codex-owned">{owned}</span> : <span className="codex-owned muted">未持有</span>}
             </div>
@@ -114,7 +115,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                   {ANIMAL_PORTRAITS[lure.species]} {lure.name}</span>)}
               </div>
               : <div className="codex-tags"><span className="codex-taglabel">会引来</span>
-                <span className="codex-none">暂无（野生动物对它没兴趣）</span></div>}
+                <span className="codex-none">{entry.kind === "herb" ? "草药气味不入兽口" : "暂无（野生动物对它没兴趣）"}</span></div>}
           </li>;
         })}
         {plants.length === 0 && <li className="codex-empty">没有匹配的条目</li>}

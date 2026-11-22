@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { CROPS, type CropId } from "../game/crops";
+import { CROPS, type CropId, type HerbId } from "../game/crops";
 import { MUTATIONS, isSpirit, isWildMutation, type Mutation, type Spirit, wildMutationFamily } from "../game/weather";
 import { createCropSpiritGeometry, createCropSpiritMaterial } from "./cropSpirits";
 
@@ -15,6 +15,73 @@ const WILD_ARCHETYPE: Partial<Record<CropId, WildArchetype>> = {
   yexiancai: "rosette", cheqiancao: "spike", yuxingcao: "herb", yebohe: "herb",
   zisu: "herb", aicao: "herb", yecong: "allium", yesuan: "allium",
   shuiqin: "celery", louhao: "herb", malantou: "daisy", juhuanao: "daisy",
+};
+
+/** 草药按 11 类药圃形态建模，50 种靠 scale / 花量 / 配色区分 */
+type HerbArchetype = "root" | "cap" | "berry" | "umbel" | "spike" | "head"
+  | "vine" | "bulb" | "tree" | "aroid" | "herb";
+export const HERB_FORM: Record<HerbId, { arch: HerbArchetype; scale: number; bloom: number }> = {
+  // 根茎类：主根 + 复叶 + 红果
+  renshen:     { arch: "root",  scale: 1.05, bloom: 1.15 },
+  sanqi:       { arch: "root",  scale: 0.86, bloom: 1.0 },
+  baishao:     { arch: "root",  scale: 0.9,  bloom: 1.1 },
+  // 菌类：菌盖 + 环纹
+  lingzhi:     { arch: "cap",   scale: 0.92, bloom: 1.1 },
+  fuling:      { arch: "cap",   scale: 0.78, bloom: 0.95 },
+  // 浆果灌木
+  gouqi:       { arch: "berry", scale: 1.0,  bloom: 1.2 },
+  nvzhenzi:    { arch: "berry", scale: 1.05, bloom: 1.0 },
+  shanzhuyu:   { arch: "berry", scale: 0.98, bloom: 1.15 },
+  wuweizi:     { arch: "berry", scale: 1.0,  bloom: 1.1 },
+  // 伞形花序
+  danggui:     { arch: "umbel", scale: 0.95, bloom: 1.15 },
+  chuanxiong:  { arch: "umbel", scale: 0.88, bloom: 1.0 },
+  chaihu:      { arch: "umbel", scale: 0.82, bloom: 0.95 },
+  fangfeng:    { arch: "umbel", scale: 0.95, bloom: 1.05 },
+  duhuo:       { arch: "umbel", scale: 0.92, bloom: 1.0 },
+  qianghuo:    { arch: "umbel", scale: 0.86, bloom: 0.95 },
+  baizhi:      { arch: "umbel", scale: 0.98, bloom: 1.1 },
+  // 穗状花序
+  huangqi:     { arch: "spike", scale: 0.95, bloom: 1.05 },
+  gancao:      { arch: "spike", scale: 0.8,  bloom: 1.0 },
+  danshen:     { arch: "spike", scale: 0.9,  bloom: 1.1 },
+  huangqin:    { arch: "spike", scale: 0.86, bloom: 1.0 },
+  huanglian:   { arch: "spike", scale: 0.75, bloom: 0.9 },
+  banlangen:   { arch: "spike", scale: 0.82, bloom: 0.95 },
+  daqingye:    { arch: "spike", scale: 0.9,  bloom: 0.85 },
+  xiakucao:    { arch: "spike", scale: 0.88, bloom: 1.2 },
+  yimucao:     { arch: "spike", scale: 1.0,  bloom: 1.2 },
+  tianma:      { arch: "spike", scale: 0.7,  bloom: 1.0 },
+  // 头状花序（花朵大）
+  juhua:       { arch: "head",  scale: 0.95, bloom: 1.2 },
+  honghua:     { arch: "head",  scale: 0.9,  bloom: 1.1 },
+  jiegeng:     { arch: "head",  scale: 0.88, bloom: 1.0 },
+  xuelian:     { arch: "head",  scale: 1.0,  bloom: 1.25 },
+  // 藤本
+  jinyinhua:   { arch: "vine",  scale: 1.0,  bloom: 1.1 },
+  heshouwu:    { arch: "vine",  scale: 1.05, bloom: 1.0 },
+  // 鳞茎 / 兰科
+  shihu:       { arch: "bulb",  scale: 0.9,  bloom: 1.05 },
+  // 矮乔木（树皮 / 果皮入药）
+  duzhong:     { arch: "tree",  scale: 1.0,  bloom: 0.9 },
+  rougui:      { arch: "tree",  scale: 1.05, bloom: 0.85 },
+  houpo:       { arch: "tree",  scale: 1.1,  bloom: 0.95 },
+  chenpi:      { arch: "tree",  scale: 0.85, bloom: 1.2 },
+  lianqiao:    { arch: "tree",  scale: 0.95, bloom: 1.15 },
+  juemingzi:   { arch: "tree",  scale: 0.8,  bloom: 1.0 },
+  // 宽叶块根 / 姜科
+  baizhu:      { arch: "aroid", scale: 0.92, bloom: 1.0 },
+  cangzhu:     { arch: "aroid", scale: 0.9,  bloom: 0.95 },
+  banxia:      { arch: "aroid", scale: 0.78, bloom: 0.9 },
+  sharen:      { arch: "aroid", scale: 0.85, bloom: 1.15 },
+  // 方茎香草
+  longnaobohe: { arch: "herb",  scale: 0.85, bloom: 1.0 },
+  suye:        { arch: "herb",  scale: 0.92, bloom: 1.05 },
+  qiai:        { arch: "herb",  scale: 1.0,  bloom: 0.85 },
+  huoxiang:    { arch: "herb",  scale: 0.95, bloom: 1.1 },
+  peilan:      { arch: "herb",  scale: 0.9,  bloom: 1.05 },
+  xiangru:     { arch: "herb",  scale: 0.82, bloom: 1.0 },
+  jingjie:     { arch: "herb",  scale: 0.86, bloom: 1.0 },
 };
 
 /** 按顶点位置重写颜色：阴阳双分、长生玉质都靠它（作用于合并后的整株） */
@@ -118,6 +185,255 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     add(new THREE.CylinderGeometry(width * 0.7, width, h, 6), color, pos, [0, 0, angle]);
   }
 
+  /* —— 草药：11 类药圃形态，靠药性部位（根 / 菌盖 / 浆果 / 花序 / 树皮）区分 —— */
+  function herbModel(herb: HerbId, ripe: boolean) {
+    const form = HERB_FORM[herb];
+    const s = form.scale * (ripe ? 1 : 0.72) * 1.68;
+    const q = form.bloom * (ripe ? 1 : 0.8);
+    const arch = form.arch;
+    const bark = tint.setHex(leaf).offsetHSL(0, -0.16, -0.2).getHex();
+    const pale = tint.setHex(body).lerp(new THREE.Color(0xf6f3e2), 0.55).getHex();
+    const deep = tint.setHex(body).offsetHSL(0, 0.06, -0.12).getHex();
+    const petal = (color: number, len: number, wid: number, y: number, a: number, tilt: number, rad = 0) =>
+      add(foldedLeaf(len, wid, len * 0.22, wid * 0.5), color,
+        [Math.sin(a) * rad, y, Math.cos(a) * rad], [tilt, a, 0]);
+    const leafAt = (color: number, len: number, wid: number, x: number, y: number, z: number, tilt: number, yaw: number) =>
+      add(foldedLeaf(len, wid, len * 0.22, wid * 0.5), color, [x, y, z], [tilt, yaw, 0]);
+    /** 两点之间长一根锥形枝干：用四元数定向，避免欧拉角把枝条放倒 */
+    const branch = (from: Point, to: Point, w0: number, w1: number, color: number) => {
+      const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2];
+      const len = Math.hypot(dx, dy, dz) || 0.01;
+      const geo = new THREE.CylinderGeometry(w1, w0, len, 6);
+      geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize()));
+      geo.translate((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2);
+      add(geo, color, [0, 0, 0], [0, 0, 0]);
+    };
+
+    if (arch === "root") {
+      // 主根：车削出圆肩收尖，侧根两条，地面只露根肩
+      const profile = [[0.006, 0], [0.062, 0.04], [0.105, 0.13], [0.09, 0.25], [0.045, 0.34], [0.016, 0.4]];
+      add(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 16),
+        tint.setHex(body).offsetHSL(0, 0.04, -0.14).getHex(), [0, -0.06, 0], [0, 0, 0], [s, s * 1.08, s]);
+      add(new THREE.CylinderGeometry(0.014, 0.026, 0.3, 6), bark, [0.1 * s, 0.1 * s, 0.02], [0.2, 0.4, -0.5]);
+      add(new THREE.CylinderGeometry(0.011, 0.022, 0.26, 6), bark, [-0.09 * s, 0.09 * s, -0.04], [-0.3, 1.1, 0.6]);
+      // 三枝复叶，每枝三小叶
+      for (let k = 0; k < 3; k++) {
+        const a = k * TAU / 3 + 0.4;
+        const bx = Math.sin(a) * 0.05 * s, bz = Math.cos(a) * 0.05 * s;
+        add(new THREE.CylinderGeometry(0.0055, 0.008, 0.3 * s, 5), leaf, [bx, 0.19 * s, bz], [0.16, a, 0.12]);
+        for (let j = 0; j < 3; j++) {
+          petal(leaf, 0.15 * s, 0.055 * s, 0.28 * s + j * 0.005, a + (j - 1) * 0.36, 0.42 + j * 0.08, 0.04);
+        }
+      }
+      // 人参红果伞
+      for (let k = 0; k < Math.round(6 * q); k++) {
+        const a = k * 2.4, y = 0.34 * s + (k % 3) * 0.028;
+        orb(deep, [Math.sin(a) * 0.07, y, Math.cos(a) * 0.06], [0.021 * s, 0.019 * s, 0.021 * s]);
+      }
+      if (herb === "baishao") {
+        for (let k = 0; k < 5; k++) petal(pale, 0.15 * s, 0.08 * s, 0.33 * s, k * TAU / 5, -0.5, 0.09);
+        orb(0xf3d36a, [0, 0.31 * s, 0], [0.035, 0.02, 0.035]);
+      }
+    } else if (arch === "cap") {
+      // 菌盖：半球 + 三道环纹 + 褶边，柄在下方
+      const cap = new THREE.SphereGeometry(0.19, 22, 12, 0, TAU, 0, Math.PI / 2);
+      add(cap, herb === "fuling" ? 0xf1e9d6 : deep, [0, 0.19 * s, 0], [0, 0, 0], [s, 0.62 * s, s]);
+      for (let r = 1; r <= 3; r++) {
+        add(new THREE.TorusGeometry((0.175 - r * 0.038) * s, 0.0045, 4, 26),
+          herb === "fuling" ? 0xe0d5bb : 0xc98a52, [0, (0.255 - r * 0.018) * s, 0], [Math.PI / 2, 0, 0]);
+      }
+      for (let k = 0; k < 16; k++) {
+        petal(herb === "fuling" ? 0xf6efdd : 0xb56a37, 0.07 * s, 0.02, 0.155 * s, k * TAU / 16, 1.6, 0.175 * s);
+      }
+      add(new THREE.CylinderGeometry(0.035, 0.05, 0.24 * s, 8), 0xe7d9b8, [0, 0.06 * s, 0]);
+      // 灵芝孢子粉
+      if (herb === "lingzhi") {
+        for (let k = 0; k < 7; k++) {
+          const a = k * 1.7;
+          orb(0xd9a86a, [Math.sin(a) * 0.09, 0.27 * s + (k % 2) * 0.01, Math.cos(a) * 0.07], [0.012, 0.008, 0.012]);
+        }
+      }
+    } else if (arch === "berry") {
+      // 小灌木：三枝分叉上举，对生叶，浆果成串垂在枝侧
+      for (let k = 0; k < 3; k++) {
+        const a = k * TAU / 3 + 0.2;
+        const base: Point = [Math.sin(a) * 0.035, 0.02, Math.cos(a) * 0.035];
+        const mid: Point = [Math.sin(a) * 0.12, 0.26 * s, Math.cos(a) * 0.12];
+        const tip: Point = [Math.sin(a) * 0.205, 0.52 * s, Math.cos(a) * 0.205];
+        branch(base, mid, 0.013, 0.009, bark);
+        branch(mid, tip, 0.009, 0.005, bark);
+        for (let j = 0; j < 5; j++) {
+          const y = (0.13 + j * 0.085) * s;
+          const a2 = a + (j % 2 ? 1.15 : -1.15) + 0.35;
+          const rad = 0.055 + j * 0.022;
+          leafAt(leaf, 0.17 * s, 0.065 * s, Math.sin(a) * rad, y, Math.cos(a) * rad, 0.4, a2);
+        }
+        for (let j = 0; j < Math.round(5 * q); j++) {
+          const a2 = a + 0.45 + j * 0.5;
+          const rad = 0.11 + j * 0.02;
+          orb(j % 3 === 1 ? deep : body,
+            [Math.sin(a) * rad + Math.sin(a2) * 0.05, (0.33 + j * 0.032) * s, Math.cos(a) * rad + Math.cos(a2) * 0.05],
+            [0.029 * s, 0.035 * s, 0.029 * s]);
+        }
+      }
+    } else if (arch === "umbel") {
+      // 伞形科：粗茎、羽状叶、复伞花序
+      add(new THREE.CylinderGeometry(0.012, 0.022, 0.5 * s, 7), tint.setHex(leaf).offsetHSL(0, 0.02, 0.04).getHex(), [0, 0.25 * s, 0]);
+      for (let k = 0; k < 3; k++) {
+        const y = (0.14 + k * 0.1) * s, a = k * 1.9;
+        for (let j = -1; j <= 1; j++) {
+          petal(leaf, (0.2 - k * 0.03) * s, 0.05 * s, y, a + j * 0.55, 0.22 + Math.abs(j) * 0.16, 0.03);
+        }
+      }
+      // 伞辐：十根细梗托起小球簇
+      for (let k = 0; k < Math.round(12 * q); k++) {
+        const a = k * TAU / 12 + 0.3, rad = (0.055 + (k % 3) * 0.018) * s, y = 0.52 * s + (k % 2) * 0.02;
+        add(new THREE.CylinderGeometry(0.0032, 0.0045, 0.1 * s, 4), leaf,
+          [Math.sin(a) * rad * 0.5, y - 0.05 * s, Math.cos(a) * rad * 0.5], [0.32 * Math.cos(a), a, -0.32 * Math.sin(a)]);
+        orb(pale, [Math.sin(a) * rad, y, Math.cos(a) * rad], [0.024 * s * (0.8 + (k % 3) * 0.12), 0.018 * s, 0.024 * s]);
+        orb(body, [Math.sin(a) * rad + 0.012, y + 0.006, Math.cos(a) * rad], [0.009, 0.008, 0.009]);
+      }
+    } else if (arch === "spike") {
+      // 唇形 / 总状：方茎、对生叶、轮伞花穗
+      add(new THREE.CylinderGeometry(0.014, 0.02, 0.48 * s, 4), tint.setHex(leaf).offsetHSL(0, -0.04, -0.04).getHex(), [0, 0.24 * s, 0]);
+      for (let j = 0; j < 4; j++) {
+        const y = (0.12 + j * 0.09) * s, a = j * 1.55;
+        petal(leaf, (0.17 - j * 0.018) * s, 0.05 * s, y, a, 0.3, 0.02);
+        petal(leaf, (0.17 - j * 0.018) * s, 0.05 * s, y, a + Math.PI, 0.3, 0.02);
+      }
+      const rows = Math.round(7 * q);
+      for (let r = 0; r < rows; r++) {
+        const y = (0.4 + r * 0.042) * s, a = r * 0.8, spread = 0.03 + r * 0.003;
+        for (let k = 0; k < 4; k++) {
+          const ang = a + k * TAU / 4;
+          orb(r === rows - 1 ? pale : body, [Math.sin(ang) * spread, y, Math.cos(ang) * spread],
+            [0.016 * s, 0.013 * s, 0.016 * s]);
+        }
+      }
+      orb(pale, [0, (0.4 + rows * 0.042) * s, 0], [0.026 * s, 0.032 * s, 0.026 * s]);
+    } else if (arch === "head") {
+      // 菊科：细茎、两圈大花瓣、颗粒花心
+      add(new THREE.CylinderGeometry(0.012, 0.02, 0.42 * s, 7), tint.setHex(leaf).offsetHSL(0, -0.05, -0.02).getHex(), [0, 0.21 * s, 0]);
+      petal(leaf, 0.2 * s, 0.07 * s, 0.12 * s, 0.3, 0.24);
+      petal(leaf, 0.18 * s, 0.06 * s, 0.16 * s, 2.4, 0.28);
+      const cy = 0.44 * s, rr = 0.1 * s;
+      for (let k = 0; k < 14; k++) {
+        const a = k * TAU / 14;
+        petal(k % 3 ? body : tint.setHex(body).offsetHSL(0, 0, 0.12).getHex(), 0.2 * s * (0.92 + (k % 4) * 0.03), 0.045 * s, cy, a, 1.32, rr * 0.55);
+      }
+      for (let k = 0; k < 10; k++) {
+        const a = k * TAU / 10 + 0.3;
+        petal(tint.setHex(body).offsetHSL(0, -0.05, -0.06).getHex(), 0.12 * s, 0.04 * s, cy + 0.012, a, 1.18, rr * 0.5);
+      }
+      add(new THREE.SphereGeometry(1, 14, 10), herb === "honghua" ? 0xa8392a : 0xefc85a, [0, cy + 0.006, 0], [0, 0, 0], [0.055 * s, 0.024 * s, 0.055 * s]);
+      for (let k = 0; k < 12; k++) {
+        const a = k * 2.1, r2 = 0.02 + (k % 3) * 0.012;
+        orb(0xffe08a, [Math.sin(a) * r2, cy + 0.024, Math.cos(a) * r2], [0.006, 0.005, 0.006]);
+      }
+      if (herb === "xuelian") {
+        for (let k = 0; k < 14; k++) {
+          const a = k * TAU / 14;
+          petal(0xf4f7ef, 0.13 * s, 0.014, cy - 0.01, a, 1.5, rr * 0.8);
+        }
+      }
+    } else if (arch === "vine") {
+      // 藤本：折线藤茎攀架，心形叶，管状花
+      let prev: Point = [0, 0.03, 0];
+      for (let k = 0; k < 5; k++) {
+        const a = k * 1.05;
+        const next: Point = [Math.sin(a) * (0.1 + k * 0.03), (0.16 + k * 0.11) * s, Math.cos(a) * (0.1 + k * 0.03)];
+        branch(prev, next, 0.009, 0.006, leaf);
+        leafAt(leaf, 0.16 * s, 0.08 * s, next[0], next[1] - 0.015, next[2], 0.3, a + 1.1);
+        leafAt(leaf, 0.15 * s, 0.075 * s, next[0], next[1] - 0.02, next[2], 0.3, a - 1.1);
+        prev = next;
+      }
+      for (let k = 0; k < Math.round(4 * q); k++) {
+        const a = k * 2.2 + 0.4, y = (0.28 + k * 0.095) * s;
+        const x = Math.sin(a) * 0.13, z = Math.cos(a) * 0.13;
+        add(new THREE.CylinderGeometry(0.009, 0.006, 0.11 * s, 6), pale, [x, y, z], [0.7, a, 0]);
+        for (let j = 0; j < 5; j++) petal(k % 2 ? 0xf8f1c8 : pale, 0.055 * s, 0.02, y + 0.05 * s, a + j * TAU / 5, 1.2, 0.01);
+        orb(0xf3d97a, [x, y + 0.055 * s, z], [0.008, 0.008, 0.008]);
+      }
+    } else if (arch === "bulb") {
+      // 兰科：纺锤假鳞茎、线叶、顶生紫花
+      for (let k = 0; k < 3; k++) {
+        const a = k * TAU / 3, x = Math.sin(a) * 0.045, z = Math.cos(a) * 0.045;
+        orb(tint.setHex(leaf).offsetHSL(0, -0.1, 0.06).getHex(), [x, 0.12 * s + k * 0.02, z], [0.032 * s, 0.055 * s, 0.032 * s]);
+        add(new THREE.CylinderGeometry(0.004, 0.005, 0.2 * s, 5), bark, [x, 0.24 * s, z], [0.1, a, 0.06]);
+      }
+      for (let k = 0; k < 5; k++) {
+        const a = k * TAU / 5 + 0.2;
+        petal(leaf, 0.26 * s, 0.022, 0.28 * s, a, 0.55, 0.03);
+      }
+      for (let k = 0; k < 3; k++) {
+        const a = k * 2.1, y = 0.3 * s + (k % 2) * 0.02;
+        for (let j = 0; j < 4; j++) petal(0xc98fd6, 0.075 * s, 0.026, y, a + j * TAU / 4, 1.1, 0.05);
+        orb(0xf0d8f5, [Math.sin(a) * 0.05, y + 0.012, Math.cos(a) * 0.05], [0.014, 0.011, 0.014]);
+      }
+    } else if (arch === "tree") {
+      // 矮乔木：主干、三枝上举、层叠冠叶与果实
+      branch([0, 0, 0], [0, 0.72 * s, 0], 0.05, 0.032, bark);
+      for (let k = 0; k < 3; k++) {
+        const a = k * TAU / 3 + 0.5;
+        const tip: Point = [Math.sin(a) * 0.28 * s, 1.02 * s, Math.cos(a) * 0.28 * s];
+        branch([0, 0.46 * s, 0], tip, 0.024, 0.012, bark);
+        for (let j = 0; j < 5; j++) {
+          const a2 = a + j * 1.3;
+          leafAt(leaf, (0.2 + (j % 2) * 0.05) * s, 0.095 * s,
+            tip[0] + Math.sin(a2) * 0.11 * s, tip[1] - 0.02 + (j % 3) * 0.03 * s, tip[2] + Math.cos(a2) * 0.11 * s,
+            0.28, a2);
+        }
+        for (let j = 0; j < Math.round(4 * q); j++) {
+          const a2 = a + 0.6 + j * 0.7;
+          orb(j % 2 ? body : deep,
+            [tip[0] + Math.sin(a2) * 0.07 * s, tip[1] - 0.05 * s - j * 0.028 * s, tip[2] + Math.cos(a2) * 0.07 * s],
+            [0.022 * s, 0.025 * s, 0.022 * s]);
+        }
+      }
+      if (herb === "juemingzi") {
+        for (let k = 0; k < 4; k++) {
+          const a = k * 1.6;
+          branch([Math.sin(a) * 0.06, 0.32 * s, Math.cos(a) * 0.06],
+            [Math.sin(a) * 0.16, 0.62 * s, Math.cos(a) * 0.16], 0.008, 0.008,
+            tint.setHex(leaf).offsetHSL(0, 0.02, -0.05).getHex());
+        }
+      }
+    } else if (arch === "aroid") {
+      // 天南星 / 姜科：宽叶基生，佛焰苞裹肉穗
+      for (let k = 0; k < 4; k++) {
+        const a = k * TAU / 4 + 0.3;
+        add(new THREE.CylinderGeometry(0.006, 0.01, 0.18 * s, 5), leaf, [Math.sin(a) * 0.03, 0.1 * s, Math.cos(a) * 0.03], [0.2, a, 0.1]);
+        petal(leaf, (0.26 + (k % 2) * 0.05) * s, 0.13 * s, 0.2 * s, a, 0.35, 0.06);
+      }
+      add(new THREE.CylinderGeometry(0.02, 0.026, 0.26 * s, 7), 0xefe6cf, [0.02, 0.2 * s, -0.02], [0.1, 0.6, 0.06]);
+      add(new THREE.CylinderGeometry(0.014, 0.018, 0.22 * s, 7), herb === "banxia" ? 0x8fae63 : 0xa8783e, [0.02, 0.21 * s, -0.02], [0.1, 0.6, 0.06]);
+      petal(herb === "sharen" ? 0xd97c86 : 0xe8ecd8, 0.2 * s, 0.075 * s, 0.28 * s, 0.6, 0.9, 0.03);
+      if (herb === "sharen") {
+        for (let k = 0; k < 5; k++) {
+          const y = (0.18 + k * 0.022) * s;
+          orb(0xd4566a, [0.02, y, -0.02], [0.03 * s, 0.012 * s, 0.03 * s]);
+        }
+      }
+    } else {
+      // 香草：方茎、对生叶、顶轮伞小花
+      add(new THREE.CylinderGeometry(0.011, 0.016, 0.42 * s, 4), tint.setHex(leaf).offsetHSL(0, 0.04, -0.02).getHex(), [0, 0.21 * s, 0]);
+      for (let j = 0; j < 4; j++) {
+        const y = (0.1 + j * 0.085) * s, a = j * 1.5 + 0.4;
+        petal(leaf, (0.15 - j * 0.016) * s, 0.05 * s, y, a, 0.26, 0.02);
+        petal(leaf, (0.15 - j * 0.016) * s, 0.05 * s, y, a + Math.PI, 0.26, 0.02);
+      }
+      const rows = Math.round(5 * q);
+      for (let r = 0; r < rows; r++) {
+        const y = (0.33 + r * 0.04) * s, a = r * 1.2, rad = 0.03 + r * 0.004;
+        for (let k = 0; k < 5; k++) {
+          const ang = a + k * TAU / 5;
+          orb(r === rows - 1 ? pale : body, [Math.sin(ang) * rad, y, Math.cos(ang) * rad], [0.014, 0.011, 0.014]);
+        }
+      }
+    }
+  }
+
   if (stage === 0) {
     orb(0x9c6a47, [0, 0.025, 0], [0.17, 0.065, 0.14]);
     add(new THREE.SphereGeometry(1, 8, 5), 0xe5c493, [0, 0.074, 0], [0, 0, 0.35], [0.035, 0.047, 0.03]);
@@ -125,6 +441,8 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     stem([0, 0.094, 0], 0.19, 0.023);
     leaves(2, 0.16, 0.21, 0.083, 0.07, 0.035, 0.6);
     leaves(2, 0.19, 0.105, 0.048, 0.045, 0.08, 2);
+  } else if (CROPS[crop].herb) {
+    herbModel(crop as HerbId, stage === 3);
   } else {
     const ripe = stage === 3;
     switch (crop) {
@@ -504,6 +822,16 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   }
   const merged = mergeGeometries(pieces)!;
   pieces.forEach((part) => part.dispose());
+  // 草药变异：仙品做玉质冷白渐变，神品整株向金黄压深（闪电与云雾交给特效层）
+  if (mutation === "xianpin" || mutation === "shenpin") {
+    const out = new THREE.Color();
+    const root = new THREE.Color(mutation === "xianpin" ? 0xa9d8c2 : 0xb07c22);
+    const tip = new THREE.Color(mutation === "xianpin" ? 0xfdfdff : 0xffe884);
+    recolorVertices(merged, (_x, y, _z, base) => {
+      const t = smoothstep(0, 0.5, y);
+      return out.copy(root).lerp(tip, 0.35 + 0.55 * t).multiplyScalar(0.9 + 0.14 * base.g + 0.04 * Math.sin(y * 22));
+    });
+  }
   // 野菜变异是整株材质变化：阴阳按左右双分，长生做玉质渐变，生长期也可见
   if (mutation && isWildMutation(mutation)) {
     const out = new THREE.Color();

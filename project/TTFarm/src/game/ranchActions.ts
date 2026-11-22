@@ -1,5 +1,5 @@
 import { harvestLots } from "./crops";
-import { animalName, baitCount, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, wildAnimalsAt, type RanchState } from "./ranch";
+import { animalName, animalValue, baitCount, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, wildAnimalsAt, type RanchState } from "./ranch";
 import { setNearbyAnimal, useRanchInteraction } from "./ranchInteraction";
 
 interface RanchData { ranch: RanchState; harvest: Record<string, number>; coins: number }
@@ -9,6 +9,7 @@ export interface RanchActions {
   tameWild: (id: string, baitKey: string) => void;
   setRiding: (id: string | null) => boolean;
   releaseAnimal: (id: string) => void;
+  sellAnimal: (id: string) => void;
 }
 
 export function createRanchActions(set: (value: Partial<RanchData>) => void, get: () => RanchContext): RanchActions {
@@ -59,6 +60,15 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       set({ ranch: { ...ranch, ridingId: ranch.ridingId === id ? null : ranch.ridingId,
         animals: ranch.animals.filter((owned) => owned.id !== id) } });
       notify(`已将${animalName(animal)}放归野外`);
+    },
+    sellAnimal(id) {
+      const { ranch, coins, notify } = get();
+      const animal = ranch.animals.find((owned) => owned.id === id);
+      if (!animal) return;
+      const value = animalValue(animal);
+      set({ coins: coins + value, ranch: { ...ranch, ridingId: ranch.ridingId === id ? null : ranch.ridingId,
+        animals: ranch.animals.filter((owned) => owned.id !== id) } });
+      notify(`已卖出${animalName(animal)}，+${value} 金币`);
     },
   };
 }

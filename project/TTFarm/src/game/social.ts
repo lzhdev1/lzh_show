@@ -128,7 +128,7 @@ export async function enterVisit(ownerId: string, mode: VisitMode, signal: Abort
   if (token !== useAccount.getState().token || signal.aborted || generation !== visitGeneration) return;
   useGame.getState().selectPlot(null);
   localPose = null;
-  useSocial.setState({ present: false, visitOnFoot:false });
+  useSocial.setState({ present: false, visitOnFoot: true });
   applySnapshot(snapshot, mode);
 }
 

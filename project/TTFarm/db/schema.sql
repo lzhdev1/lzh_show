@@ -124,3 +124,25 @@ CREATE TABLE IF NOT EXISTS farm_presence (
   seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS farm_presence_room_idx ON farm_presence(owner_id,seen_at DESC);
+
+-- 房间聊天：每位房主一本留言册，只让同一房间的人读写。
+-- 保留策略由服务端按房间裁剪（默认最近 200 条），客户端只拉最近 20 条。
+CREATE TABLE IF NOT EXISTS farm_chat (
+  id         BIGSERIAL PRIMARY KEY,
+  owner_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  nickname   VARCHAR(32) NOT NULL,
+  body       VARCHAR(80) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS farm_chat_room_idx ON farm_chat(owner_id,created_at DESC);
+
+-- 房主请离记录：5 分钟内访客无法再次进入该农场，好友关系不受影响。
+CREATE TABLE IF NOT EXISTS farm_room_kicks (
+  owner_id  BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  until     TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY(owner_id,user_id)
+);
+CREATE INDEX IF NOT EXISTS farm_room_kicks_until_idx ON farm_room_kicks(until);
+

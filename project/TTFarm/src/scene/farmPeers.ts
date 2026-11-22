@@ -7,6 +7,8 @@ import { createAnimalLibrary, saddleHeight } from "./ranchAnimals";
 import type { WorldObstacles } from "./obstacles";
 import type { AvatarMotion, ActionId } from "./rig";
 import { ACTIONS, actionWeight, isActionId } from "./actionMotion";
+import { createChatBubble } from "./chatBubble";
+import { bubbleText } from "../game/chat";
 import type { createRanchAuras } from "./ranchAuras";
 import type { RanchAnimal } from "../game/ranch";
 
@@ -48,6 +50,9 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
     group.add(root);
     let label = nameplate(sample.nickname);
     root.add(label.sprite);
+    const bubble = createChatBubble();
+    bubble.sprite.position.set(0, 2.4, 0);
+    root.add(bubble.sprite);
     const start = root.position.clone(), end = start.clone();
     let mount: ReturnType<typeof library.create> | undefined;
     let horseTrail: ReturnType<typeof createHorseTrail> | undefined;
@@ -128,11 +133,14 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
         mount?.animate(time, motion.phase * 2 * Math.PI, motion.moving * (.54 + .46 * motion.running), root.position.distanceToSquared(focus));
         motion.saddleHeight = mount?.seatHeight ?? 0;
         label.sprite.position.y = 1.92 + Math.max(0, motion.saddleHeight - .6);
+        bubble.sprite.position.y = label.sprite.position.y + .34;
+        bubble.set(bubbleText(sample.id));
+        bubble.tick(performance.now());
         avatar.animatePeer(dt, time, motion);
       },
       dispose() {
         horseTrail?.dispose();
-        label.dispose(); mount?.dispose(); avatar.dispose(); root.removeFromParent();
+        label.dispose(); bubble.dispose(); mount?.dispose(); avatar.dispose(); root.removeFromParent();
       },
     };
   }

@@ -1,19 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useClock } from "../game/clock";
 import { CROP_LIST, harvestLots, produceName, CROPS, type CropId } from "../game/crops";
 import { useFieldInteraction } from "../game/fieldInteraction";
 import { formatRemain, isReady, MAX_WATER, remainingMs } from "../game/growth";
-import { animalName, baitCount, ranchCapacity } from "../game/ranch";
+import { animalName, baitCount, isMountAnimal, ranchCapacity } from "../game/ranch";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { helpAtFarm, leaveVisit, useSocial, type Visit } from "../game/social";
+import { kickGuest } from "../game/chat";
 import { useGame } from "../game/state";
 import { ReturnToLoginButton, TouchControls } from "./FieldControls";
+import { ActionTrigger } from "./ActionPanel";
 import { FriendsIcon } from "./FriendsPanel";
 import { HarvestIcon, SowIcon, WateringCanIcon } from "./icons";
 
 export function FarmGuests() {
-  const names = useSocial(state => state.players.map(player => player.nickname).join("、"));
-  return names ? <div className="farm-guests"><FriendsIcon/><span>正在串门 · {names}</span></div> : null;
+  const players = useSocial(state => state.players);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => { if (!players.length) setOpen(false); }, [players.length]);
+  if (!players.length) return null;
+  const kick = async (id: string, nickname: string) => {
+    if (busy) return;
+    setBusy(id);
+    try {
+      await kickGuest(id, nickname);
+      useGame.getState().notify(`已请离 ${nickname}，5 分钟内不能再进你的农场`);
+    } catch (error) {
+      useGame.getState().notify(error instanceof Error ? error.message : "请离失败，稍后再试", "warn");
+    } finally { setBusy(null); }
+  };
+  return <div className="farm-guests-wrap">
+    <button type="button" className="farm-guests" aria-expanded={open}
+      aria-label="查看在场访客" onClick={() => setOpen(value => !value)}>
+      <FriendsIcon/><span>正在串门 · {players.map(player => player.nickname).join("、")}</span>
+    </button>
+    {open && <div className="farm-guest-list" role="menu" aria-label="在场访客">
+      {players.map(player => <div key={player.id} className="farm-guest-row">
+        <span>{player.nickname}</span>
+        <button type="button" disabled={busy === player.id} onClick={() => void kick(player.id, player.nickname)}>
+          {busy === player.id ? "处理中…" : "请离"}
+        </button>
+      </div>)}
+    </div>}
+  </div>;
 }
 
 function GuestAction({ visit }: { visit: Visit }) {
@@ -82,7 +111,19 @@ function GuestAction({ visit }: { visit: Visit }) {
 export function VisitHUD({ visit }: { visit: Visit }) {
   const reconnecting = useSocial(state => state.reconnecting);
   const onFoot = useSocial(state => state.visitOnFoot);
-  const mount = useGame(state => state.ranch.animals.find(animal => animal.id === state.ranch.ridingId));
+  const ranch = useGame(state => state.ranch);
+  const mount = ranch.animals.find(animal => animal.id === ranch.ridingId);
+  // 没有正在骑的动物时，也允许从坐骑栏里挑一只——串门时不必回自己牧场先上马。
+  const rideReady = mount ?? ranch.animals.find(isMountAnimal);
+  const toggleRide = () => {
+    if (!onFoot) { useSocial.setState({ visitOnFoot: true }); return; }
+    if (!rideReady) {
+      useGame.getState().notify("牧场还没有可骑的动物：收服野马，或让狼、熊、虎、狮子、大象、熊猫带上五行变异", "warn");
+      return;
+    }
+    if (!mount && !useGame.getState().setRiding(rideReady.id)) return;
+    useSocial.setState({ visitOnFoot: false });
+  };
   const guestNames = useSocial(state => state.players.map(player => player.nickname).join("、"));
   const spectator = visit.mode === "spectate";
   const focus = (area: "farm" | "ranch") => window.dispatchEvent(new CustomEvent("ttfarm:visit-focus", { detail: area }));
@@ -106,10 +147,14 @@ export function VisitHUD({ visit }: { visit: Visit }) {
       <small className="touch-guide">滑动环绕 · 摇杆平移 · 双指缩放</small>
     </nav> : <>
       {guestNames && <div className="visit-company">同场 · {guestNames}</div>}
-      {mount && <button className="visit-ride" onClick={() => useSocial.setState({ visitOnFoot: !onFoot })}
-        title={animalName(mount)} aria-label={onFoot ? `骑上${animalName(mount)}` : "下坐骑"}>
-        {onFoot ? "骑上坐骑" : "下坐骑"}
-      </button>}
+      <div className="visit-tools">
+        <ActionTrigger/>
+        <button className={`visit-ride${rideReady ? "" : " empty"}`} onClick={toggleRide}
+          title={rideReady ? animalName(rideReady) : "还没有可骑的动物"}
+          aria-label={onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : "下坐骑"}>
+          {onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : `下坐骑 · ${animalName(mount!)}`}
+        </button>
+      </div>
       {visit.canManage && !reconnecting && <GuestAction visit={visit}/>}
     </>}
     <TouchControls spectating={spectator}/>

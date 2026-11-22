@@ -53,6 +53,21 @@ export const animalName = (animal: RanchAnimal) =>
 export const baitCount = (animal: RanchAnimal, crop: CropId) =>
   animal.element && crop !== ANIMALS[animal.species].favorite ? 2 : 1;
 
+/** 动物基础售价：按物种稀有度定档，五行变异再乘元素系数 */
+const ANIMAL_VALUE: Record<AnimalSpecies, number> = {
+  wolf: 220, bear: 260, tiger: 320, lion: 340, elephant: 380, panda: 360, fox: 160,
+  rabbit: 90, deer: 130, boar: 150, goat: 110, alpaca: 170, sheep: 120, horse: 480,
+  cow: 190, raccoon: 100, redPanda: 180, penguin: 140, duck: 110, crane: 160,
+};
+/** 元素溢价：金最贵，木/水略低，火/土居中 */
+const ANIMAL_ELEMENT_VALUE: Record<AnimalElement, number> = {
+  metal: 1.6, wood: 1.3, water: 1.3, fire: 1.5, earth: 1.5,
+};
+export function animalValue(animal: RanchAnimal): number {
+  const factor = animal.element ? ANIMAL_ELEMENT_VALUE[animal.element] : 1;
+  return Math.round(ANIMAL_VALUE[animal.species] * factor);
+}
+
 export function normalizeRanch(value?: unknown): RanchState {
   const src = (value && typeof value === "object" ? value : {}) as Partial<RanchState>;
   const level = Number.isFinite(src.level) ? Math.min(RANCH_MAX_LEVEL, Math.max(1, Math.trunc(src.level!))) : 1;

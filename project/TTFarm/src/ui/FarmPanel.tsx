@@ -2,9 +2,9 @@ import { useState } from "react";
 import { PLOT_COUNT, landPriceOf, useGame } from "../game/state";
 import { CloseIcon, CoinIcon, LandIcon } from "./icons";
 import { useClock } from "../game/clock";
-import { ELEMENTS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, WILD_MUTATION_CHANCE, WILD_MUTATIONS, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
+import { ELEMENTS, HERB_MUTATIONS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, WILD_MUTATION_CHANCE, WILD_MUTATIONS, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
 import { formatRemain } from "../game/growth";
-import { FORAGE_SEED_CHANCE, forageEndsAt } from "../game/forage";
+import { FORAGE_PATCH_COUNT, FORAGE_SEED_CHANCE, HERB_PATCH_SHARE, HERB_SEED_CHANCE, forageEndsAt } from "../game/forage";
 import { FarmDecorPanel } from "./FarmDecorPanel";
 
 const money = (value: number) => value.toLocaleString("zh-CN");
@@ -71,13 +71,14 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
           <ul>{SPIRITS.map(id => <li key={id}>{MUTATIONS[id].label}</li>)}</ul>
         </details>
 
-        <h3 className="section-title">野外野菜</h3>
+        <h3 className="section-title">野外野菜与草药</h3>
         <div className="row">
           <div className="row-main">
-            <strong>下一批野菜 · {formatRemain(forageEndsAt(now) - now)}后刷新</strong>
+            <strong>下一批菜丛 · {formatRemain(forageEndsAt(now) - now)}后刷新</strong>
             <span className="muted small">
-              野外每 10 分钟长出 18 丛野菜，走近即可采摘；每次采摘有 {Math.round(FORAGE_SEED_CHANCE * 100)}% 捡到种子，可以种回农场。
-              约一成菜丛自带阴阳或长生变异，采到就是变异收成。
+              野外每 10 分钟长出 {FORAGE_PATCH_COUNT} 丛菜与草药，其中约 {Math.round(HERB_PATCH_SHARE * 100)}% 是草药。
+              走近即可采摘；野菜有 {Math.round(FORAGE_SEED_CHANCE * 100)}%、草药有 {Math.round(HERB_SEED_CHANCE * 100)}% 几率捡到种子。
+              约一成野菜丛自带阴阳或长生变异。
             </span>
           </div>
           <button className="btn mini" onClick={() => { window.dispatchEvent(new Event("ttfarm:find-forage")); onClose(); }}>去寻找</button>
@@ -86,6 +87,11 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
           <summary>野菜变异图鉴</summary>
           <p>野菜只会发生两种变异：阴阳（半黑半白、星辰环绕）与长生（玉质云雾、金龙环绕）。种下野菜种子有 {Math.round(WILD_MUTATION_CHANCE * 100)}% 概率变异，级别越高越稀有。</p>
           <ul>{WILD_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
+        </details>
+        <details className="crop-almanac">
+          <summary>草药变异图鉴</summary>
+          <p>草药种子不卖，只能从野外草药丛采到。种下后有机会抽出金木水火土五行；仙品会云雾缭绕、植株闪光，神品会闪电缠身、整株发黄，都是万中无一的收成。</p>
+          <ul>{HERB_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
         </details>
         <h3 className="section-title">扩建</h3>
         {locked.length > 0 ? (

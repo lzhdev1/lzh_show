@@ -1,6 +1,6 @@
 import { CROPS, type CropId } from "./crops";
 import { ANIMALS, MOUNT_SPECIES, MOUNT_UNLOCK_LEVEL, type AnimalSpecies } from "./ranch";
-import { MUTATIONS, type Mutation } from "./weather";
+import { HERB_MUTATIONS, MUTATIONS, type Mutation } from "./weather";
 
 /**
  * 图鉴数据：游戏里全部作物、野菜、变异与动物，以及它们之间的引诱关系。
@@ -8,7 +8,7 @@ import { MUTATIONS, type Mutation } from "./weather";
  * 这里只维护“文案”和“关系”，改数值时图鉴自动跟着变。
  */
 
-export type CodexTab = "crop" | "wild" | "mutation" | "animal";
+export type CodexTab = "crop" | "wild" | "herb" | "mutation" | "animal";
 
 export const ANIMAL_PORTRAITS: Record<AnimalSpecies, string> = {
   wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼", fox: "🦊",
@@ -68,6 +68,60 @@ const WILD_BLURB: Record<string, string> = {
   juhuanao: "菊叶清苦回甘，炒蛋或做汤都清新。农场门口就常能遇到。",
 };
 
+/** 草药的风味、药理与采法 */
+const HERB_BLURB: Record<string, string> = {
+  gouqi: "红果成串，晒干泡水最养眼。耐旱好活，野外灌木丛里常能采到。",
+  longnaobohe: "叶面凉气重，揉碎有龙脑香。喜欢阴湿田边，采到就能种回药圃。",
+  suye: "紫叶带清香，解表散寒。和紫苏同族但更偏药用，香气更沉。",
+  qiai: "艾香厚实，端午前后最盛。叶背灰白，成片长在向阳草坡。",
+  jinyinhua: "藤上并蒂开黄白小花，清热解毒。花期短，采到种子要赶紧种。",
+  juhua: "头状花序层层叠叠，清肝明目。秋后开花，一朵能压住整株的香。",
+  honghua: "橙红管状花，活血通经。花瓣带刺，采摘时记得戴手套。",
+  huoxiang: "方茎对叶，气味辛香，化湿和胃。湿地边一长就是一片。",
+  peilan: "叶细花香，醒脾开胃。比藿香更清雅，常长在溪畔草甸。",
+  xiangru: "穗状小花带薄荷气，发汗解表。夏秋开花，野外石缝里也能扎根。",
+  jingjie: "细叶紫穗，祛风解表。香气清烈，晒干后能存很久。",
+  chenpi: "橘皮陈放三年才成药，理气化痰。矮橘树上结的果，晒干就是钱。",
+  banxia: "三叶一苞，块茎入药，燥湿化痰。喜阴湿，采时别碰佛焰苞的汁水。",
+  jiegeng: "紫铃状花，宣肺利咽。根粗如指，秋季采挖最饱满。",
+  banlangen: "板蓝的根，清热解毒。叶可做青黛，一株两用，是药圃里的常客。",
+  daqingye: "板蓝的大叶，鲜用清热。叶面蓝绿发亮，和板蓝根同株同源。",
+  xiakucao: "夏至后花序枯黄，故名夏枯。紫穗层层，清火散结。",
+  yimucao: "益母草，粉紫轮伞花序，活血调经。田埂荒地最常见。",
+  juemingzi: "豆荚细长，籽粒明目。小灌木黄花，晒干后豆荚能存一年。",
+  nvzhenzi: "女贞的紫黑小果，滋补肝肾。常绿小树，冬天也不落叶。",
+  danggui: "伞形白花，根头肥厚，补血活血。气味浓，切开满屋药香。",
+  huangqi: "黄芪直根深扎，豆科黄花成穗。补气固表，是药圃里的顶梁柱。",
+  gancao: "甘草甜根，调和诸药。紫花总状，根皮红棕，嚼一口回甘很久。",
+  danshen: "丹参紫红穗花，活血祛瘀。根皮赤红，是心血管方里的常客。",
+  chuanxiong: "川芎伞花细碎，根茎香气冲鼻。活血行气，四川产的尤佳。",
+  baishao: "白芍根粗皮白，养血柔肝。粉白花瓣，花开时药圃最好看。",
+  huanglian: "黄连根茎金黄，味极苦，清热燥湿。喜阴凉，叶下藏着一串黄根。",
+  huangqin: "黄芩紫花成穗，根心枯黄。清肺燥湿，老根比新根更值钱。",
+  chaihu: "柴胡伞形黄花，解表退热。根细如须，一丛能挖出一小把。",
+  fangfeng: "防风直根深长，伞花白绿。祛风胜湿，野外的风口处长得最壮。",
+  duhuo: "独活大叶伞花，祛风止痛。根粗有香气，喜阴湿山坡。",
+  qianghuo: "羌活茎紫花白，解表散寒。根茎带节，像一串小竹节。",
+  baizhi: "白芷伞花雪白，根粗味香。祛风止痛，晒干切片能存很久。",
+  baizhu: "白术块茎肥厚，健脾益气。紫花藏在宽叶下，秋后挖根最实。",
+  cangzhu: "苍术根茎苍褐，燥湿健脾。叶宽花紫，喜向阳山坡。",
+  sharen: "砂仁姜科穗花，果实带壳，化湿开胃。岭南药圃里的香气担当。",
+  lianqiao: "连翘早春开黄花，果实清热解毒。枝条拱垂，是药圃里的报春树。",
+  houpo: "厚朴树皮入药，行气燥湿。大叶白花，剥皮要选十年以上的老树。",
+  shihu: "石斛附生兰，假鳞茎一节一节，滋阴清热。紫花小巧，喜阴湿石壁。",
+  renshen: "五加科人参，掌状复叶配红果。根如人形，是药圃里最金贵的镇园之宝。",
+  lingzhi: "灵芝菌盖赤褐有环纹，补气安神。喜老树根，一朵能长好几年。",
+  sanqi: "三七块根带瘤节，止血化瘀。红果成簇，云南文山的最有名。",
+  heshouwu: "何首乌藤蔓缠绕，块根黑褐，乌发益肾。藤上结的果像小三角。",
+  wuweizi: "五味子藤本红果串，酸甘五味俱全。收敛固涩，藤蔓能爬满整架。",
+  tianma: "天麻无叶，靠蜜环菌共生，根茎肥白。平肝息风，是兰科里的怪才。",
+  duzhong: "杜仲树皮折断有银丝，补肝肾强筋骨。小乔木，叶背灰绿。",
+  rougui: "肉桂树皮辛甜，温阳散寒。常绿小乔木，剥皮晒干卷成筒。",
+  fuling: "茯苓菌核雪白，利水渗湿。长在松树根下，挖出来像一块白玉。",
+  shanzhuyu: "山茱萸红果晶莹，补益肝肾。小乔木，秋后满树像挂了一串珊瑚。",
+  xuelian: "雪莲头状花序包在白色绒毛里，高山才有。温肾壮阳，是药圃里最难养的一味。",
+};
+
 /** 变异的来源与效果 */
 const MUTATION_BLURB: Record<string, string> = {
   thunder: "果实表面缠着紫色电弧，噼啪作响。普通作物播种时抽中，收成售价 ×2。",
@@ -90,6 +144,13 @@ const MUTATION_BLURB: Record<string, string> = {
   longlife1: "植株玉质化，翡翠云雾绕身，一条小金龙沿脊线游动。野菜专属，售价 ×5。",
   longlife2: "玉质更深，云雾里浮着光尘，两条金龙对游。野菜专属，售价 ×10。",
   longlife3: "整株如老玉生光，三条金龙首尾相逐，是野外最难得的收成。售价 ×20。",
+  herbMetal: "植株镀上一层温润的金色，药香里带一点矿石气。草药五行变异，售价 ×4。",
+  herbWood: "枝叶泛青翠灵光，像刚从春雨里拔出来。草药五行变异，售价 ×4。",
+  herbWater: "叶面流动着水光，雾气压在根际。草药五行变异，售价 ×4。",
+  herbFire: "花瓣与叶缘烧出一圈暖红，靠近能闻到焙药香。草药五行变异，售价 ×5。",
+  herbEarth: "根茎裹着土黄宝光，沉甸甸压手。草药五行变异，售价 ×5。",
+  xianpin: "云雾从根部层层升起，整株泛着细碎闪光，像被月光洗过。仙品草药，售价 ×15。",
+  shenpin: "闪电在植株上游走，叶片与根茎烧成金黄，落地仍有余雷。神品草药，售价 ×30。",
 };
 
 /** 动物的性情与来历 */
@@ -125,7 +186,7 @@ for (const [species, def] of Object.entries(ANIMALS) as [AnimalSpecies, { name: 
 }
 
 export interface PlantEntry {
-  kind: "crop" | "wild";
+  kind: "crop" | "wild" | "herb";
   crop: CropId;
   name: string;
   blurb: string;
@@ -137,7 +198,7 @@ export interface MutationEntry {
   label: string;
   blurb: string;
   multiplier: number;
-  family: "element" | "spirit" | "legacy" | "wild";
+  family: "element" | "spirit" | "legacy" | "wild" | "herb";
 }
 
 export interface AnimalEntry {
@@ -154,10 +215,10 @@ const ATTRACTION = (crop: CropId) => (LURE_BY_CROP.get(crop) ?? []).map((species
 }));
 
 export const CODEX_PLANTS: readonly PlantEntry[] = Object.values(CROPS).map((crop) => ({
-  kind: crop.wild ? "wild" as const : "crop" as const,
+  kind: crop.herb ? "herb" as const : crop.wild ? "wild" as const : "crop" as const,
   crop: crop.id,
   name: crop.name,
-  blurb: (crop.wild ? WILD_BLURB[crop.id] : CROP_BLURB[crop.id]) ?? "",
+  blurb: (crop.herb ? HERB_BLURB[crop.id] : crop.wild ? WILD_BLURB[crop.id] : CROP_BLURB[crop.id]) ?? "",
   lures: ATTRACTION(crop.id),
 }));
 
@@ -170,6 +231,7 @@ export const CODEX_MUTATIONS: readonly MutationEntry[] = (Object.keys(MUTATIONS)
   blurb: MUTATION_BLURB[id] ?? "",
   multiplier: MUTATIONS[id].multiplier,
   family: id.startsWith("yinyang") || id.startsWith("longlife") ? "wild" as const
+    : (HERB_MUTATIONS as readonly string[]).includes(id) ? "herb" as const
     : (LEGACY_IDS as string[]).includes(id) ? "legacy" as const
     : (SPIRIT_IDS as string[]).includes(id) ? "spirit" as const : "element" as const,
 }));

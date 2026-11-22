@@ -1,6 +1,7 @@
 import type { Queryable } from "./ttfarm-auth";
 import { checkVisit, playerId } from "./ttfarm-friends";
 import { FarmError } from "./ttfarm-http";
+import { assertNotKicked } from "./ttfarm-room";
 import { normalizeRanch, isMountAnimal, MOUNT_UNLOCK_LEVEL } from "@farm-rules/ranch";
 
 function coordinate(value: unknown, limit: number) {
@@ -31,6 +32,7 @@ export async function heartbeat(client: Queryable, self: number, body: Record<st
   const owner = playerId(body.ownerId);
   if (body.mode !== "home" && body.mode !== "friend") throw new FarmError(400, "旁观模式无法加入房间");
   if (body.mode === "home" && owner !== self) throw new FarmError(403, "请选择自己的农场");
+  await assertNotKicked(client, self, owner);
   const canHelp = body.mode === "home" || await checkVisit(client,self,owner,"friend",true);
   const candidate = body.mount as Record<string,unknown> | null;
   const mount = candidate && typeof candidate.species === "string" && candidate.species.length<20

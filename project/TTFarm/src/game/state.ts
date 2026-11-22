@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
-import { isMutation, isRainy, rollMutation, rollWildMutation, weatherAt } from "./weather";
+import { isMutation, isRainy, rollHerbMutation, rollMutation, rollWildMutation, weatherAt } from "./weather";
 import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
@@ -121,7 +121,8 @@ export const useGame = create<GameStore>()(
       notify: (text, tone = "ok") => {
         toastSeq += 1;
         const id = toastSeq;
-        set((s) => ({ toasts: [...s.toasts, { id, text, tone }] }));
+        // 顶部只留最近两条：新消息直接把旧消息顶掉，避免提示堆成瀑布。
+        set((s) => ({ toasts: [...s.toasts, { id, text, tone }].slice(-2) }));
         window.setTimeout(() => {
           set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
         }, 2400);
@@ -144,6 +145,10 @@ export const useGame = create<GameStore>()(
         const def = CROPS[crop];
         if (def.wild) {
           get().notify("野菜种子不卖，去野外采摘有机会捡到", "warn");
+          return;
+        }
+        if (def.herb) {
+          get().notify("草药种子不卖，去野外的草药丛里采", "warn");
           return;
         }
         const level = levelFromXp(get().xp);
@@ -182,8 +187,8 @@ export const useGame = create<GameStore>()(
         }
         const now = Date.now();
         const weather = weatherAt(now);
-        // 野菜只抽阴阳/长生；普通作物仍按天气抽签
-        const mutation = def.wild ? rollWildMutation() : rollMutation(weather);
+        // 三类作物分开抽签：草药五行/仙品/神品，野菜阴阳/长生，普通作物按天气抽元素
+        const mutation = def.herb ? rollHerbMutation() : def.wild ? rollWildMutation() : rollMutation(weather);
         const watered = isRainy(weather) ? 1 : 0;
         set((s) => ({
           seeds: { ...s.seeds, [selectedSeed]: s.seeds[selectedSeed] - 1 },

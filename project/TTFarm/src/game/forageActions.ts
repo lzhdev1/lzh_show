@@ -1,5 +1,5 @@
 import { CROPS, harvestKey, produceName } from "./crops";
-import { FORAGE_SEED_CHANCE, FORAGE_XP, forageRotationAt, wildPatchesAt, type ForageState } from "./forage";
+import { FORAGE_SEED_CHANCE, FORAGE_XP, HERB_FORAGE_XP, HERB_SEED_CHANCE, forageRotationAt, wildPatchesAt, type ForageState } from "./forage";
 import { setNearbyPatch, useForageInteraction } from "./forageInteraction";
 
 interface ForageData {
@@ -23,15 +23,16 @@ export function createForageActions(set: (value: Partial<ForageData>) => void, g
       const rotation = forageRotationAt(now);
       const patch = wildPatchesAt(now).find((item) => item.id === id);
       if (!patch || useForageInteraction.getState().nearbyPatch?.id !== id) {
-        return notify("走近野菜丛才能采摘", "warn");
+        return notify("走近菜丛才能采摘", "warn");
       }
       const taken = forage.rotation === rotation ? forage.taken : [];
       if (taken.includes(patch.slot)) return;
       const def = CROPS[patch.crop];
       const key = harvestKey(def.id, patch.mutation);
-      const seedDrop = Math.random() < FORAGE_SEED_CHANCE;
+      const herb = Boolean(def.herb);
+      const seedDrop = Math.random() < (herb ? HERB_SEED_CHANCE : FORAGE_SEED_CHANCE);
       set({
-        xp: xp + FORAGE_XP,
+        xp: xp + (herb ? HERB_FORAGE_XP : FORAGE_XP),
         harvest: { ...harvest, [key]: (harvest[key] ?? 0) + 1 },
         seeds: seedDrop ? { ...seeds, [def.id]: (seeds[def.id] ?? 0) + 1 } : seeds,
         forage: { rotation, taken: [...taken, patch.slot] },

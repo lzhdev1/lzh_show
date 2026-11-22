@@ -97,6 +97,8 @@
 .resident-name { flex: 1; min-width: 84px; }
 .resident-actions { margin-left: auto; gap: 3px; }
 .release-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #765f4b; }
+.sell-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #3f6b45; font-weight: 650; }
+.btn.mini.danger { background: #f6e2d9; border-color: #d8a58f; color: #8a452f; }
 @media (max-width: 560px) {
   .riding-action { top: calc(109px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); }
 }

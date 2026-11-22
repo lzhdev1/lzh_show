@@ -1,4 +1,4 @@
-import { MUTATIONS, isSpirit, isWildMutation, type Mutation } from "./weather";
+import { MUTATIONS, isHerbMutation, isSpirit, isWildMutation, type Mutation } from "./weather";
 
 /** 作物配置表 */
 export type CropId =
@@ -26,7 +26,8 @@ export type CropId =
   | "rosePurple"
   | "pineapple"
   | "durian"
-  | WildGreenId;
+  | WildGreenId
+  | HerbId;
 
 /** 野菜：商店不卖种子，只能野外采摘概率获得 */
 export type WildGreenId =
@@ -51,6 +52,19 @@ export type WildGreenId =
   | "malantou"
   | "juhuanao";
 
+/** 草药：商店不卖，种子只能野外采到；变异走金木水火土 + 仙品 + 神品 */
+export type HerbId =
+  | "renshen" | "lingzhi" | "gouqi" | "danggui" | "huangqi"
+  | "gancao" | "danshen" | "sanqi" | "chuanxiong" | "baishao"
+  | "huanglian" | "huangqin" | "jinyinhua" | "juhua" | "honghua"
+  | "longnaobohe" | "suye" | "qiai" | "heshouwu" | "wuweizi"
+  | "tianma" | "duzhong" | "rougui" | "fuling" | "baizhu"
+  | "chenpi" | "banxia" | "jiegeng" | "chaihu" | "fangfeng"
+  | "duhuo" | "qianghuo" | "baizhi" | "cangzhu" | "houpo"
+  | "sharen" | "huoxiang" | "peilan" | "xiangru" | "jingjie"
+  | "lianqiao" | "banlangen" | "daqingye" | "xiakucao" | "yimucao"
+  | "juemingzi" | "nvzhenzi" | "shanzhuyu" | "shihu" | "xuelian";
+
 export interface CropDef {
   id: CropId;
   name: string;
@@ -72,6 +86,8 @@ export interface CropDef {
   leaf: number;
   /** 野菜标记：不进商店，种子靠野外采摘掉落 */
   wild?: boolean;
+  /** 草药标记：不进商店，野外草药丛掉落种子，变异走五行 / 仙品 / 神品 */
+  herb?: boolean;
 }
 
 export const CROPS: Record<CropId, CropDef> = {
@@ -384,22 +400,81 @@ export const CROPS: Record<CropId, CropDef> = {
   louhao:     { id: "louhao",     name: "蒌蒿",   seedPrice: 0, sellPrice: 26, yields: 2, growMs: 105_000, unlockLevel: 1, xp: 9,  body: 0xa8b878, leaf: 0x7a9a58, wild: true },
   malantou:   { id: "malantou",   name: "马兰头", seedPrice: 0, sellPrice: 28, yields: 2, growMs: 110_000, unlockLevel: 1, xp: 10, body: 0x9a7ab8, leaf: 0x5f9d4c, wild: true },
   juhuanao:   { id: "juhuanao",   name: "菊花脑", seedPrice: 0, sellPrice: 30, yields: 2, growMs: 115_000, unlockLevel: 1, xp: 11, body: 0xf2d068, leaf: 0x6aa04c, wild: true },
+  // —— 草药：种子只野外掉落；生长慢、单价高，变异规则独立（五行 / 仙品 / 神品） ——
+  // 常见档：枸杞、薄荷、艾、金银花、菊花、红花、陈皮、半夏、桔梗、板蓝根等
+  gouqi:       { id: "gouqi",       name: "枸杞",     seedPrice: 0, sellPrice: 52,  yields: 1, growMs: 150_000, unlockLevel: 1, xp: 14, body: 0xd8442c, leaf: 0x5f9448, herb: true },
+  longnaobohe: { id: "longnaobohe", name: "龙脑薄荷", seedPrice: 0, sellPrice: 46,  yields: 1, growMs: 140_000, unlockLevel: 1, xp: 13, body: 0xcfe8d0, leaf: 0x5f9a58, herb: true },
+  suye:        { id: "suye",        name: "苏叶",     seedPrice: 0, sellPrice: 46,  yields: 1, growMs: 140_000, unlockLevel: 1, xp: 13, body: 0x8a4a7a, leaf: 0x6a4a78, herb: true },
+  qiai:        { id: "qiai",        name: "蕲艾",     seedPrice: 0, sellPrice: 42,  yields: 1, growMs: 135_000, unlockLevel: 1, xp: 12, body: 0xd8e0c0, leaf: 0x8aa878, herb: true },
+  jinyinhua:   { id: "jinyinhua",   name: "金银花",   seedPrice: 0, sellPrice: 62,  yields: 1, growMs: 170_000, unlockLevel: 1, xp: 16, body: 0xf2e6a0, leaf: 0x5f9a4a, herb: true },
+  juhua:       { id: "juhua",       name: "菊花",     seedPrice: 0, sellPrice: 56,  yields: 1, growMs: 160_000, unlockLevel: 1, xp: 15, body: 0xf2cf5a, leaf: 0x5f9448, herb: true },
+  honghua:     { id: "honghua",     name: "红花",     seedPrice: 0, sellPrice: 64,  yields: 1, growMs: 170_000, unlockLevel: 1, xp: 16, body: 0xe0562e, leaf: 0x6a9a50, herb: true },
+  huoxiang:    { id: "huoxiang",    name: "藿香",     seedPrice: 0, sellPrice: 50,  yields: 1, growMs: 150_000, unlockLevel: 1, xp: 14, body: 0xb07ac0, leaf: 0x5f9a50, herb: true },
+  peilan:      { id: "peilan",      name: "佩兰",     seedPrice: 0, sellPrice: 50,  yields: 1, growMs: 150_000, unlockLevel: 1, xp: 14, body: 0xd0a0e0, leaf: 0x6a9a55, herb: true },
+  xiangru:     { id: "xiangru",     name: "香薷",     seedPrice: 0, sellPrice: 46,  yields: 1, growMs: 145_000, unlockLevel: 1, xp: 13, body: 0xc8b0e0, leaf: 0x6f9a55, herb: true },
+  jingjie:     { id: "jingjie",     name: "荆芥",     seedPrice: 0, sellPrice: 46,  yields: 1, growMs: 145_000, unlockLevel: 1, xp: 13, body: 0xd8c0e8, leaf: 0x6a9a50, herb: true },
+  chenpi:      { id: "chenpi",      name: "陈皮",     seedPrice: 0, sellPrice: 58,  yields: 1, growMs: 160_000, unlockLevel: 1, xp: 15, body: 0xef9a3a, leaf: 0x4f8a45, herb: true },
+  banxia:      { id: "banxia",      name: "半夏",     seedPrice: 0, sellPrice: 50,  yields: 1, growMs: 150_000, unlockLevel: 1, xp: 14, body: 0x9ab06a, leaf: 0x5f9a50, herb: true },
+  jiegeng:     { id: "jiegeng",     name: "桔梗",     seedPrice: 0, sellPrice: 56,  yields: 1, growMs: 160_000, unlockLevel: 1, xp: 15, body: 0x7a6ac0, leaf: 0x5f9448, herb: true },
+  banlangen:   { id: "banlangen",   name: "板蓝根",   seedPrice: 0, sellPrice: 56,  yields: 1, growMs: 160_000, unlockLevel: 1, xp: 15, body: 0xf2d060, leaf: 0x5f9a50, herb: true },
+  daqingye:    { id: "daqingye",    name: "大青叶",   seedPrice: 0, sellPrice: 50,  yields: 1, growMs: 155_000, unlockLevel: 1, xp: 14, body: 0x4f6a9a, leaf: 0x5a8f50, herb: true },
+  xiakucao:    { id: "xiakucao",    name: "夏枯草",   seedPrice: 0, sellPrice: 58,  yields: 1, growMs: 170_000, unlockLevel: 1, xp: 16, body: 0xa07ac0, leaf: 0x6a9a50, herb: true },
+  yimucao:     { id: "yimucao",     name: "益母草",   seedPrice: 0, sellPrice: 58,  yields: 1, growMs: 170_000, unlockLevel: 1, xp: 16, body: 0xc07ad0, leaf: 0x5f9448, herb: true },
+  juemingzi:   { id: "juemingzi",   name: "决明子",   seedPrice: 0, sellPrice: 52,  yields: 1, growMs: 155_000, unlockLevel: 1, xp: 14, body: 0xf2d060, leaf: 0x6a9a50, herb: true },
+  nvzhenzi:    { id: "nvzhenzi",    name: "女贞子",   seedPrice: 0, sellPrice: 82,  yields: 1, growMs: 195_000, unlockLevel: 1, xp: 18, body: 0x5a4a8a, leaf: 0x3f7a3f, herb: true },
+  // 中档：根茎与花穗类药材
+  danggui:     { id: "danggui",     name: "当归",     seedPrice: 0, sellPrice: 112, yields: 1, growMs: 230_000, unlockLevel: 1, xp: 22, body: 0xdad2b4, leaf: 0x6f9b50, herb: true },
+  huangqi:     { id: "huangqi",     name: "黄芪",     seedPrice: 0, sellPrice: 102, yields: 1, growMs: 220_000, unlockLevel: 1, xp: 21, body: 0xf0e2a0, leaf: 0x74a04e, herb: true },
+  gancao:      { id: "gancao",      name: "甘草",     seedPrice: 0, sellPrice: 90,  yields: 1, growMs: 200_000, unlockLevel: 1, xp: 19, body: 0xc9a6e0, leaf: 0x7aa352, herb: true },
+  danshen:     { id: "danshen",     name: "丹参",     seedPrice: 0, sellPrice: 95,  yields: 1, growMs: 210_000, unlockLevel: 1, xp: 20, body: 0xb03a5a, leaf: 0x5f8f48, herb: true },
+  chuanxiong:  { id: "chuanxiong",  name: "川芎",     seedPrice: 0, sellPrice: 95,  yields: 1, growMs: 210_000, unlockLevel: 1, xp: 20, body: 0xf2efe0, leaf: 0x6e9a55, herb: true },
+  baishao:     { id: "baishao",     name: "白芍",     seedPrice: 0, sellPrice: 120, yields: 1, growMs: 240_000, unlockLevel: 1, xp: 23, body: 0xf3e6ea, leaf: 0x5d8f47, herb: true },
+  huanglian:   { id: "huanglian",   name: "黄连",     seedPrice: 0, sellPrice: 100, yields: 1, growMs: 220_000, unlockLevel: 1, xp: 21, body: 0xe8d070, leaf: 0x5c8f45, herb: true },
+  huangqin:    { id: "huangqin",    name: "黄芩",     seedPrice: 0, sellPrice: 90,  yields: 1, growMs: 205_000, unlockLevel: 1, xp: 19, body: 0x9a7ad0, leaf: 0x6b9a50, herb: true },
+  chaihu:      { id: "chaihu",      name: "柴胡",     seedPrice: 0, sellPrice: 86,  yields: 1, growMs: 200_000, unlockLevel: 1, xp: 19, body: 0xe8e0a0, leaf: 0x6f9a50, herb: true },
+  fangfeng:    { id: "fangfeng",    name: "防风",     seedPrice: 0, sellPrice: 90,  yields: 1, growMs: 205_000, unlockLevel: 1, xp: 19, body: 0xf0f0e0, leaf: 0x6a9a55, herb: true },
+  duhuo:       { id: "duhuo",       name: "独活",     seedPrice: 0, sellPrice: 96,  yields: 1, growMs: 210_000, unlockLevel: 1, xp: 20, body: 0xe8efe0, leaf: 0x5f8f4a, herb: true },
+  qianghuo:    { id: "qianghuo",    name: "羌活",     seedPrice: 0, sellPrice: 100, yields: 1, growMs: 215_000, unlockLevel: 1, xp: 20, body: 0xf0ead0, leaf: 0x6a9a50, herb: true },
+  baizhi:      { id: "baizhi",      name: "白芷",     seedPrice: 0, sellPrice: 100, yields: 1, growMs: 220_000, unlockLevel: 1, xp: 21, body: 0xf2f0e0, leaf: 0x6f9a55, herb: true },
+  baizhu:      { id: "baizhu",      name: "白术",     seedPrice: 0, sellPrice: 110, yields: 1, growMs: 230_000, unlockLevel: 1, xp: 22, body: 0xe0d4b0, leaf: 0x6f9a50, herb: true },
+  cangzhu:     { id: "cangzhu",     name: "苍术",     seedPrice: 0, sellPrice: 105, yields: 1, growMs: 225_000, unlockLevel: 1, xp: 21, body: 0xd8c890, leaf: 0x7a8f50, herb: true },
+  sharen:      { id: "sharen",      name: "砂仁",     seedPrice: 0, sellPrice: 120, yields: 1, growMs: 230_000, unlockLevel: 1, xp: 22, body: 0xe8d070, leaf: 0x5f8a45, herb: true },
+  lianqiao:    { id: "lianqiao",    name: "连翘",     seedPrice: 0, sellPrice: 80,  yields: 1, growMs: 195_000, unlockLevel: 1, xp: 18, body: 0xf2d050, leaf: 0x5f8f45, herb: true },
+  houpo:       { id: "houpo",       name: "厚朴",     seedPrice: 0, sellPrice: 140, yields: 1, growMs: 250_000, unlockLevel: 1, xp: 24, body: 0xc08a6a, leaf: 0x4f7a3f, herb: true },
+  shihu:       { id: "shihu",       name: "石斛",     seedPrice: 0, sellPrice: 160, yields: 1, growMs: 270_000, unlockLevel: 1, xp: 26, body: 0x9ad0a0, leaf: 0x6a9a50, herb: true },
+  // 珍稀档：年份药材与高山灵草
+  renshen:     { id: "renshen",     name: "人参",     seedPrice: 0, sellPrice: 260, yields: 1, growMs: 340_000, unlockLevel: 1, xp: 34, body: 0xf0e0c0, leaf: 0x4f8a45, herb: true },
+  lingzhi:     { id: "lingzhi",     name: "灵芝",     seedPrice: 0, sellPrice: 220, yields: 1, growMs: 300_000, unlockLevel: 1, xp: 30, body: 0x9c3a2a, leaf: 0x6a4a2e, herb: true },
+  sanqi:       { id: "sanqi",       name: "三七",     seedPrice: 0, sellPrice: 180, yields: 1, growMs: 280_000, unlockLevel: 1, xp: 28, body: 0xd8c49a, leaf: 0x4f8a4a, herb: true },
+  heshouwu:    { id: "heshouwu",    name: "何首乌",   seedPrice: 0, sellPrice: 190, yields: 1, growMs: 290_000, unlockLevel: 1, xp: 29, body: 0x7a4a3a, leaf: 0x5f8f4a, herb: true },
+  wuweizi:     { id: "wuweizi",     name: "五味子",   seedPrice: 0, sellPrice: 170, yields: 1, growMs: 280_000, unlockLevel: 1, xp: 27, body: 0xd03a48, leaf: 0x5a8f45, herb: true },
+  tianma:      { id: "tianma",      name: "天麻",     seedPrice: 0, sellPrice: 200, yields: 1, growMs: 300_000, unlockLevel: 1, xp: 30, body: 0xe8d8b0, leaf: 0x8a7a4a, herb: true },
+  duzhong:     { id: "duzhong",     name: "杜仲",     seedPrice: 0, sellPrice: 150, yields: 1, growMs: 260_000, unlockLevel: 1, xp: 26, body: 0x6f8f5a, leaf: 0x4f7a3a, herb: true },
+  rougui:      { id: "rougui",      name: "肉桂",     seedPrice: 0, sellPrice: 170, yields: 1, growMs: 280_000, unlockLevel: 1, xp: 27, body: 0x9a5a3a, leaf: 0x3f6f3a, herb: true },
+  fuling:      { id: "fuling",      name: "茯苓",     seedPrice: 0, sellPrice: 160, yields: 1, growMs: 270_000, unlockLevel: 1, xp: 26, body: 0xe8e2d0, leaf: 0x8a7a5a, herb: true },
+  shanzhuyu:   { id: "shanzhuyu",   name: "山茱萸",   seedPrice: 0, sellPrice: 150, yields: 1, growMs: 260_000, unlockLevel: 1, xp: 26, body: 0xd03a3a, leaf: 0x5f8f48, herb: true },
+  xuelian:     { id: "xuelian",     name: "雪莲",     seedPrice: 0, sellPrice: 200, yields: 1, growMs: 300_000, unlockLevel: 1, xp: 30, body: 0xf2eee0, leaf: 0x9ab0a0, herb: true },
 };
 
 export const CROP_LIST = Object.values(CROPS);
-/** 商店里能买到种子的作物 */
-export const SHOP_CROPS = CROP_LIST.filter((crop) => !crop.wild);
+/** 商店里能买到种子的作物（野菜与草药都不卖种子） */
+export const SHOP_CROPS = CROP_LIST.filter((crop) => !crop.wild && !crop.herb);
 /** 全部野菜 */
 export const WILD_GREENS = CROP_LIST.filter((crop) => crop.wild);
+/** 全部草药 */
+export const HERB_LIST = CROP_LIST.filter((crop) => crop.herb);
 
 export function harvestKey(id: CropId, mutation: Mutation | null): string {
   return mutation ? `${id}:${mutation}` : id;
 }
 
-/** 阴阳/长生只属于野菜，元素/精灵只属于普通作物；脏存档里的错配一律丢弃 */
+/** 三类作物各用各的变异池：草药五行/仙品/神品，野菜阴阳/长生，普通作物元素/精灵 */
 export function cropMutationValid(id: CropId, mutation: Mutation | null): boolean {
   if (!mutation) return true;
-  return Boolean(CROPS[id].wild) === isWildMutation(mutation);
+  const def = CROPS[id];
+  if (def.herb) return isHerbMutation(mutation);
+  if (def.wild) return isWildMutation(mutation);
+  return !isWildMutation(mutation) && !isHerbMutation(mutation);
 }
 
 export function produceName(crop: CropDef, mutation: Mutation | null): string {

@@ -1,4 +1,4 @@
-import { WILD_GREENS, type CropId } from "./crops";
+import { CROPS, HERB_LIST, WILD_GREENS, type CropId } from "./crops";
 import { pickWildMutation, type WildMutation } from "./weather";
 
 /**
@@ -10,6 +10,10 @@ export const FORAGE_ROTATION_MS = 10 * 60_000;
 export const FORAGE_PATCH_COUNT = 28;
 /** 每次采摘掉种子的概率 */
 export const FORAGE_SEED_CHANCE = 0.35;
+/** 草药丛占野外菜丛比例，草药掉种子的概率与经验略高 */
+export const HERB_PATCH_SHARE = 0.4;
+export const HERB_SEED_CHANCE = 0.45;
+export const HERB_FORAGE_XP = 6;
 /** 采到野菜给的经验 */
 export const FORAGE_XP = 4;
 /** 野外菜丛自带变异的概率（阴阳/长生，级别同播种抽签） */
@@ -50,7 +54,7 @@ export function forageEndsAt(now: number): number {
 let lastRotation = -1;
 let patches: WildPatch[] = [];
 
-/** 同一轮内返回同一批菜丛；野菜品种不够时洗第二遍补齐，约一成自带阴阳/长生变异。 */
+/** 同一轮内返回同一批菜丛；野菜与草药混排，草药约占四成，野菜可能自带阴阳/长生变异。 */
 export function wildPatchesAt(now: number): readonly WildPatch[] {
   const rotation = forageRotationAt(now);
   if (rotation === lastRotation) return patches;
@@ -61,19 +65,26 @@ export function wildPatchesAt(now: number): readonly WildPatch[] {
     value = Math.imul(value ^ (value >>> 15), 0x735a2d97);
     return ((value ^ (value >>> 15)) >>> 0) / 0x100000000;
   };
-  const greens = WILD_GREENS.map((crop) => crop.id);
-  const picks: CropId[] = [];
-  while (picks.length < FORAGE_PATCH_COUNT) {
-    const round = greens.slice();
-    for (let i = round.length - 1; i > 0; i--) {
+  const shuffle = <T>(list: T[]) => {
+    for (let i = list.length - 1; i > 0; i--) {
       const j = Math.floor(next() * (i + 1));
-      [round[i], round[j]] = [round[j], round[i]];
+      [list[i], list[j]] = [list[j], list[i]];
     }
-    picks.push(...round);
-  }
+    return list;
+  };
+  const fill = (ids: CropId[], count: number) => {
+    const picked: CropId[] = [];
+    while (picked.length < count) picked.push(...shuffle(ids.slice()));
+    return picked.slice(0, count);
+  };
+  const herbCount = Math.round(FORAGE_PATCH_COUNT * HERB_PATCH_SHARE);
+  const picks = shuffle([
+    ...fill(HERB_LIST.map((crop) => crop.id), herbCount),
+    ...fill(WILD_GREENS.map((crop) => crop.id), FORAGE_PATCH_COUNT - herbCount),
+  ]);
   patches = picks.slice(0, FORAGE_PATCH_COUNT).map((crop, slot) => {
-    // 用独立序列抽变异，保证菜丛品种与变异互不串扰
-    const mutation = next() < FORAGE_MUTATION_CHANCE ? pickWildMutation(next) : null;
+    // 草药丛不带变异，避免与野菜的阴阳/长生特效混线；变异留给播种抽签
+    const mutation = !CROPS[crop].herb && next() < FORAGE_MUTATION_CHANCE ? pickWildMutation(next) : null;
     return { id: `forage-${rotation}-${slot}`, slot, crop, mutation };
   });
   lastRotation = rotation;

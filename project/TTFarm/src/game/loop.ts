@@ -13,6 +13,9 @@ import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
 import { WORLD_HALF } from "../scene/layout";
 import { ranchBounds } from "../scene/ranchLayout";
+import { createChatBubble } from "../scene/chatBubble";
+import { bubbleText } from "./chat";
+import { useAccount } from "./account";
 import { setLocalPresence, useSocial } from "./social";
 import { useAction } from "./actionStore";
 import { ACTIONS, ACTION_IDS, isActionId } from "../scene/actionMotion";
@@ -62,6 +65,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   };
   const player = new Player(initial.avatarId, world.obstacles, fieldHeightAt, initial.outfitId, initial.bottomId);
   view.scene.add(player.root);
+  const localBubble = createChatBubble();
+  localBubble.sprite.position.set(0, 1.86, 0);
+  player.root.add(localBubble.sprite);
   const peers = createFarmPeers(world.obstacles, fieldHeightAt, ranchScene.animalLibrary);
   view.scene.add(peers.group);
   const horseTrail = createHorseTrail();
@@ -294,6 +300,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       spectatorFocus.z = THREE.MathUtils.clamp(spectatorFocus.z, -WORLD_HALF, WORLD_HALF);
     } else {
       player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running);
+      const selfId = String(useAccount.getState().user?.id ?? "");
+      localBubble.set(selfId ? bubbleText(selfId) : null);
+      localBubble.tick(nowMs);
       const currentAction = player.currentAction;
       if (useAction.getState().current !== currentAction) useAction.setState({ current: currentAction });
       if (elapsed >= nextPresence) {
