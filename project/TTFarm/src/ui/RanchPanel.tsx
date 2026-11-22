@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { CROPS, harvestLots } from "../game/crops";
 import { animalName, animalValue, ANIMALS, ANIMAL_ELEMENTS, baitCount, HORSE_SPEED_FACTOR, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, RANCH_MAX_LEVEL, type AnimalSpecies, type RanchAnimal, type WildAnimal } from "../game/ranch";
+import { MEAT_YIELD, meatName } from "../game/market";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { useGame } from "../game/state";
 import { CloseIcon, CoinIcon } from "./icons";
@@ -95,9 +96,11 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
   const setRiding = useGame((s) => s.setRiding);
   const release = useGame((s) => s.releaseAnimal);
   const sell = useGame((s) => s.sellAnimal);
+  const butcher = useGame((s) => s.butcherAnimal);
   const [tab, setTab] = useState<"pasture" | "stable">("pasture");
   const [releasing, setReleasing] = useState<string | null>(null);
   const [selling, setSelling] = useState<string | null>(null);
+  const [butchering, setButchering] = useState<string | null>(null);
   const hasStable = ranch.level >= MOUNT_UNLOCK_LEVEL;
   const stable = hasStable ? ranch.animals.filter(isMountAnimal) : [];
   const residents = tab === "stable" ? stable : ranch.animals.filter((animal) => !hasStable || !isMountAnimal(animal));
@@ -145,6 +148,11 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
             {selling === animal.id ? <div className="resident-actions">
               <button className="btn mini danger" onClick={() => { sell(animal.id); setSelling(null); }}>确认卖出 +{animalValue(animal)}</button>
               <button className="btn mini" onClick={() => setSelling(null)}>取消</button>
+            </div> : butchering === animal.id ? <div className="resident-actions">
+              <button className="btn mini" onClick={() => { butcher(animal.id); setButchering(null); }}>
+                确认出栏 {meatName(animal.species, animal.element)}×{MEAT_YIELD}
+              </button>
+              <button className="btn mini" onClick={() => setButchering(null)}>取消</button>
             </div> : releasing === animal.id ? <div className="resident-actions">
               <button className="btn mini" onClick={() => { release(animal.id); setReleasing(null); }}>确认放归</button>
               <button className="btn mini" onClick={() => setReleasing(null)}>取消</button>
@@ -153,9 +161,11 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
                 if (ranch.ridingId === animal.id) setRiding(null);
                 else if (setRiding(animal.id)) onClose();
               }}>{ranch.ridingId === animal.id ? "下坐骑" : "骑乘"}</button>}
-              <button className="sell-button" onClick={() => { setSelling(animal.id); setReleasing(null); }}
+              <button className="sell-button" onClick={() => { setSelling(animal.id); setReleasing(null); setButchering(null); }}
                 aria-label={`卖出${animalName(animal)}，可得 ${animalValue(animal)} 金币`}>卖出</button>
-              <button className="release-button" onClick={() => { setReleasing(animal.id); setSelling(null); }} aria-label={`放归${animalName(animal)}`}>放归</button>
+              <button className="butcher-button" onClick={() => { setButchering(animal.id); setSelling(null); setReleasing(null); }}
+                aria-label={`${animalName(animal)}出栏，得到${meatName(animal.species, animal.element)}`}>出栏</button>
+              <button className="release-button" onClick={() => { setReleasing(animal.id); setSelling(null); setButchering(null); }} aria-label={`放归${animalName(animal)}`}>放归</button>
             </div>}
           </li>)}</ul>}
     </section>

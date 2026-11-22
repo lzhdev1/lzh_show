@@ -183,6 +183,20 @@ export class WorldObstacles {
     return this.trace(a.x, a.z, b.x-a.x, b.z-a.z, layer).time === 1;
   }
 
+  /**
+   * 大半径占位检测：中心 + 圆周 8 点。给车辆用，避免只用一个点就穿过墙角。
+   * 圆形近似比车辆包围盒稍保守，但驾驶时不会明显卡顿。
+   */
+  canOccupy(x: number, z: number, radius: number, layer: CollisionLayer = "terrain"): boolean {
+    if (Math.abs(x) > WORLD_HALF || Math.abs(z) > WORLD_HALF) return false;
+    if (this.blocked(x, z, layer)) return false;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      if (this.blocked(x + Math.cos(a) * radius, z + Math.sin(a) * radius, layer)) return false;
+    }
+    return true;
+  }
+
   /** Mutates only desired.x/z. The unused displacement slides along the contact;
    * subsequent sweeps stop a slide at a second wall or at a concave corner. */
   move(from: Point, desired: Point, layer: CollisionLayer = "terrain") {

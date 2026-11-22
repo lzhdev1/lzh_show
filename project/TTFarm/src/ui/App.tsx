@@ -22,6 +22,9 @@ import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
 import { FarmGuests, VisitHUD } from "./VisitHUD";
 import { ChatDock } from "./ChatDock";
+import { MarketPanel } from "./MarketPanel";
+import { CarStorePanel } from "./CarStorePanel";
+import { TownHUD } from "./TownHUD";
 import "./social.css";
 
 export function App() {
@@ -48,6 +51,8 @@ export function App() {
   const [rankingOpen, setRankingOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [codexOpen, setCodexOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [carStoreOpen, setCarStoreOpen] = useState(false);
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   useEffect(() => startChatSync(), []);
@@ -56,6 +61,7 @@ export function App() {
     if (!away && token) return;
     setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
     setProfileOpen(false); setFarmOpen(false); setRanchOpen(false); setCodexOpen(false);
+    setMarketOpen(false); setCarStoreOpen(false);
   }, [away, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
@@ -72,13 +78,13 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
-  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen);
+  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen || marketOpen || carStoreOpen);
   useEffect(() => {
     if (!panelOpen) return;
     const dismiss = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return;
       setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
-      setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false);
+      setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false); setMarketOpen(false); setCarStoreOpen(false);
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -182,6 +188,7 @@ export function App() {
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
         <ForageHUD />
+        <TownHUD onOpenMarket={() => setMarketOpen(true)} onOpenCarStore={() => setCarStoreOpen(true)} />
       </>}
 
       <div className="dock">
@@ -220,6 +227,8 @@ export function App() {
 
       {!panelOpen && <PlotSheet onOpenFarm={() => setFarmOpen(true)} />}
       {shopOpen && <ShopPanel onClose={() => setShopOpen(false)} />}
+      {marketOpen && <MarketPanel onClose={() => setMarketOpen(false)} />}
+      {carStoreOpen && <CarStorePanel onClose={() => setCarStoreOpen(false)} />}
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {farmOpen && <FarmPanel onClose={() => setFarmOpen(false)} />}
       {ranchOpen && <RanchPanel onClose={() => setRanchOpen(false)} />}

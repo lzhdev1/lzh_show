@@ -12,6 +12,7 @@ import type { FarmDecor } from "../game/decor";
 import { WorldObstacles } from "./obstacles";
 import { onRanchReserve } from "./ranchLayout";
 import { inTown } from "./town/townLayout";
+import { inSalesHallGround } from "./salesHallLayout";
 import { PALETTE, clay } from "./materials";
 import {
   BRIDGE,
@@ -106,6 +107,8 @@ function createDustMotes(): { points: THREE.Points; update: (t: number) => void 
 
 /** 四边的大山：贴着方形地图的四条边摆一圈，正门方向（+z 边）留一道山口 */
 function buildMountains(obstacles: WorldObstacles): THREE.Group {
+  // 东侧山脚原本伸到 x≈124，会把河东大城最东一排压住，这里把东边整条山脊后退 34m
+  const EAST_MOUNTAIN_PUSH = 34;
   const group = new THREE.Group();
   const PER_SIDE = 12;
   const ridges = new Map<string, THREE.Group>();
@@ -139,7 +142,8 @@ function buildMountains(obstacles: WorldObstacles): THREE.Group {
         x = along;
         z = -MOUNTAIN_LINE - jitter;
       } else if (side === 1) {
-        x = MOUNTAIN_LINE + jitter;
+        // 河东大城铺到 x140，东侧山脊要整体后退，山脚不能再压进街区
+        x = MOUNTAIN_LINE + EAST_MOUNTAIN_PUSH + jitter;
         z = along;
       } else if (side === 2) {
         x = along;
@@ -164,7 +168,7 @@ function buildMountains(obstacles: WorldObstacles): THREE.Group {
     [-1, 1],
     [-1, -1],
   ] as Array<[number, number]>).forEach(([sx, sz]) => {
-    place(sx * MOUNTAIN_LINE, sz * MOUNTAIN_LINE, 0);
+    place(sx * MOUNTAIN_LINE + (sx === 1 ? EAST_MOUNTAIN_PUSH : 0), sz * MOUNTAIN_LINE, 0);
   });
 
   for (const ridge of ridges.values()) {
@@ -220,7 +224,10 @@ function buildRoad(points = ROAD_POINTS, halfWidth = ROAD_HALF_WIDTH): THREE.Mes
   mesh.receiveShadow = true;
   return mesh;
 }
-/** 过河的桥：桥面 + 横铺木条 + 两端坡道 + 栏杆 + 桥桩 */
+/**
+ * 过河的水泥桥：混凝土桥面 + 伸缩缝 + 两侧人行道 + 混凝土基座金属护栏
+ * + 桥墩 + 四角桥灯。桥面仍由 BRIDGE / bridgeHeightAt 驱动行走高度。
+ */
 function buildBridge(obstacles: WorldObstacles): THREE.Group {
   const group = new THREE.Group();
   group.position.set(BRIDGE.x, 0, BRIDGE.z);
@@ -230,41 +237,52 @@ function buildBridge(obstacles: WorldObstacles): THREE.Group {
   const halfLen = BRIDGE.halfLength;
   const halfWid = BRIDGE.halfWidth;
   const deckY = BRIDGE.deckY;
+  const concrete = 0xbdb8ac;
+  const concreteDark = 0x9a9589;
+  const concreteLight = 0xd3cdbf;
 
+  // 主桥面：一整块混凝土板，伸缩缝与防滑槽都在上面
   const deck = new THREE.Mesh(
-    new RoundedBoxGeometry(halfWid * 2, 0.2, halfLen * 2, 3, 0.06),
-    clay(PALETTE.wood, { roughness: 0.9 })
+    new RoundedBoxGeometry(halfWid * 2, 0.5, halfLen * 2, 3, 0.06),
+    clay(concrete, { roughness: 0.96 })
   );
-  deck.position.y = deckY - 0.135;
+  deck.position.y = deckY - 0.25;
   deck.castShadow = true;
   deck.receiveShadow = true;
-  // 桥面要能被点击选中，否则点到桥上会打穿到桥下的地面，目标点落回自己脚下
   deck.name = "bridge-deck";
   group.add(deck);
 
-  // Keep the structural details in one batch and the deck as a separate ray target.
   const framing = new THREE.Group();
-  const boardCount = 29;
-  const pitch = halfLen * 2 / boardCount;
-  const boards = [0xb68b64, 0xc89c72, 0xb99370, 0xd0ab7e, 0xc59b74];
-  for (let i = 0; i < boardCount; i++) {
-    const z = -halfLen + (i + 0.5) * pitch;
-    const slat = new THREE.Mesh(
-      new THREE.BoxGeometry(halfWid * 2 + Math.sin(i * 5) * 0.075, 0.095, pitch - 0.026),
-      clay(boards[(i * 7) % boards.length])
-    );
-    slat.position.set(0, deckY - 0.047, z);
-    framing.add(slat);
+
+  // 桥面伸缩缝：横向细缝，沿桥长每 3.2m 一道
+  for (let z = -halfLen + 3.2; z < halfLen - 0.6; z += 3.2) {
+    const joint = new THREE.Mesh(new THREE.BoxGeometry(halfWid * 2 - 0.08, 0.018, 0.09), clay(0x77736b));
+    joint.position.set(0, deckY + 0.008, z);
+    framing.add(joint);
   }
 
-  // 两端坡道：把桥面接到地面，别让桥板看上去漂在草上
+  // 两侧人行道：比车道高 5cm，边缘一条深色路缘
+  for (const side of [-1, 1]) {
+    const walk = new THREE.Mesh(
+      new THREE.BoxGeometry(0.78, 0.1, halfLen * 2 - 0.1),
+      clay(concreteLight, { roughness: 0.95 })
+    );
+    walk.position.set(side * (halfWid - 0.39), deckY + 0.05, 0);
+    walk.receiveShadow = true;
+    framing.add(walk);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, halfLen * 2 - 0.1), clay(concreteDark));
+    curb.position.set(side * (halfWid - 0.86), deckY + 0.09, 0);
+    framing.add(curb);
+  }
+
+  // 两端坡道：混凝土斜坡接草地
   [-1, 1].forEach((sign) => {
     const rampLen = BRIDGE.rampLength;
     const ramp = new THREE.Mesh(
-      new RoundedBoxGeometry(halfWid * 2 - 0.24, 0.16, rampLen, 3, 0.05),
-      clay(0xb79470)
+      new RoundedBoxGeometry(halfWid * 2 - 0.12, 0.22, rampLen, 2, 0.04),
+      clay(concrete, { roughness: 0.97 })
     );
-    ramp.position.set(0, deckY * 0.5 - 0.075, sign * (halfLen + rampLen / 2 - 0.12));
+    ramp.position.set(0, deckY * 0.5 - 0.11, sign * (halfLen + rampLen / 2 - 0.1));
     ramp.rotation.x = sign * Math.atan2(deckY, rampLen);
     ramp.castShadow = true;
     ramp.receiveShadow = true;
@@ -272,46 +290,65 @@ function buildBridge(obstacles: WorldObstacles): THREE.Group {
     group.add(ramp);
   });
 
-  // 栏杆：两侧各五根立柱 + 两根横杆，顺桥面通长
-  [-1, 1].forEach((side) => {
-    const railX = side * (halfWid - 0.18);
+  // 护栏：混凝土基座 + 金属立柱 + 两道横杆，两侧通长
+  const metal = clay(0x58605f, { roughness: 0.55, metalness: 0.35 });
+  for (const side of [-1, 1]) {
+    const railX = side * (halfWid - 0.14);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.42, halfLen * 2 - 0.1), clay(concreteLight));
+    base.position.set(railX, deckY + 0.24, 0);
+    base.castShadow = true;
+    framing.add(base);
+
     const railCenter = group.localToWorld(new THREE.Vector3(railX, 0, 0));
-    obstacles.addBox(railCenter.x, railCenter.z, 0.13, halfLen - 0.02, group.rotation.y, "deck");
-    [-1, -0.5, 0, 0.5, 1].forEach((t) => {
-      const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.095, 0.13, 1.14, 8),
-        clay(0x8d6853)
-      );
-      post.position.set(railX, deckY + 0.5, t * (halfLen - 0.15));
+    obstacles.addBox(railCenter.x, railCenter.z, 0.2, halfLen - 0.02, group.rotation.y, "deck");
+
+    for (let i = 0; i < 7; i++) {
+      const t = -1 + (i / 6) * 2;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.86, 0.1), metal);
+      post.position.set(railX, deckY + 0.84, t * (halfLen - 0.25));
       post.castShadow = true;
       framing.add(post);
-    });
-    [0.62, 0.98].forEach((h) => {
-      const rail = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.05, halfLen * 1.94, 8),
-        clay(0xab8968)
-      );
-      rail.rotation.x = Math.PI / 2;
+    }
+    [0.72, 1.14].forEach((h) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.075, halfLen * 1.92), metal);
       rail.position.set(railX, deckY + h, 0);
       rail.castShadow = true;
       framing.add(rail);
     });
-  });
+  }
 
-  // 桥桩：四根斜插进水里
+  // 桥墩：两排混凝土墩从河床穿出水面，托住整块桥面
   [-1, 1].forEach((side) => {
     [-1, 1].forEach((sign) => {
-      const bottom = RIVER_BED.bedY - .15;
-      const pile = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.15, 0.21, deckY - bottom, 8),
-        clay(0x8d6853)
+      const bottom = RIVER_BED.bedY - 0.2;
+      const pier = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.56, deckY - 0.4 - bottom, 14),
+        clay(0xa39d90, { roughness: 0.98 })
       );
-      pile.position.set(side * (halfWid - 0.5), (deckY + bottom) * .5, sign * halfLen * 0.55);
-      const pileCenter = group.localToWorld(pile.position.clone());
-      obstacles.addCircle(pileCenter.x, pileCenter.z, 0.21, "terrain");
-      framing.add(pile);
+      pier.position.set(side * 2.05, (deckY - 0.4 + bottom) * 0.5, sign * 4.4);
+      pier.castShadow = true;
+      const center = group.localToWorld(pier.position.clone());
+      obstacles.addCircle(center.x, center.z, 0.46, "terrain");
+      framing.add(pier);
     });
   });
+
+  // 四角桥灯：混凝土灯柱 + 暖白灯罩
+  const lampGlow = new THREE.MeshBasicMaterial({ color: 0xffe8b8 });
+  const lampGeo = new THREE.SphereGeometry(0.16, 10, 7);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * (halfWid - 0.42), z = sz * (halfLen - 1.1);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.0, 8), clay(concreteDark));
+    post.position.set(x, deckY + 1.5, z);
+    post.castShadow = true;
+    framing.add(post);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 10), clay(concrete));
+    cap.position.set(x, deckY + 3.0, z);
+    framing.add(cap);
+    const lamp = new THREE.Mesh(lampGeo, lampGlow);
+    lamp.position.set(x, deckY + 3.16, z);
+    group.add(lamp);
+  }
 
   group.add(bakeScenery(framing));
   return group;
@@ -491,6 +528,8 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
     if (roadInfo(x, z) < ROAD_HALF_WIDTH + 1.6) return true;
     // 河东小城整块留空，树石草丛不进城
     if (inTown(x, z)) return true;
+    // 河岸售货大厅与门口硬化区也不许长树
+    if (inSalesHallGround(x, z)) return true;
     return false;
   };
 

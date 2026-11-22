@@ -1,25 +1,45 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TownBuilder, addBench, addGardenTree, addLampPost, addTreePlanter, buildMidrise, buildShop, buildTower } from "./townBuild";
 import { createDealership } from "./townDealership";
+import { buildConvenienceStore } from "./townStores";
 import { createTownLife } from "./townLife";
 import { createTownRoads, SIGNAL_POLES } from "./townRoads";
-import { disposeTownMaterials, lampGlow, signMaterial, signTexture } from "./townMaterials";
-import { DEALERSHIP, MIDRISES, POCKET_PARK, SHOPS, TOWERS, WALK, type TownFace } from "./townLayout";
+import { disposeTownMaterials, lampGlow, signMaterial, signTexture, townGlass, townInk, townSolid } from "./townMaterials";
+import { MIDRISES, POCKET_PARK, SHOPS, TOWERS, WALK, AVENUES, CROSSES, INTERSECTIONS, type TownFace } from "./townLayout";
 import type { WorldObstacles } from "../obstacles";
 
 const faceYaw: Record<TownFace, number> = { "+z": 0, "-z": Math.PI, "+x": Math.PI / 2, "-x": -Math.PI / 2 };
 
-const LAMPS: Array<[number, number]> = [
-  [48, WALK.avenueSouthZ], [62, WALK.avenueSouthZ], [90, WALK.avenueSouthZ],
-  [104, WALK.avenueSouthZ], [118, WALK.avenueSouthZ],
-  [48, WALK.avenueNorthZ], [62, WALK.avenueNorthZ], [96, WALK.avenueNorthZ], [110, WALK.avenueNorthZ],
-  [WALK.crossWestX, 30], [WALK.crossWestX, 68], [WALK.crossWestX, 84],
-  [WALK.crossEastX, 30], [WALK.crossEastX, 68], [WALK.crossEastX, 84],
-];
+/** 沿四条主路的人行道均匀布灯，路口区间自动跳过 */
+const LAMPS: Array<[number, number]> = (() => {
+  const list: Array<[number, number]> = [];
+  const nearIntersection = (x: number, z: number) =>
+    INTERSECTIONS.some(i => Math.abs(x - i.cross.x) < i.cross.half + 4 && Math.abs(z - i.avenue.z) < i.avenue.half + 4);
+  for (const a of AVENUES) {
+    for (const z of [a.z - a.half - 1, a.z + a.half + 1]) {
+      for (let x = a.x0 + 6; x <= a.x1 - 4; x += 14) {
+        if (!nearIntersection(x, z)) list.push([x, z]);
+      }
+    }
+  }
+  for (const c of CROSSES) {
+    for (const x of [c.x - c.half - 1, c.x + c.half + 1]) {
+      for (let z = c.z0 + 7; z <= c.z1 - 4; z += 16) {
+        if (!nearIntersection(x, z)) list.push([x, z]);
+      }
+    }
+  }
+  return list;
+})();
 
 const TREES: Array<[number, number]> = [
   [WALK.crossWestX, 24.8], [WALK.crossEastX, 24.8],
   [WALK.crossWestX, 93.4], [WALK.crossEastX, 93.4],
+  [WALK.eastWestX, 24.8], [WALK.eastEastX, 24.8],
+  [WALK.eastWestX, 93.4], [WALK.eastEastX, 93.4],
+  [WALK.crossWestX, 135.2], [WALK.crossEastX, 135.2],
+  [WALK.eastWestX, 135.2], [WALK.eastEastX, 135.2],
 ];
 
 /** 街区内部绿化：只落在铺装边缘、店面背后，不挡门头 */
@@ -28,11 +48,68 @@ const PLAZA_TREES: Array<[number, number]> = [
   [119, 65], [118.4, 84], [118.4, 43],
   [45.5, 37.5], [67.5, 29],
   [118.5, 66.5], [118.5, 74],
+  [47, 96], [66, 94], [110, 94], [118, 92],
+  [47, 128], [76, 134], [88, 128], [119, 134],
+  [132.5, 28], [132.5, 50], [132.5, 96], [132.5, 120],
 ];
 
 const BENCHES: Array<[number, number, number]> = [
   [47.4, 58.8, Math.PI], [73.2, 58.8, Math.PI], [88.6, 58.8, Math.PI], [117.4, 58.8, Math.PI],
+  [48.5, 103.2, 0], [66, 103.2, 0], [90, 103.2, 0], [112, 103.2, 0],
+  [132.2, 62, Math.PI / 2], [132.2, 86, Math.PI / 2],
 ];
+
+/** 把整城建筑的实心/玻璃/墨线各并成一张网格；每栋只剩招牌等少量独立网格 */
+function mergeBuildingShells(group: THREE.Group, roots: THREE.Object3D[]) {
+  group.updateMatrixWorld(true);
+  const solids: THREE.BufferGeometry[] = [];
+  const glasses: THREE.BufferGeometry[] = [];
+  const inks: THREE.BufferGeometry[] = [];
+  const oldGeometries: THREE.BufferGeometry[] = [];
+  for (const root of roots) {
+    root.updateMatrixWorld(true);
+    const remove: THREE.Object3D[] = [];
+    root.traverse(node => {
+      if (node instanceof THREE.Mesh && (node.material === townSolid || node.material === townGlass)) {
+        const geo = node.geometry.clone().applyMatrix4(node.matrixWorld);
+        (node.material === townSolid ? solids : glasses).push(geo);
+        oldGeometries.push(node.geometry);
+        remove.push(node);
+      } else if (node instanceof THREE.LineSegments && node.material === townInk) {
+        const geo = node.geometry.clone().applyMatrix4(node.matrixWorld);
+        inks.push(geo);
+        oldGeometries.push(node.geometry);
+        remove.push(node);
+      }
+    });
+    remove.forEach(node => node.removeFromParent());
+  }
+  for (const geo of oldGeometries) geo.dispose();
+
+  const addStatic = (parts: THREE.BufferGeometry[], kind: "solid" | "glass" | "ink") => {
+    if (!parts.length) return;
+    const merged = mergeGeometries(parts);
+    parts.forEach(geo => geo.dispose());
+    if (!merged) return;
+    if (kind === "ink") {
+      const edges = new THREE.LineSegments(merged, townInk);
+      edges.renderOrder = 1;
+      edges.name = "town-merged-ink";
+      group.add(edges);
+      return;
+    }
+    const mesh = new THREE.Mesh(merged, kind === "solid" ? townSolid : townGlass);
+    mesh.castShadow = kind === "solid";
+    mesh.receiveShadow = kind === "solid";
+    mesh.name = kind === "solid" ? "town-merged-solid" : "town-merged-glass";
+    group.add(mesh);
+  };
+  addStatic(solids, "solid");
+  addStatic(glasses, "glass");
+  addStatic(inks, "ink");
+}
+
+
 
 export interface Town {
   group: THREE.Group;
@@ -47,20 +124,35 @@ export function createTown(obstacles: WorldObstacles): Town {
   const roads = createTownRoads();
   group.add(roads.group);
 
+  const buildingRoots: THREE.Object3D[] = [];
   for (const def of TOWERS) {
-    group.add(buildTower(def));
-    obstacles.addBox(def.x, def.z, def.w / 2, def.d / 2, 0);
+    const root = buildTower(def);
+    buildingRoots.push(root);
+    group.add(root);
+    obstacles.addBox(def.x, def.z, def.w / 2, def.d / 2, faceYaw[def.face]);
   }
   for (const def of MIDRISES) {
-    group.add(buildMidrise(def));
+    const root = buildMidrise(def);
+    buildingRoots.push(root);
+    group.add(root);
     obstacles.addBox(def.x, def.z, def.w / 2, def.d / 2, faceYaw[def.face]);
   }
   for (const def of SHOPS) {
-    group.add(buildShop(def));
-    obstacles.addBox(def.x, def.z, def.w / 2, def.d / 2, faceYaw[def.face]);
+    if (def.enterable === "mart24") {
+      const root = buildConvenienceStore(def, obstacles);
+      buildingRoots.push(root);
+      group.add(root);
+    } else {
+      const root = buildShop(def);
+      buildingRoots.push(root);
+      group.add(root);
+      obstacles.addBox(def.x, def.z, def.w / 2, def.d / 2, faceYaw[def.face]);
+    }
   }
-  group.add(createDealership());
-  obstacles.addBox(DEALERSHIP.x, DEALERSHIP.z, DEALERSHIP.w / 2, DEALERSHIP.d / 2, 0);
+  const dealer = createDealership(obstacles);
+  buildingRoots.push(dealer);
+  group.add(dealer);
+  mergeBuildingShells(group, buildingRoots);
 
   // —— 街道家具 ——
   const props = new TownBuilder();
@@ -105,9 +197,14 @@ export function createTown(obstacles: WorldObstacles): Town {
   garden(92, 83, 7, 9, [[90.6, 81.5], [93.6, 85.4]]);
   garden(101, 33, 7, 9, [[99.6, 31], [102.4, 35.4]]);
   garden(62, 30, 9, 6, [[59.8, 30], [64.4, 29.2]]);
+  garden(70, 135, 8, 5, [[67, 134], [72.5, 136.5]]);
+  garden(116, 134, 7, 5, [[113.5, 133], [118, 136]]);
+  garden(136, 128, 5, 7, [[136, 128]]);
   addBench(props, 92, 78.4, 0);
   addBench(props, 101, 28.4, 0);
   addBench(props, 62, 26.7, 0);
+  addBench(props, 70, 131.8, 0);
+  addBench(props, 116, 130.8, 0);
   for (const [x, z, ry] of BENCHES) addBench(props, x, z, ry);
   addBench(props, 47.2, 44.6, Math.PI);
   addBench(props, 73.2, 44.6, Math.PI);

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
+import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestLots, harvestValue, levelFromXp, produceName } from "./crops";
 import { isMutation, isRainy, rollHerbMutation, rollMutation, rollWildMutation, weatherAt } from "./weather";
 import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
@@ -9,6 +9,8 @@ import { normalizeRanch, type RanchState } from "./ranch";
 import { createRanchActions, type RanchActions } from "./ranchActions";
 import { normalizeForage, type ForageState } from "./forage";
 import { createForageActions, type ForageActions } from "./forageActions";
+import { meatLots, normalizeMeat } from "./market";
+import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
@@ -37,6 +39,8 @@ interface GameData {
   plots: PlotState[];
   seeds: Record<CropId, number>;
   harvest: Record<string, number>;
+  meat: Record<string, number>;
+  garage: GarageState;
   nickname: string;
   avatarId: AvatarId;
   outfitId: OutfitId;
@@ -55,6 +59,14 @@ interface GameActions extends RanchActions, ForageActions {
   water: (plotId: number) => void;
   harvestPlot: (plotId: number) => void;
   sellAll: () => void;
+  /** 只卖一种蔬菜/收成，大厅柜台用 */
+  sellProduce: (key: string) => void;
+  /** 卖指定份数的肉品 */
+  sellMeat: (key: string, count?: number) => void;
+  sellAllMeat: () => void;
+  /** 在星野汽车购车；成功扣金币并写入车库 */
+  buyCar: (model: CarModelId, color: number) => boolean;
+  setActiveCar: (id: string | null) => void;
   expand: () => void;
   /** 一次扩建 count 块地（金币不够或没有空地时返回失败原因） */
   expandBy: (count: number) => boolean;
@@ -96,6 +108,8 @@ export function initialData(): GameData {
     plots: makePlots(),
     seeds: { ...emptyRecord(0), radish: 3, cabbage: 2 },
     harvest: emptyRecord(0),
+    meat: {},
+    garage: { cars: [], activeId: null },
     nickname: "农场主",
     avatarId: "xiaosui",
     outfitId: "field",
@@ -259,6 +273,83 @@ export const useGame = create<GameStore>()(
         get().notify(`卖出全部收成，+${total} 金币`);
       },
 
+      sellProduce: (key) => {
+        const lot = harvestLots(get().harvest).find((item) => item.key === key);
+        if (!lot || lot.count <= 0) {
+          get().notify("这一批蔬菜已经卖完了", "warn");
+          return;
+        }
+        const total = lot.price * lot.count;
+        set((s) => ({ coins: s.coins + total, harvest: { ...s.harvest, [key]: 0 } }));
+        get().notify(`卖出${lot.name} ×${lot.count}，+${total} 金币`);
+      },
+
+      sellMeat: (key, count) => {
+        const lot = meatLots(get().meat).find((item) => item.key === key);
+        if (!lot) {
+          get().notify("冷柜里没有这批肉", "warn");
+          return;
+        }
+        const qty = Math.max(1, Math.min(lot.count, Math.trunc(count ?? lot.count)));
+        const total = lot.price * qty;
+        set((s) => {
+          const meat = { ...s.meat };
+          const remain = (meat[key] ?? 0) - qty;
+          if (remain > 0) meat[key] = remain;
+          else delete meat[key];
+          return { coins: s.coins + total, meat };
+        });
+        get().notify(`卖出${lot.name} ×${qty}，+${total} 金币`);
+      },
+
+      sellAllMeat: () => {
+        const lots = meatLots(get().meat);
+        const total = lots.reduce((sum, lot) => sum + lot.price * lot.count, 0);
+        if (total <= 0) {
+          get().notify("冷柜里没有可卖的肉", "warn");
+          return;
+        }
+        set((s) => ({ coins: s.coins + total, meat: {} }));
+        get().notify(`卖出全部肉品，+${total} 金币`);
+      },
+
+      buyCar: (modelId, color) => {
+        const model = CAR_MODELS.find((m) => m.id === modelId);
+        if (!model) return false;
+        const { coins, garage, notify } = get();
+        if (garage.cars.length >= 6) {
+          notify("车库最多停 6 台车，先开一台出去吧", "warn");
+          return false;
+        }
+        if (coins < model.price) {
+          notify(`还差 ${model.price - coins} 金币`, "warn");
+          return false;
+        }
+        const index = garage.cars.length;
+        const car = {
+          id: `car-${Date.now().toString(36)}-${index}`,
+          model: model.id,
+          color: CAR_PAINTS.some((p) => p.hex === color) ? color : CAR_PAINTS[0].hex,
+          plate: newPlate(index),
+          purchasedAt: Date.now(),
+        };
+        set((s) => ({
+          coins: s.coins - model.price,
+          garage: { cars: [...s.garage.cars, car], activeId: car.id },
+        }));
+        notify(`提车成功：${model.name} ${car.plate}`);
+        return true;
+      },
+
+      setActiveCar: (id) => {
+        set((s) => ({
+          garage: {
+            ...s.garage,
+            activeId: id && s.garage.cars.some((c) => c.id === id) ? id : null,
+          },
+        }));
+      },
+
       expand: () => {
         const next = get().plots.find((p) => !p.unlocked);
         if (!next) {
@@ -324,6 +415,8 @@ export const useGame = create<GameStore>()(
         plots: s.plots,
         seeds: s.seeds,
         harvest: s.harvest,
+        meat: s.meat,
+        garage: s.garage,
         nickname: s.nickname,
         avatarId: s.avatarId,
         outfitId: s.outfitId,
@@ -357,6 +450,8 @@ export const useGame = create<GameStore>()(
           plots,
           seeds: { ...base.seeds, ...saved.seeds },
           harvest: { ...base.harvest, ...saved.harvest },
+          meat: normalizeMeat(saved.meat),
+          garage: normalizeGarage(saved.garage),
         };
       },
     }

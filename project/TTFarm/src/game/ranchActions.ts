@@ -1,8 +1,9 @@
 import { harvestLots } from "./crops";
 import { animalName, animalValue, baitCount, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, wildAnimalsAt, type RanchState } from "./ranch";
+import { MEAT_YIELD, meatKey, meatName } from "./market";
 import { setNearbyAnimal, useRanchInteraction } from "./ranchInteraction";
 
-interface RanchData { ranch: RanchState; harvest: Record<string, number>; coins: number }
+interface RanchData { ranch: RanchState; harvest: Record<string, number>; coins: number; meat: Record<string, number> }
 interface RanchContext extends RanchData { notify: (text: string, tone?: "ok" | "warn") => void }
 export interface RanchActions {
   upgradeRanch: () => void;
@@ -10,6 +11,8 @@ export interface RanchActions {
   setRiding: (id: string | null) => boolean;
   releaseAnimal: (id: string) => void;
   sellAnimal: (id: string) => void;
+  /** 出栏：动物转为肉品库存，去河岸售货大厅卖 */
+  butcherAnimal: (id: string) => void;
 }
 
 export function createRanchActions(set: (value: Partial<RanchData>) => void, get: () => RanchContext): RanchActions {
@@ -69,6 +72,21 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       set({ coins: coins + value, ranch: { ...ranch, ridingId: ranch.ridingId === id ? null : ranch.ridingId,
         animals: ranch.animals.filter((owned) => owned.id !== id) } });
       notify(`已卖出${animalName(animal)}，+${value} 金币`);
+    },
+    butcherAnimal(id) {
+      const { ranch, meat, notify } = get();
+      const animal = ranch.animals.find((owned) => owned.id === id);
+      if (!animal) return;
+      const key = meatKey(animal.species, animal.element);
+      set({
+        meat: { ...meat, [key]: (meat[key] ?? 0) + MEAT_YIELD },
+        ranch: {
+          ...ranch,
+          ridingId: ranch.ridingId === id ? null : ranch.ridingId,
+          animals: ranch.animals.filter((owned) => owned.id !== id),
+        },
+      });
+      notify(`${animalName(animal)}已出栏，${meatName(animal.species, animal.element)} ×${MEAT_YIELD}`);
     },
   };
 }

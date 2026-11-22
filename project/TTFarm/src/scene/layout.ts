@@ -124,8 +124,8 @@ export const BRIDGE = {
   nz: normal.z,
   /** 桥体沿跨河方向的半长（要比河宽长，两端各搭到岸上） */
   halfLength: 9.6,
-  /** 桥面半宽 */
-  halfWidth: 2.7,
+  /** 桥面半宽：6.8m，两侧各留 0.75m 人行道，车辆可双向通过 */
+  halfWidth: 3.4,
   /** 桥面高度 */
   deckY: 0.62,
   rampLength: 3.0,

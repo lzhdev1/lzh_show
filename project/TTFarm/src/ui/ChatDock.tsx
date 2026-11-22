@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { sendChat, useChat, CHAT_LIMIT } from "../game/chat";
 import { useAccount } from "../game/account";
+import { DriveDock } from "./DriveDock";
 
 function clockOf(at: number) {
   const date = new Date(at);
@@ -72,6 +73,7 @@ export function ChatDock() {
         <button type="button" className="chat-send" disabled={sending || !text.trim()} onClick={() => void submit()}>发送</button>
       </div>
     </section>}
+    <DriveDock />
     <button type="button" className="chat-toggle" aria-expanded={open} aria-label="发言"
       onClick={() => setOpen(value => !value)}>
       <span aria-hidden="true">💬</span><b>发言</b>

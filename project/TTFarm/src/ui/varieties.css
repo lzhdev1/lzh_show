@@ -14,9 +14,51 @@
 .variety-mark.wind { color: #287b6e; }
 .variety-mark.yinyang1, .variety-mark.yinyang2, .variety-mark.yinyang3 { color: #4a4a5e; }
 .variety-mark.longlife1, .variety-mark.longlife2, .variety-mark.longlife3 { color: #2e7d5b; }
+.market-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 6px; }
+.market-tabs button {
+  border: 1px solid #d9cdb6; background: #f6f0e2; color: #6b5b45;
+  border-radius: 12px; padding: 8px 10px; font: inherit; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+}
+.market-tabs button span { font-weight: 400; font-size: .76rem; color: #95856c; }
+.market-tabs button.active { background: #4f6f57; border-color: #4f6f57; color: #fff8e8; }
+.market-tabs button.active span { color: #e4dcc7; }
+.meat-icon { font-size: 1.25rem; display: grid; place-items: center; }
+.market-modal { max-height: 84vh; overflow: auto; }
 .crop-almanac { margin: 10px 0; padding: 10px 12px; background: #f5f1e6; border-radius: 12px; font-size: .85rem; }
 .crop-almanac summary { cursor: pointer; color: #526744; font-weight: 700; }
 .crop-almanac p { line-height: 1.6; margin: 10px 0; }
 .crop-almanac ul { display: flex; flex-wrap: wrap; gap: 5px; padding: 0; margin: 10px 0 0; list-style: none; }
 .crop-almanac li { background: #fffaf0; border: 1px solid #e1d9c5; border-radius: 8px; padding: 3px 7px; }
 .crop-almanac li b { margin-left: 4px; color: #8a6829; }
+
+/* ---------- 星野汽车展厅 ---------- */
+.carstore-modal { max-height: 88vh; overflow: auto; width: min(560px, calc(100vw - 32px)); }
+.paint-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+.paint-name { margin-left: 4px; font-size: .8rem; color: #6d6552; }
+.paint-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #ffffffb3; box-shadow: 0 0 0 1px #00000024; cursor: pointer; }
+.paint-dot.active { outline: 2px solid #4f6f57; outline-offset: 2px; }
+.car-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.car-card {
+  display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; gap: 12px;
+  align-items: center; padding: 10px; border: 1px solid #e2d8c1; border-radius: 16px; background: #fbf7ec;
+}
+.car-preview { position: relative; height: 58px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px #00000014; }
+.car-preview::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 16px; background: #cbbfa8; }
+.car-preview-window { position: absolute; left: 26px; top: 9px; width: 56px; height: 14px; border-radius: 7px 7px 3px 3px; background: #dfeaf0cc; }
+.car-preview-body { position: absolute; left: 10px; right: 10px; bottom: 11px; height: 22px; border-radius: 9px; background: #ffffff2e; box-shadow: inset 0 -4px 0 #0000001c; }
+.car-preview-body.tourer { height: 25px; border-radius: 5px 11px 7px 7px; }
+.car-preview-body.sport { height: 17px; border-radius: 12px 14px 6px 6px; }
+.car-preview-wheel { position: absolute; bottom: 4px; width: 13px; height: 13px; border-radius: 50%; background: #37342f; border: 2px solid #efe7d6; }
+.car-preview-wheel.left { left: 20px; }
+.car-preview-wheel.right { right: 20px; }
+.car-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.car-info strong { font-size: .98rem; color: #34432f; }
+.car-stats { display: flex; flex-wrap: wrap; gap: 6px; font-size: .72rem; color: #7b735f; }
+.car-stats span { background: #f1ead8; border-radius: 6px; padding: 1px 6px; }
+.car-buy { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.car-price { font-weight: 800; color: #8b5f22; font-size: .85rem; white-space: nowrap; }
+@media (max-width: 560px) {
+  .car-card { grid-template-columns: 82px minmax(0, 1fr); }
+  .car-buy { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+}

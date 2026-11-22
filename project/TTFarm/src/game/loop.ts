@@ -9,7 +9,13 @@ import { saddleHeight } from "../scene/ranchAnimals";
 import { createPlots, disposePlots, plotIdAt, plotPosition, updatePlots, PLOT_SIZE, bedHeightAt } from "../scene/plots";
 import { createForageScene } from "../scene/forageScene";
 import { createTown } from "../scene/town/townScene";
-import { townSurfaceHeight } from "../scene/town/townLayout";
+import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect } from "../scene/town/townLayout";
+import { createSalesHall } from "../scene/salesHall";
+import { salesHallHeight, inSalesHall, HALL_COUNTER } from "../scene/salesHallLayout";
+import { useTownInteraction, type TownPlace } from "./townInteraction";
+import { useDrive } from "./drive";
+import { PlayerVehicle } from "../scene/vehicle";
+import { onBridge } from "../scene/layout";
 import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
@@ -38,6 +44,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   view.scene.add(world.group);
   const town = createTown(world.obstacles);
   view.scene.add(town.group);
+  const salesHall = createSalesHall(world.obstacles);
+  view.scene.add(salesHall);
   const ranchScene = createRanchScene(world.obstacles);
   view.scene.add(ranchScene.group);
 
@@ -65,6 +73,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       }
       return TERRACE_TOP;
     }
+    // 河岸售货大厅的混凝土台比草地高，进店先抬脚
+    const hallH = salesHallHeight(x, z);
+    if (hallH > 0) return hallH;
     // 河东小城的铺装比草地略高，走上去要抬脚
     const townH = townSurfaceHeight(x, z);
     if (townH > 0) return townH;
@@ -80,6 +91,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const horseTrail = createHorseTrail();
   view.scene.add(horseTrail.mesh);
   let trailHorseId: string | undefined;
+  let vehicle: PlayerVehicle | null = null;
   const spectatorFocus = new THREE.Vector3();
   let roomKey = "home";
   let homePose = { x: 0, z: 6.9, yaw: Math.PI, deck: false };
@@ -109,6 +121,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (e.code === "Space") {
       if (e.target instanceof HTMLElement && e.target.closest("button")) return;
       e.preventDefault();
+      keys.add(" ");
       if (!e.repeat) farmInput.jump = true;
       return;
     }
@@ -242,6 +255,52 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
   };
 
+  const startDriving = (id: string) => {
+    if (vehicle) return;
+    if (useSocial.getState().visit) {
+      useGame.getState().notify("做客时不能开自己的车", "warn");
+      useDrive.getState().stop();
+      return;
+    }
+    if (useTownInteraction.getState().place) {
+      useGame.getState().notify("先走到室外再上车", "warn");
+      useDrive.getState().stop();
+      return;
+    }
+    const car = useGame.getState().garage.cars.find((c) => c.id === id);
+    if (!car) {
+      useDrive.getState().stop();
+      return;
+    }
+    const p = player.root.position;
+    const fx = Math.sin(player.root.rotation.y), fz = Math.cos(player.root.rotation.y);
+    const spawn = world.obstacles.project({ x: p.x + fx * 3.0, z: p.z + fz * 3.0 });
+    vehicle = new PlayerVehicle(car, spawn.x, spawn.z, player.root.rotation.y - Math.PI / 2);
+    view.scene.add(vehicle.root);
+    player.root.visible = false;
+    player.cancelTarget();
+    useGame.getState().setRiding(null);
+    useGame.getState().setActiveCar(id);
+    useDrive.getState().setDriving(true);
+    useGame.getState().notify(`已上车：${car.plate}`);
+    controls.reset();
+  };
+
+  const stopDriving = () => {
+    if (!vehicle) return;
+    const h = vehicle.yaw;
+    const rx = Math.sin(h), rz = Math.cos(h);
+    const want = { x: vehicle.x + rx * 2.4, z: vehicle.z + rz * 2.4 };
+    const deck = onBridge(want.x, want.z, 0.4);
+    const p = world.obstacles.project(want, deck ? "deck" : "terrain");
+    player.root.visible = true;
+    player.relocate(p.x, p.z, h + Math.PI / 2, onBridge(p.x, p.z, 0.4));
+    vehicle.dispose();
+    vehicle = null;
+    useDrive.getState().setDriving(false);
+    controls.reset();
+  };
+
   const step = (nowMs: number) => {
     const dt = THREE.MathUtils.clamp((nowMs - lastTime) / 1000, 0, 0.1);
     lastTime = nowMs;
@@ -251,6 +310,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const spectator = visit?.mode === "spectate";
     const nextRoom = visit ? visit.mode + "/" + visit.ownerId : "home";
     if (roomKey !== nextRoom) {
+      if (vehicle) stopDriving();
       if (roomKey === "home") homePose = { x: player.positionRef.x, z: player.positionRef.z, yaw: player.root.rotation.y, deck: player.onBridgeDeck };
       roomKey = nextRoom;
       keys.clear(); releaseTouchInput(); destination = null;
@@ -266,6 +326,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       world.setDecor(sceneState.decor);
       lastDecor = sceneState.decor;
     }
+
+    const requestedCar = useDrive.getState().consume();
+    if (requestedCar) startDriving(requestedCar);
+    if (vehicle && !useDrive.getState().driving) stopDriving();
 
     inputDir.set(0, 0, 0);
     view.camera.getWorldDirection(forward);
@@ -297,7 +361,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     farmInput.jump = false;
     const herd = sceneState.ranch;
     const ownHerd = useGame.getState().ranch;
-    const mount = !spectator && !(visit && visitOnFoot) && ownHerd.ridingId ? ownHerd.animals.find(a => a.id === ownHerd.ridingId) : undefined;
+    const mount = !vehicle && !spectator && !(visit && visitOnFoot) && ownHerd.ridingId ? ownHerd.animals.find(a => a.id === ownHerd.ridingId) : undefined;
     const seat = mount ? saddleHeight(mount.species) : 0;
     const animatedSeat=mount && (visit ? peers : ranchScene).seatHeight(mount.id);
     player.setSaddleHeight(animatedSeat ?? seat, mount?.species);
@@ -305,8 +369,48 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       spectatorFocus.addScaledVector(inputDir.clampLength(0, 1), dt * (keys.has("shift") || farmInput.running ? 22 : 11));
       spectatorFocus.x = THREE.MathUtils.clamp(spectatorFocus.x, -WORLD_HALF, WORLD_HALF);
       spectatorFocus.z = THREE.MathUtils.clamp(spectatorFocus.z, -WORLD_HALF, WORLD_HALF);
+    } else if (vehicle) {
+      const kThrottle = (keys.has("w") || keys.has("arrowup") ? 1 : 0) - (keys.has("s") || keys.has("arrowdown") ? 1 : 0);
+      const kSteer = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
+      const throttle = THREE.MathUtils.clamp(kThrottle + farmInput.forward, -1, 1);
+      const steer = THREE.MathUtils.clamp(kSteer + farmInput.x, -1, 1);
+      vehicle.update(dt, {
+        throttle,
+        steer,
+        brake: farmInput.jump || keys.has(" "),
+        boost: keys.has("shift") || farmInput.running,
+      }, world.obstacles, fieldHeightAt);
+      useTownInteraction.getState().set(null, "");
+      if (elapsed >= nextPresence) {
+        nextPresence = elapsed + .08;
+        const { x, z } = vehicle.root.position;
+        setLocalPresence({ x, y: vehicle.root.position.y, z, yaw: vehicle.yaw, moving: Math.abs(vehicle.currentSpeed) > 1.2,
+          running: (keys.has("shift") || farmInput.running) && Math.abs(vehicle.currentSpeed) > 2,
+          jumping: false, swimming: false, action: null, actionTime: 0, mount: null });
+      }
     } else {
       player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running);
+      // 城市场景交互：售货大厅柜台、汽车店室内、便利店室内
+      {
+        const px = player.root.position.x, pz = player.root.position.z;
+        let place: TownPlace = null;
+        let martName = "";
+        if (inSalesHall(px, pz) && Math.hypot(px - HALL_COUNTER.x, pz - HALL_COUNTER.z) <= HALL_COUNTER.radius) {
+          place = "market";
+        } else if (Math.abs(px - DEALERSHIP.x) <= DEALERSHIP.w / 2 - 0.3 && Math.abs(pz - DEALERSHIP.z) <= DEALERSHIP.d / 2 - 0.3) {
+          place = "dealer";
+        } else {
+          for (const shop of SHOPS) {
+            if (!shop.enterable) continue;
+            if (insideFacingRect(px, pz, shop.x, shop.z, shop.w, shop.d, shop.face, 0.4)) {
+              place = shop.id.includes("mart-b") ? "mart-b" : "mart-a";
+              martName = shop.name;
+              break;
+            }
+          }
+        }
+        useTownInteraction.getState().set(place, martName);
+      }
       const selfId = String(useAccount.getState().user?.id ?? "");
       localBubble.set(selfId ? bubbleText(selfId) : null);
       localBubble.tick(nowMs);
@@ -343,7 +447,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
     const wallTime = Date.now();
     const rider = !visit ? "local" : players.some(p => p.id === visit.ownerId && p.mount) ? "peer" : "stable";
-    const focus = spectator ? spectatorFocus : player.positionRef;
+    const focus = vehicle ? vehicle.root.position : spectator ? spectatorFocus : player.positionRef;
     peers.update(players, dt, elapsed, focus);
     peers.localRide(visit?.mode === "friend" ? mount : undefined, player, dt, elapsed);
     ranchScene.update(elapsed, dt, wallTime, herd, player.root, player.isMoving, rider, spectator ? spectatorFocus : undefined, peers.emitAuras, player.isRunning);
@@ -358,8 +462,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
     updatePlots(plots, sceneState.plots, standingPlot ?? inspectedPlot, growthTime, elapsed);
 
-    const cameraBase = player.cameraGroundY - 0.87 * player.swimAmount + Math.max(0, seat - 0.6);
-    controls.update(focus, spectator ? fieldHeightAt(focus.x, focus.z) : cameraBase, dt, Number(keys.has("e")) - Number(keys.has("q")));
+    const cameraBase = vehicle
+      ? vehicle.root.position.y + 0.15
+      : player.cameraGroundY - 0.87 * player.swimAmount + Math.max(0, seat - 0.6);
+    controls.update(focus, vehicle ? cameraBase : spectator ? fieldHeightAt(focus.x, focus.z) : cameraBase, dt, Number(keys.has("e")) - Number(keys.has("q")));
 
     // 阴影跟着人物走：整片方形地图铺不下 2048 的阴影贴图，只罩住人物周围
     view.keyLight.position.set(
@@ -394,9 +500,17 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     riverAudio.dispose();
     unsubscribeAppearance();
     peers.clear();
+    if (vehicle) { vehicle.dispose(); vehicle = null; }
     horseTrail.dispose();
     ranchScene.dispose();
     forageScene.dispose();
+    view.scene.remove(salesHall);
+    salesHall.traverse(node => {
+      if (!(node instanceof THREE.Mesh || node instanceof THREE.Line)) return;
+      node.geometry.dispose();
+      const list = Array.isArray(node.material) ? node.material : [node.material];
+      list.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+    });
     town.dispose();
     world.dispose();
     player.dispose();

@@ -1,216 +1,324 @@
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { TownBuilder } from "./townBuild";
 import { buildCar, CAR_COLORS } from "./townCar";
-import { walkNodes, WALK_Y, ROAD_Y, WALK } from "./townLayout";
+import { AVENUES, CROSSES, townSurfaceHeight, walkNodes, type RouteNode } from "./townLayout";
+import { bridgeHeightAt } from "../layout";
+import { SHOPPER_ROUTE, inSalesHall, SALES_HALL } from "../salesHallLayout";
 
-const SKIN = [0xe8c5a4, 0xd9b08a, 0xc99874];
-const HAIR = [0x332a25, 0x54402f, 0x2c2724, 0x8a6746, 0xd0c09e];
-const CLOTH = [0x5b7a8a, 0xb06a5c, 0x87976a, 0xd2ad63, 0x7a6b8f, 0xded2bb, 0x4e6858, 0xc3866b];
-const PANTS = [0x4a4c52, 0x6b6152, 0x3e4a52, 0x84776a];
+/** NPC 与循环车的固定参数都放这里，方便手感调优 */
+const WALK_SPEED = 0.78;
+const CAR_CRUISE = 3.0;
+const CAR_SLOW = 8.5;
+const CAR_RADIUS = 1.55;
+const SHOPPER_SPEED = 1.0;
+const SHOPPER_PAUSE = 7;
+const SHOPPER_COUNT = 4;
 
-const NPC_COUNT = 14;
+const SKIN = [0xf3c9a5, 0xe4ad82, 0xc88e64, 0xa9704d, 0xf7d8bb];
+const HAIR = [0x3f2e26, 0x5b4234, 0x2e2a28, 0x7b5b3e, 0x9b7650, 0x4a3a52];
+const COAT = [0x6f8f7c, 0xb56d54, 0x6e88a6, 0xc79b5e, 0x8b6f94, 0x5e7b74, 0xd0b18a, 0x9a5f68];
+const PANTS = [0x46515c, 0x5a4c40, 0x3f4a44, 0x6a5b55, 0x4c4552];
+const SHOES = [0x3a3633, 0x5d4634, 0x2f3339];
 
-function makeRandom(seed: number) {
-  let s = seed >>> 0;
+interface Person {
+  node: THREE.Group;
+  legL: THREE.Group;
+  legR: THREE.Group;
+}
+
+/** 低模三渲二市民：头/发/帽/围巾/挎包/外套/手臂/裤腿/鞋，身体用顶点色合并 */
+function makePerson(seed: number, shopper = false): Person {
+  const node = new THREE.Group();
+  const body = new TownBuilder();
+  const r = mulberry(seed);
+  const skin = SKIN[Math.floor(r() * SKIN.length)];
+  const coat = COAT[Math.floor(r() * COAT.length)];
+  const pants = PANTS[Math.floor(r() * PANTS.length)];
+  const hair = HAIR[Math.floor(r() * HAIR.length)];
+  const shoe = SHOES[Math.floor(r() * SHOES.length)];
+  const scale = 0.92 + r() * 0.16;
+  const hasHat = shopper ? r() < 0.35 : r() < 0.22;
+  const hasBag = shopper || r() < 0.4;
+  const hasScarf = r() < 0.45;
+
+  // 裤腿与鞋：每条腿一个合并网格，挂在髋部枢轴上摆动
+  const leg = (side: -1 | 1) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.105, 0.62 * scale, 0);
+    const lb = new TownBuilder();
+    lb.box(0.17, 0.58 * scale, 0.2, pants, { y: -0.29 * scale, z: side * 0.01 });
+    lb.box(0.19, 0.1, 0.32, shoe, { y: -0.55 * scale, z: 0.05 });
+    const g = lb.build(false, false);
+    pivot.add(g);
+    return pivot;
+  };
+  const legL = leg(-1), legR = leg(1);
+  node.add(legL, legR);
+
+  // 躯干：下摆微张，肩部收窄，腰上一条深色腰带
+  body.box(0.42, 0.52 * scale, 0.25, coat, { y: 0.88 * scale });
+  body.box(0.46, 0.12, 0.27, coat, { y: 0.6 * scale });
+  body.box(0.44, 0.055, 0.27, 0x5a4a3d, { y: 0.67 * scale });
+  // 手臂：贴身两条，手掌比袖口浅
+  for (const side of [-1, 1]) {
+    body.box(0.11, 0.44 * scale, 0.14, coat, { x: side * 0.255, y: 0.86 * scale, rz: side * 0.05 });
+    body.sphere(0.075, skin, { x: side * 0.28, y: 0.6 * scale, z: 0.015 });
+  }
+  // 衣领与前襟扣子
+  body.box(0.26, 0.1, 0.19, 0xe7dcc7, { y: 1.15 * scale, z: 0.09 });
+  for (let i = 0; i < 3; i++) body.sphere(0.024, 0x4b4037, { y: (1.08 - i * 0.14) * scale, z: 0.135 });
+
+  // 脖子与头
+  body.cylinder(0.075, 0.085, 0.1, skin, { y: 1.22 * scale }, 8);
+  body.sphere(0.16, skin, { y: 1.36 * scale, z: 0.01 });
+  // 头发：后脑一层 + 额前碎发
+  body.sphere(0.168, hair, { y: 1.39 * scale, z: -0.035 });
+  body.box(0.3, 0.09, 0.2, hair, { y: 1.46 * scale, z: -0.02 });
+  body.box(0.18, 0.075, 0.08, hair, { y: 1.44 * scale, z: 0.11 });
+  // 眼睛两点
+  body.sphere(0.018, 0x2f2a27, { x: -0.058, y: 1.375 * scale, z: 0.145 });
+  body.sphere(0.018, 0x2f2a27, { x: 0.058, y: 1.375 * scale, z: 0.145 });
+  // 围巾
+  if (hasScarf) {
+    body.box(0.34, 0.09, 0.3, 0xc76a5b, { y: 1.2 * scale });
+    body.box(0.09, 0.3, 0.13, 0xc76a5b, { x: 0.12, y: 1.03 * scale, z: 0.12, rz: 0.18 });
+  }
+  // 帽子
+  if (hasHat) {
+    body.cylinder(0.15, 0.16, 0.06, 0xefe2c9, { y: 1.53 * scale });
+    body.cylinder(0.11, 0.13, 0.11, 0xefe2c9, { y: 1.6 * scale });
+  }
+  // 挎包：斜挎到腰侧
+  if (hasBag) {
+    body.box(0.2, 0.24, 0.1, shopper ? 0xc79b56 : 0x8a6748, { x: 0.27, y: 0.82 * scale, z: -0.03, rz: 0.1 });
+    body.box(0.035, 0.52, 0.035, 0x6d5239, { x: 0.16, y: 1.03 * scale, z: 0.08, rz: -0.26 });
+  }
+
+  const bodyGroup = body.build(false, false);
+  node.add(bodyGroup);
+  return { node, legL, legR };
+}
+
+/** 轻量可复现随机：NPC 外形在刷新后不变 */
+function mulberry(seed: number) {
+  let a = seed >>> 0;
   return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-const pick = <T>(rand: () => number, list: readonly T[]) => list[Math.floor(rand() * list.length)];
-
-/** 上半身 + 头 + 头发 + 配饰，全部 merge；双腿独立以便摆步 */
-function buildPerson(rand: () => number) {
-  const b = new TownBuilder();
-  const shirt = pick(rand, CLOTH);
-  const pants = pick(rand, PANTS);
-  const skin = pick(rand, SKIN);
-  const hair = pick(rand, HAIR);
-  const skirt = rand() < 0.35;
-  const hat = rand() < 0.28;
-  const bag = rand() < 0.4;
-
-  b.add(new RoundedBoxGeometry(0.44, 0.5, 0.27, 2, 0.07), shirt, { y: 0.93 });
-  if (skirt) {
-    b.cylinder(0.24, 0.31, 0.38, shirt, { y: 0.66 }, 10);
-  } else {
-    b.box(0.4, 0.16, 0.24, pants, { y: 0.64 });
+class Walker {
+  constructor(
+    private person: Person,
+    private nodes: RouteNode[],
+    private links: Array<[number, number]>,
+    seed: number,
+    nodeIndex: number,
+  ) {
+    this.node = nodeIndex;
+    this.phase = mulberry(seed + 31)() * Math.PI * 2;
+    this.person.node.position.set(nodes[nodeIndex].x, 0.14, nodes[nodeIndex].z);
   }
-  b.box(0.12, 0.42, 0.15, skin, { x: -0.28, y: 0.94, rz: 0.08 });
-  b.box(0.12, 0.42, 0.15, skin, { x: 0.28, y: 0.94, rz: -0.08 });
-  b.box(0.3, 0.1, 0.2, shirt, { y: 1.19 });
-  b.sphere(0.175, skin, { y: 1.34 }, 12, 9);
-  // 头发：后脑壳 + 额前一小撮，避免圆头
-  b.add(new THREE.SphereGeometry(0.186, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), hair, { y: 1.37, z: -0.01 });
-  b.box(0.2, 0.08, 0.18, hair, { y: 1.28, z: 0.1, rx: -0.12 });
-  if (hat) {
-    b.cylinder(0.27, 0.29, 0.05, 0xd8c59c, { y: 1.48 }, 14);
-    b.cylinder(0.17, 0.2, 0.16, 0xd8c59c, { y: 1.55 }, 14);
-  }
-  if (bag) {
-    b.box(0.26, 0.3, 0.12, 0x6b4f3a, { x: 0.31, y: 0.76, z: 0.12 });
-    b.box(0.04, 0.5, 0.04, 0x6b4f3a, { x: 0.27, y: 1.05, z: 0.08, rz: 0.18 });
-  }
-  // 一条围巾，打破色块
-  b.box(0.32, 0.09, 0.22, rand() < 0.5 ? 0xd8d2c0 : 0xa8564e, { y: 1.22 });
-
-  const body = b.build(true, false);
-
-  const legs: THREE.Mesh[] = [];
-  for (const side of [-1, 1]) {
-    const lb = new TownBuilder();
-    lb.box(0.15, 0.5, 0.18, pants, { y: -0.25, x: 0.0 });
-    lb.box(0.17, 0.1, 0.28, 0x4a413a, { y: -0.51, z: 0.04 });
-    const group = lb.build(true, false);
-    const leg = group.children[0] as THREE.Mesh;
-    leg.position.set(side * 0.105, 0.56, 0);
-    legs.push(leg);
-  }
-  return { body, legs };
-}
-
-export interface Walker {
-  group: THREE.Group;
-  legs: THREE.Mesh[];
-  from: number;
-  to: number;
-  progress: number;
-  distance: number;
-  speed: number;
-  idle: number;
+  node: number;
+  target: number | null = null;
   phase: number;
-  height: number;
-  previous: number;
+  private neighborsOf(index: number): number[] {
+    const out: number[] = [];
+    for (const [a, b] of this.links) {
+      if (a === index) out.push(b);
+      else if (b === index) out.push(a);
+    }
+    return out;
+  }
+  update(dt: number, t: number) {
+    if (this.target === null) {
+      const neighbors = this.neighborsOf(this.node);
+      if (neighbors.length) this.target = neighbors[Math.floor(Math.random() * neighbors.length)];
+    }
+    const to = this.target === null ? null : this.nodes[this.target];
+    const from = this.nodes[this.node];
+    if (to) {
+      const dx = to.x - from.x, dz = to.z - from.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.35) {
+        this.node = this.target!;
+        this.target = null;
+      } else {
+        const step = Math.min(dist, WALK_SPEED * dt);
+        this.person.node.position.x += (dx / dist) * step;
+        this.person.node.position.z += (dz / dist) * step;
+        this.person.node.rotation.y = Math.atan2(dx, dz);
+      }
+    }
+    const y = townSurfaceHeight(this.person.node.position.x, this.person.node.position.z) || 0.14;
+    this.person.node.position.y = y;
+    const swing = Math.sin(t * 5.4 + this.phase);
+    this.person.legL.rotation.x = swing * 0.42;
+    this.person.legR.rotation.x = -swing * 0.42;
+    this.person.node.position.y += Math.abs(swing) * 0.018;
+    this.person.node.rotation.z = swing * 0.035;
+  }
 }
 
-export interface TownLife {
-  group: THREE.Group;
-  update: (dt: number, t: number) => void;
-  walkers: Walker[];
-  cars: THREE.Group[];
+/** 过桥顾客：固定路线走到大厅柜台，停一会儿再原路返回 */
+class Shopper {
+  readonly person: Person;
+  private route = SHOPPER_ROUTE;
+  private cumulative: number[] = [];
+  private total = 0;
+  private cursor = 1;
+  private dir: 1 | -1 = 1;
+  private pause = 0;
+  private progress: number;
+  constructor(index: number) {
+    this.person = makePerson(800 + index, true);
+    for (let i = 0; i < this.route.length; i++) {
+      if (i === 0) this.cumulative.push(0);
+      else {
+        const a = this.route[i - 1], b = this.route[i];
+        this.total += Math.hypot(b.x - a.x, b.z - a.z);
+        this.cumulative.push(this.total);
+      }
+    }
+    this.progress = (index / SHOPPER_COUNT) * this.total;
+    this.person.node.rotation.y = 0;
+  }
+  update(dt: number, t: number) {
+    if (this.pause > 0) this.pause -= dt;
+    else this.progress += SHOPPER_SPEED * dt * this.dir;
+
+    if (this.dir > 0 && this.progress >= this.total) {
+      this.progress = this.total;
+      this.pause = SHOPPER_PAUSE;
+      this.dir = -1;
+    } else if (this.dir < 0 && this.progress <= 0) {
+      this.progress = 0;
+      this.pause = SHOPPER_PAUSE;
+      this.dir = 1;
+    }
+
+    while (this.cursor < this.route.length - 1 && this.cumulative[this.cursor] < this.progress) this.cursor++;
+    while (this.cursor > 1 && this.cumulative[this.cursor - 1] > this.progress) this.cursor--;
+    const a = this.route[this.cursor - 1], b = this.route[this.cursor];
+    const seg = this.cumulative[this.cursor] - this.cumulative[this.cursor - 1] || 1;
+    const k = Math.max(0, Math.min(1, (this.progress - this.cumulative[this.cursor - 1]) / seg));
+    const x = a.x + (b.x - a.x) * k, z = a.z + (b.z - a.z) * k;
+    this.person.node.position.set(x, this.groundAt(x, z), z);
+    this.person.node.rotation.y = Math.atan2((b.x - a.x) * this.dir, (b.z - a.z) * this.dir);
+    const swing = Math.sin(t * 5.2 + this.cursor);
+    this.person.legL.rotation.x = swing * 0.38;
+    this.person.legR.rotation.x = -swing * 0.38;
+  }
+  private groundAt(x: number, z: number) {
+    const bridge = bridgeHeightAt(x, z);
+    if (bridge !== undefined) return bridge;
+    if (inSalesHall(x, z)) return SALES_HALL.floorY;
+    return 0.02;
+  }
+}
+
+interface Lane {
+  axis: "x" | "z";
+  fixed: number;
+  from: number; to: number;
+  dir: 1 | -1;
+  stops: number[];
+  signal: "ew" | "ns";
+  color: number;
+  scale: number;
+}
+
+class Traffic {
+  constructor(readonly lane: Lane, start: number, private mesh: THREE.Group) {
+    this.pos = start;
+    mesh.scale.setScalar(lane.scale);
+    mesh.position.y = 0.08;
+    mesh.rotation.y = lane.axis === "x" ? (lane.dir > 0 ? 0 : Math.PI) : (lane.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
+  }
+  pos: number;
+  speed = 0;
+  update(dt: number, signal: "green" | "yellow" | "red") {
+    let wanted = CAR_CRUISE;
+    let nearest = Infinity;
+    for (const stop of this.lane.stops) {
+      const gap = this.lane.dir > 0 ? stop - this.pos : this.pos - stop;
+      if (gap > 0 && gap < nearest) nearest = gap;
+    }
+    if (signal !== "green" && nearest < CAR_SLOW) {
+      wanted = Math.min(wanted, Math.max(0, (nearest - 1.1) * 0.72));
+    } else if (nearest < CAR_RADIUS) {
+      wanted = Math.min(wanted, 1.1);
+    }
+    this.speed = THREE.MathUtils.damp(this.speed, wanted, wanted < this.speed ? 7 : 2.4, dt);
+    this.pos += this.speed * this.lane.dir * dt;
+    if (this.pos > this.lane.to) this.pos = this.lane.from;
+    if (this.pos < this.lane.from) this.pos = this.lane.to;
+    if (this.lane.axis === "x") this.mesh.position.x = this.pos;
+    else this.mesh.position.z = this.pos;
+  }
 }
 
 export function createTownLife(
   signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" },
   seed = 1009,
-): TownLife {
-  const rand = makeRandom(seed);
-  const { nodes, links } = walkNodes();
-  const adjacency: number[][] = nodes.map(() => []);
-  for (const [a, b] of links) { adjacency[a].push(b); adjacency[b].push(a); }
+) {
+  return new TownLife(signalStates, seed);
+}
 
-  const group = new THREE.Group();
-  group.name = "town-life";
-  const walkers: Walker[] = [];
+export class TownLife {
+  private walkers: Walker[] = [];
+  private shoppers: Shopper[] = [];
+  private traffic: Traffic[] = [];
+  readonly group = new THREE.Group();
+  constructor(signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" }, seed = 1009) {
+    const graph = walkNodes();
+    const r = mulberry(seed);
+    for (let i = 0; i < 24; i++) {
+      const person = makePerson(seed + i * 7 + 3);
+      this.walkers.push(new Walker(person, graph.nodes, graph.links, seed + i, Math.floor(r() * graph.nodes.length)));
+      this.group.add(person.node);
+    }
+    for (let i = 0; i < SHOPPER_COUNT; i++) {
+      const shopper = new Shopper(i);
+      this.shoppers.push(shopper);
+      this.group.add(shopper.person.node);
+    }
 
-  for (let i = 0; i < NPC_COUNT; i++) {
-    const { body, legs } = buildPerson(rand);
-    const scale = 0.94 + rand() * 0.14;
-    const start = Math.floor(rand() * nodes.length);
-    const to = adjacency[start][Math.floor(rand() * adjacency[start].length)];
-    const person = new THREE.Group();
-    person.add(body);
-    for (const leg of legs) person.add(leg);
-    person.scale.setScalar(scale);
-    const a = nodes[start], bNode = nodes[to];
-    const distance = Math.hypot(bNode.x - a.x, bNode.z - a.z);
-    const progress = rand() * 0.7;
-    person.position.set(a.x + (bNode.x - a.x) * progress, WALK_Y, a.z + (bNode.z - a.z) * progress);
-    person.rotation.y = Math.atan2(bNode.x - a.x, bNode.z - a.z);
-    group.add(person);
-    walkers.push({
-      group: person, legs, from: start, to, progress, distance,
-      speed: 0.62 + rand() * 0.36, idle: 0, phase: rand() * 6.28,
-      height: 1.55 * scale, previous: start,
+    const lane = (axis: "x" | "z", fixed: number, from: number, to: number, dir: 1 | -1, color: number, scale: number): Lane => {
+      const stops: number[] = [];
+      if (axis === "x") {
+        for (const c of CROSSES) stops.push(c.x + (dir > 0 ? -c.half - 4.0 : c.half + 4.0));
+      } else {
+        for (const a of AVENUES) stops.push(a.z + (dir > 0 ? -a.half - 4.0 : a.half + 4.0));
+      }
+      return { axis, fixed, from, to, dir, stops, signal: axis === "x" ? "ew" : "ns", color, scale };
+    };
+    const lanes: Lane[] = [
+      lane("x", 50.2, 44, 139, 1, CAR_COLORS[0], 0.98),
+      lane("x", 53.8, 44, 139, -1, CAR_COLORS[2], 1.02),
+      lane("x", 108.2, 46, 139, 1, CAR_COLORS[3], 1.05),
+      lane("x", 111.8, 46, 139, -1, CAR_COLORS[4], 0.94),
+      lane("z", 83.8, 23, 139, 1, CAR_COLORS[1], 1.0),
+      lane("z", 80.2, 23, 139, -1, CAR_COLORS[5], 0.96),
+      lane("z", 127.8, 23, 139, 1, CAR_COLORS[6], 1.04),
+      lane("z", 124.2, 23, 139, -1, CAR_COLORS[7], 0.92),
+    ];
+    lanes.forEach((l, i) => {
+      const mesh = buildCar(l.color);
+      const start = l.from + ((i * 13.7 + 9) % (l.to - l.from));
+      this.traffic.push(new Traffic(l, start, mesh));
+      this.group.add(mesh);
     });
+    this.signalStates = signalStates;
   }
-
-  // 车：四条车道，各自循环；车身整体合并
-  const cars: THREE.Group[] = [];
-  interface Lane { kind: "x" | "z"; fixed: number; min: number; max: number; dir: 1 | -1; rotation: number; }
-  const lanes: Lane[] = [
-    { kind: "x", fixed: 50.2, min: 43.5, max: 121.5, dir: 1, rotation: 0 },
-    { kind: "x", fixed: 50.2, min: 43.5, max: 121.5, dir: 1, rotation: 0 },
-    { kind: "x", fixed: 53.8, min: 43.5, max: 121.5, dir: -1, rotation: Math.PI },
-    { kind: "x", fixed: 53.8, min: 43.5, max: 121.5, dir: -1, rotation: Math.PI },
-    { kind: "z", fixed: 83.8, min: 23, max: 95, dir: 1, rotation: -Math.PI / 2 },
-    { kind: "z", fixed: 80.2, min: 23, max: 95, dir: -1, rotation: Math.PI / 2 },
-  ];
-  const carState: Array<{ lane: Lane; pos: number; speed: number }> = [];
-  lanes.forEach((lane, index) => {
-    const car = buildCar(CAR_COLORS[index % CAR_COLORS.length]);
-    const span = lane.max - lane.min;
-    const pos = lane.kind === "x" ? lane.min + span * (0.12 + index * 0.16) : lane.min + span * (0.18 + index * 0.13);
-    if (lane.kind === "x") car.position.set(pos, ROAD_Y, lane.fixed);
-    else car.position.set(lane.fixed, ROAD_Y, pos);
-    car.rotation.y = lane.rotation;
-    group.add(car);
-    cars.push(car);
-    carState.push({ lane, pos, speed: 3.4 });
-  });
-
-  const carUpdate = (dt: number, t: number, states: ReturnType<typeof signalStates>) => {
-    for (const [index, car] of cars.entries()) {
-      const state = carState[index];
-      const { lane } = state;
-      const signal = lane.kind === "x" ? states.ew : states.ns;
-      let target = 3.3 + (index % 3) * 0.45;
-      // 接近停车线且非绿灯：减速并停在线上，绿灯再起步
-      const stop = lane.kind === "x"
-        ? (lane.dir > 0 ? WALK.crossWestX - 3.2 : WALK.crossEastX + 3.2)
-        : (lane.dir > 0 ? WALK.avenueSouthZ - 3.2 : WALK.avenueNorthZ + 3.2);
-      const remaining = (stop - state.pos) * lane.dir;
-      if (signal !== "green" && remaining > -0.4 && remaining < 11) {
-        target = Math.max(0, Math.min(target, remaining * 0.42));
-      }
-      state.speed += (target - state.speed) * Math.min(1, dt * 4.2);
-      state.pos += state.speed * lane.dir * dt;
-      if (lane.dir > 0 && state.pos > lane.max) { state.pos = lane.min; state.speed = 2.2; }
-      if (lane.dir < 0 && state.pos < lane.min) { state.pos = lane.max; state.speed = 2.2; }
-      if (lane.kind === "x") car.position.x = state.pos;
-      else car.position.z = state.pos;
-    }
-    void t;
-  };
-
-  const update = (dt: number, t: number) => {
-    carUpdate(dt, t, signalStates(t));
-    for (const w of walkers) {
-      const person = w.group;
-      if (w.idle > 0) {
-        w.idle -= dt;
-        person.position.y = WALK_Y + Math.sin(t * 1.2 + w.phase) * 0.008;
-        for (const leg of w.legs) leg.rotation.x *= 0.85;
-        continue;
-      }
-      w.progress += (w.speed / Math.max(0.001, w.distance)) * dt;
-      if (w.progress >= 1) {
-        w.progress = 0;
-        w.previous = w.from;
-        w.from = w.to;
-        const options = adjacency[w.to].filter(id => id !== w.previous);
-        w.to = options.length ? options[Math.floor(rand() * options.length)] : adjacency[w.to][0];
-        w.distance = Math.hypot(nodes[w.to].x - nodes[w.from].x, nodes[w.to].z - nodes[w.from].z);
-        w.speed = 0.62 + rand() * 0.36;
-        if (rand() < 0.22) w.idle = 1.2 + rand() * 2.4;
-      }
-      const from = nodes[w.from], to = nodes[w.to];
-      person.position.x = from.x + (to.x - from.x) * w.progress;
-      person.position.z = from.z + (to.z - from.z) * w.progress;
-      const stride = Math.sin(t * 5.2 * w.speed + w.phase);
-      person.position.y = WALK_Y + Math.abs(stride) * 0.035;
-      const yaw = Math.atan2(to.x - from.x, to.z - from.z);
-      person.rotation.y = yaw;
-      person.rotation.z = Math.sin(t * 2.6 + w.phase) * 0.018;
-      w.legs[0].rotation.x = stride * 0.4;
-      w.legs[1].rotation.x = -stride * 0.4;
-    }
-  };
-
-  return { group, update, walkers, cars };
+  private signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" };
+  update(dt: number, t: number) {
+    const signals = this.signalStates(t);
+    for (const w of this.walkers) w.update(dt, t);
+    for (const s of this.shoppers) s.update(dt, t);
+    for (const c of this.traffic) c.update(dt, signals[c.lane.signal]);
+  }
 }

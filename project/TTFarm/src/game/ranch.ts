@@ -38,7 +38,7 @@ export interface RanchState { level: number; animals: RanchAnimal[]; ridingId: s
 
 export const RANCH_MAX_LEVEL = 10;
 export const WILD_CLEARINGS = [[2,20],[-1,25],[12,22],[-24,9],[-11,-21],[15,-23],[-33,34],
-  [62,104],[-38,-31],[4,47],[1,-54],[-59,16]] as const;
+  [-62,72],[-38,-31],[4,47],[1,-54],[-59,16]] as const;
 export const MOUNT_UNLOCK_LEVEL = 3;
 export const HORSE_SPEED_FACTOR = 3;
 const upgradeCosts = [220, 460, 850, 1350, 2100, 3050, 4200, 5600, 7300];
