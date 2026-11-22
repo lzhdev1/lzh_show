@@ -8,6 +8,8 @@ import { RANCH_ENTRANCE } from "../scene/ranchLayout";
 import { saddleHeight } from "../scene/ranchAnimals";
 import { createPlots, disposePlots, plotIdAt, plotPosition, updatePlots, PLOT_SIZE, bedHeightAt } from "../scene/plots";
 import { createForageScene } from "../scene/forageScene";
+import { createTown } from "../scene/town/townScene";
+import { townSurfaceHeight } from "../scene/town/townLayout";
 import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
@@ -34,6 +36,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const initial = useGame.getState();
   const world = createWorld(initial.decor);
   view.scene.add(world.group);
+  const town = createTown(world.obstacles);
+  view.scene.add(town.group);
   const ranchScene = createRanchScene(world.obstacles);
   view.scene.add(ranchScene.group);
 
@@ -61,6 +65,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       }
       return TERRACE_TOP;
     }
+    // 河东小城的铺装比草地略高，走上去要抬脚
+    const townH = townSurfaceHeight(x, z);
+    if (townH > 0) return townH;
     return 0;
   };
   const player = new Player(initial.avatarId, world.obstacles, fieldHeightAt, initial.outfitId, initial.bottomId);
@@ -366,6 +373,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     riverAudio.update(focus.x, focus.z, screenRight.x, screenRight.z, weather);
     view.updateWeather(weather);
     world.update(elapsed, weather, focus, spectator ? 0 : player.swimAmount);
+    town.update(dt, elapsed);
     view.renderer.render(view.scene, view.camera);
   };
   raf = requestAnimationFrame(frame);
@@ -389,6 +397,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     horseTrail.dispose();
     ranchScene.dispose();
     forageScene.dispose();
+    town.dispose();
     world.dispose();
     player.dispose();
     disposePlots(plots);

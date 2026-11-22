@@ -11,6 +11,7 @@ import { createFarmDecor } from "./farmDecor";
 import type { FarmDecor } from "../game/decor";
 import { WorldObstacles } from "./obstacles";
 import { onRanchReserve } from "./ranchLayout";
+import { inTown } from "./town/townLayout";
 import { PALETTE, clay } from "./materials";
 import {
   BRIDGE,
@@ -488,6 +489,8 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
     if (riverInfo(x, z).dist < RIVER_BED.shoulder) return true;
     if (Math.hypot(x - BRIDGE.x, z - BRIDGE.z) < 14) return true;
     if (roadInfo(x, z) < ROAD_HALF_WIDTH + 1.6) return true;
+    // 河东小城整块留空，树石草丛不进城
+    if (inTown(x, z)) return true;
     return false;
   };
 
