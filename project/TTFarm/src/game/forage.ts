@@ -1,5 +1,5 @@
 import { CROPS, HERB_LIST, WILD_GREENS, type CropId } from "./crops";
-import { pickWildMutation, type WildMutation } from "./weather";
+import { pickWildMutation, rollHerbMutation, type Mutation } from "./weather";
 
 /**
  * 野外野菜：与野生动物同一套时间种子思路——
@@ -23,7 +23,7 @@ export interface WildPatch {
   id: string;
   slot: number;
   crop: CropId;
-  mutation: WildMutation | null;
+  mutation: Mutation | null;
 }
 
 export interface ForageState {
@@ -54,7 +54,7 @@ export function forageEndsAt(now: number): number {
 let lastRotation = -1;
 let patches: WildPatch[] = [];
 
-/** 同一轮内返回同一批菜丛；野菜与草药混排，草药约占四成，野菜可能自带阴阳/长生变异。 */
+/** 同一轮内返回同一批菜丛；野菜与草药混排，草药约占四成，两种都可能自带变异。 */
 export function wildPatchesAt(now: number): readonly WildPatch[] {
   const rotation = forageRotationAt(now);
   if (rotation === lastRotation) return patches;
@@ -83,8 +83,10 @@ export function wildPatchesAt(now: number): readonly WildPatch[] {
     ...fill(WILD_GREENS.map((crop) => crop.id), FORAGE_PATCH_COUNT - herbCount),
   ]);
   patches = picks.slice(0, FORAGE_PATCH_COUNT).map((crop, slot) => {
-    // 草药丛不带变异，避免与野菜的阴阳/长生特效混线；变异留给播种抽签
-    const mutation = !CROPS[crop].herb && next() < FORAGE_MUTATION_CHANCE ? pickWildMutation(next) : null;
+    // 野菜抽阴阳/长生，草药抽五行/仙品/神品；同一轮内由轮次种子决定，重进不会变
+    const mutation = CROPS[crop].herb
+      ? rollHerbMutation(next)
+      : next() < FORAGE_MUTATION_CHANCE ? pickWildMutation(next) : null;
     return { id: `forage-${rotation}-${slot}`, slot, crop, mutation };
   });
   lastRotation = rotation;

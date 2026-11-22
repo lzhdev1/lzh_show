@@ -90,7 +90,7 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
         </details>
         <details className="crop-almanac">
           <summary>草药变异图鉴</summary>
-          <p>草药种子不卖，只能从野外草药丛采到。种下后有机会抽出金木水火土五行；仙品会云雾缭绕、植株闪光，神品会闪电缠身、整株发黄，都是万中无一的收成。</p>
+          <p>草药种子不卖，只能从野外草药丛采到。野外草药丛每轮有一成左右自带金木水火土，极少数是仙品或神品，采下来就是带变异的药材；种下后也会重新抽签。仙品云雾缭绕、植株闪光，神品闪电缠身、整株发黄，都是万中无一的收成。</p>
           <ul>{HERB_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
         </details>
         <h3 className="section-title">扩建</h3>

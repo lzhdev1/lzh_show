@@ -2,8 +2,10 @@ import * as THREE from "three";
 import { forageRotationAt, wildPatchesAt, type ForageState, type WildPatch } from "../game/forage";
 import { setNearbyPatch } from "../game/forageInteraction";
 import { WILD_CLEARINGS } from "../game/ranch";
+import { CROPS } from "../game/crops";
 import { isWildMutation } from "../game/weather";
 import type { createCropLibrary } from "./crops3d";
+import { createCropAuras } from "./cropAuras";
 import { FORAGE_ANCHORS } from "./forageAnchors";
 import { createWildAuras } from "./wildAuras";
 import { FENCE_X, FENCE_Z, RIVER_BED, ROAD_HALF_WIDTH, onBridge, riverInfo, roadInfo, WORLD_HALF } from "./layout";
@@ -112,6 +114,9 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
   group.name = "wild-greens";
   const auras = createWildAuras();
   group.add(auras.group);
+  // 草药丛自带五行 / 仙品 / 神品时，复用田里的柔光与落雷（按丛位传中心点）
+  const herbAuras = createCropAuras(() => undefined);
+  group.add(herbAuras.group);
   const actors = new Map<string, PatchActor>();
   let lastKey = "";
   const hit = new THREE.Vector3();
@@ -154,6 +159,8 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
       actors.set(patch.id, { patch, mesh, anchor });
       if (patch.mutation && isWildMutation(patch.mutation)) {
         auras.setEmitter(patch.id, anchor.clone().add(new THREE.Vector3(0, 0.12, 0)), patch.mutation, 1.35);
+      } else if (patch.mutation && CROPS[patch.crop].herb) {
+        herbAuras.setPlot(patch.slot, patch.mutation, 3, anchor.clone().add(new THREE.Vector3(0, 0.1, 0)));
       }
     }
     for (const [id, actor] of actors) {
@@ -162,6 +169,7 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
       actor.mesh.dispose();
       actors.delete(id);
       auras.setEmitter(id, null, null);
+      herbAuras.setPlot(actor.patch.slot, null, -1);
     }
   }
 
@@ -202,6 +210,7 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
       playerPosition.copy(player);
       sync(now, forage);
       auras.update(t);
+      herbAuras.setTime(t);
       let closest: WildPatch | null = null;
       let closestDist = 2.3 ** 2;
       if (active) {
@@ -222,6 +231,7 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
       actors.forEach((actor) => actor.mesh.dispose());
       actors.clear();
       auras.dispose();
+      herbAuras.dispose();
       group.clear();
     },
   };

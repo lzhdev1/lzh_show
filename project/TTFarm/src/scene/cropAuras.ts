@@ -96,6 +96,8 @@ interface PlotAura {
   stage: number;
   halos: THREE.Sprite[];
   bolts: THREE.Sprite[];
+  /** 野外草药丛没有固定地块，中心点随每次生成传入 */
+  center?: THREE.Vector3;
 }
 
 /** 神品落雷：程序化画出分叉闪电的柔光贴图（多层描边 + 阴影模糊），避免用折线几何硬拼 */
@@ -155,7 +157,8 @@ function boltTexture() {
 }
 
 /** 全部菜地共用一次绘制；阶段 / 变异变化时重建该地块的柔光配方。 */
-export function createCropAuras(centers: THREE.Vector3[]) {
+export function createCropAuras(centers: THREE.Vector3[] | ((id: number) => THREE.Vector3 | undefined)) {
+  const centerOf = (id: number) => (typeof centers === "function" ? centers(id) : centers[id]);
   const group = new THREE.Group();
   group.name = "crop-mutation-auras";
   const dot = softDotTexture();
@@ -178,7 +181,7 @@ export function createCropAuras(centers: THREE.Vector3[]) {
   function rebuild() {
     const rows: number[][] = [];
     for (const [id, aura] of plots) {
-      const center = centers[id];
+      const center = aura.center ?? centerOf(id);
       if (!center) continue;
       const [rise, orbit, dust, fall, speed] = recipeOf(aura.mutation);
       const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
@@ -240,7 +243,7 @@ export function createCropAuras(centers: THREE.Vector3[]) {
       aura.bolts = [];
     }
     for (const [id, aura] of plots) {
-      const center = centers[id];
+      const center = aura.center ?? centerOf(id);
       if (!center) continue;
       const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
       const s = 0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28);
@@ -304,21 +307,23 @@ export function createCropAuras(centers: THREE.Vector3[]) {
         }
       }
     },
-    setPlot(id: number, mutation: Mutation | null, stage: number) {
+    setPlot(id: number, mutation: Mutation | null, stage: number, center?: THREE.Vector3) {
       const existing = plots.get(id);
       // 野菜变异走 wildAuras 的黑白雾 / 玉云，这里不叠加
       if (!mutation || stage < 0 || isWildMutation(mutation)) {
         if (existing) {
           existing.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
+          existing.bolts.forEach(b => { b.material.dispose(); b.removeFromParent(); });
           plots.delete(id);
           rebuild();
         }
         return;
       }
-      if (existing && existing.mutation === mutation && existing.stage === stage) return;
+      if (existing && existing.mutation === mutation && existing.stage === stage
+        && (!center || !existing.center || existing.center.distanceToSquared(center) < 1e-4)) return;
       if (existing) existing.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
       if (existing) existing.bolts.forEach(b => { b.material.dispose(); b.removeFromParent(); });
-      plots.set(id, { mutation, stage, halos: [], bolts: [] });
+      plots.set(id, { mutation, stage, halos: [], bolts: [], center });
       rebuild();
       rebuildHalos();
     },
