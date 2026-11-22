@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CROPS, CROP_LIST, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
-import { isMutation, isRainy, rollMutation, weatherAt } from "./weather";
+import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestValue, levelFromXp, produceName } from "./crops";
+import { isMutation, isRainy, rollMutation, rollWildMutation, weatherAt } from "./weather";
 import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
 import { normalizeRanch, type RanchState } from "./ranch";
 import { createRanchActions, type RanchActions } from "./ranchActions";
+import { normalizeForage, type ForageState } from "./forage";
+import { createForageActions, type ForageActions } from "./forageActions";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
@@ -41,10 +43,11 @@ interface GameData {
   bottomId: OutfitId;
   decor: FarmDecor;
   ranch: RanchState;
+  forage: ForageState;
   selectedSeed: CropId;
 }
 
-interface GameActions extends RanchActions {
+interface GameActions extends RanchActions, ForageActions {
   selectSeed: (crop: CropId) => void;
   selectPlot: (id: number | null) => void;
   buySeed: (crop: CropId, qty?: number) => void;
@@ -99,6 +102,7 @@ export function initialData(): GameData {
     bottomId: "field",
     decor: { ...DEFAULT_DECOR },
     ranch: normalizeRanch(undefined),
+    forage: normalizeForage(undefined),
     selectedSeed: "radish",
   };
 }
@@ -110,6 +114,7 @@ export const useGame = create<GameStore>()(
     (set, get) => ({
       ...initialData(),
       ...createRanchActions(set, get),
+      ...createForageActions(set, get),
       selectedPlot: null,
       toasts: [],
 
@@ -137,6 +142,10 @@ export const useGame = create<GameStore>()(
 
       buySeed: (crop, qty = 1) => {
         const def = CROPS[crop];
+        if (def.wild) {
+          get().notify("野菜种子不卖，去野外采摘有机会捡到", "warn");
+          return;
+        }
         const level = levelFromXp(get().xp);
         if (level < def.unlockLevel) {
           get().notify(`${def.name}需要 ${def.unlockLevel} 级解锁`, "warn");
@@ -173,7 +182,8 @@ export const useGame = create<GameStore>()(
         }
         const now = Date.now();
         const weather = weatherAt(now);
-        const mutation = rollMutation(weather);
+        // 野菜只抽阴阳/长生；普通作物仍按天气抽签
+        const mutation = def.wild ? rollWildMutation() : rollMutation(weather);
         const watered = isRainy(weather) ? 1 : 0;
         set((s) => ({
           seeds: { ...s.seeds, [selectedSeed]: s.seeds[selectedSeed] - 1 },
@@ -315,6 +325,7 @@ export const useGame = create<GameStore>()(
         bottomId: s.bottomId,
         decor: s.decor,
         ranch: s.ranch,
+        forage: s.forage,
         selectedSeed: s.selectedSeed,
       }),
       // 兼容字段缺失（版本升级、新增作物）的情况
@@ -326,7 +337,7 @@ export const useGame = create<GameStore>()(
           return old ? {
             ...plot,
             ...old,
-            mutation: old.crop && isMutation(old.mutation) ? old.mutation : null,
+            mutation: old.crop && isMutation(old.mutation) && cropMutationValid(old.crop, old.mutation) ? old.mutation : null,
           } : plot;
         });
         return {
@@ -337,6 +348,7 @@ export const useGame = create<GameStore>()(
           ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
           decor: normalizeDecor(saved.decor),
           ranch: normalizeRanch(saved.ranch),
+          forage: normalizeForage(saved.forage),
           plots,
           seeds: { ...base.seeds, ...saved.seeds },
           harvest: { ...base.harvest, ...saved.harvest },

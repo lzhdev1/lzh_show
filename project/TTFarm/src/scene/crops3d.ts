@@ -1,11 +1,39 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { CROPS, type CropId } from "../game/crops";
-import { MUTATIONS, isSpirit, type Mutation, type Spirit } from "../game/weather";
+import { MUTATIONS, isSpirit, isWildMutation, type Mutation, type Spirit, wildMutationFamily } from "../game/weather";
 import { createCropSpiritGeometry, createCropSpiritMaterial } from "./cropSpirits";
 
 type Point = [number, number, number];
 const TAU = Math.PI * 2;
+
+/** 野菜按形态原型建模，20 个品种共享 11 种原型，靠配色区分 */
+type WildArchetype = "rosette" | "puff" | "daisy" | "succulent" | "fern" | "sprig" | "coin" | "bell" | "herb" | "allium" | "celery" | "spike";
+const WILD_ARCHETYPE: Partial<Record<CropId, WildArchetype>> = {
+  jicai: "rosette", pugongying: "puff", machixian: "succulent", juecai: "fern",
+  xiangchun: "sprig", yuqian: "coin", huaihua: "bell", huihuicai: "rosette",
+  yexiancai: "rosette", cheqiancao: "spike", yuxingcao: "herb", yebohe: "herb",
+  zisu: "herb", aicao: "herb", yecong: "allium", yesuan: "allium",
+  shuiqin: "celery", louhao: "herb", malantou: "daisy", juhuanao: "daisy",
+};
+
+/** 按顶点位置重写颜色：阴阳双分、长生玉质都靠它（作用于合并后的整株） */
+function recolorVertices(geometry: THREE.BufferGeometry, fn: (x: number, y: number, z: number, base: THREE.Color) => THREE.Color) {
+  const position = geometry.getAttribute("position");
+  const color = geometry.getAttribute("color") as THREE.BufferAttribute;
+  const c = new THREE.Color();
+  for (let i = 0; i < position.count; i += 1) {
+    c.fromBufferAttribute(color, i);
+    const next = fn(position.getX(i), position.getY(i), position.getZ(i), c);
+    color.setXYZ(i, next.r, next.g, next.b);
+  }
+  color.needsUpdate = true;
+}
+
+function smoothstep(edge0: number, edge1: number, x: number) {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
 
 // 中脉有窄窄的浅色脊，叶缘有自然扭转。小萼片只需要三个横截面。
 function foldedLeaf(length: number, width: number, height: number, tip: number, ruffled = false): THREE.BufferGeometry {
@@ -181,8 +209,247 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
         stem([0, r * 1.5 + 0.04, 0], 0.16, 0.043, -0.27, 0x85804e);
         break;
       }
+      case "eggplant": {
+        stem([0, 0.42, 0], 0.84, 0.034);
+        leaves(3, 0.3, 0.3, 0.11, 0.1, -0.02, 0.5);
+        leaves(3, 0.56, 0.26, 0.1, 0.12, 0.02, 1.7);
+        const count = ripe ? 3 : 2;
+        for (let i = 0; i < count; i++) {
+          const a = i * TAU / count + 0.4, x = Math.sin(a) * 0.2, z = Math.cos(a) * 0.2, y = 0.3 + (i % 2) * 0.16;
+          add(new THREE.SphereGeometry(1, 12, 9), ripe ? body : 0x9db86a, [x, y, z], [0.16, a, 0.1], [0.075, 0.155, 0.075]);
+          for (let k = 0; k < 3; k++) add(foldedLeaf(0.085, 0.03, 0.008, -0.02), leaf, [x, y + 0.145, z], [0.2, k * TAU / 3 + a, 0]);
+          stem([x, y + 0.18, z], 0.07, 0.012, 0.2);
+        }
+        break;
+      }
+      case "bean": {
+        stem([0, 0.55, 0], 1.1, 0.028, 0.05, 0xb79863);
+        stem([0.08, 0.52, -0.05], 1.05, 0.024, -0.06, 0xb79863);
+        for (let j = 0; j < 3; j++) leaves(3, 0.3 + j * 0.26, 0.26, 0.09, 0.08, -0.03, j * 1.3);
+        const pods = ripe ? 5 : 3;
+        for (let i = 0; i < pods; i++) {
+          const a = i * 2.4 + 0.7, x = Math.sin(a) * 0.16, z = Math.cos(a) * 0.16, y = 0.36 + (i % 3) * 0.2;
+          add(new THREE.SphereGeometry(1, 8, 7), ripe ? body : 0x8fbf6a, [x, y, z], [0.3, a, 0.14], [0.028, ripe ? 0.14 : 0.09, 0.028]);
+        }
+        break;
+      }
+      case "chili": {
+        stem([0, 0.36, 0], 0.72, 0.03);
+        leaves(4, 0.26, 0.26, 0.09, 0.09, -0.02, 0.3);
+        leaves(3, 0.5, 0.22, 0.08, 0.1, 0.02, 1.5);
+        const pods = ripe ? 5 : 3;
+        for (let i = 0; i < pods; i++) {
+          const a = i * 2.4 + 1.1, x = Math.sin(a) * 0.18, z = Math.cos(a) * 0.18, y = 0.28 + (i % 2) * 0.18;
+          add(new THREE.SphereGeometry(1, 9, 7), ripe ? body : 0x7fae5a, [x, y, z], [0.55, a, 0.2], [0.032, ripe ? 0.115 : 0.07, 0.032]);
+          stem([x * 0.8, y + 0.1, z * 0.8], 0.05, 0.01, 0.3);
+        }
+        break;
+      }
+      case "watermelon": {
+        leaves(5, 0.05, 0.4, 0.13, 0.1, 0.05, 0.2);
+        const r = ripe ? 0.33 : 0.16;
+        const melon = new THREE.SphereGeometry(1, 26, 15);
+        const mp = melon.getAttribute("position");
+        const mc = new Float32Array(mp.count * 3);
+        const light = new THREE.Color(ripe ? body : 0x7fae5a), dark = new THREE.Color(ripe ? 0x1e4d26 : 0x4c7a3a);
+        for (let i = 0; i < mp.count; i++) {
+          const band = Math.floor((Math.atan2(mp.getZ(i), mp.getX(i)) / Math.PI + 1) * 5) % 2 === 0;
+          const c = band ? dark : light;
+          mc[i * 3] = c.r; mc[i * 3 + 1] = c.g; mc[i * 3 + 2] = c.b;
+        }
+        melon.setAttribute("color", new THREE.BufferAttribute(mc, 3));
+        add(melon, 0xffffff, [0.05, r * 0.82, 0], [0, 0.3, 0], [r, r * 0.85, r]);
+        stem([0.05, r * 1.68, 0], 0.09, 0.024, 0.35, 0x6a8a4a);
+        break;
+      }
+      case "peach":
+      case "apricot":
+      case "jujube":
+      case "pear":
+      case "durian": {
+        // 矮果树：树干 + 两团树冠 + 挂在冠下的果实
+        stem([0, 0.38, 0], 0.76, 0.05, 0, 0x8a6a4a);
+        orb(leaf, [0, 0.92, 0], [0.4, 0.32, 0.4]);
+        orb(tint.setHex(leaf).offsetHSL(0.01, 0, 0.05).getHex(), [0.17, 1.04, 0.09], [0.23, 0.19, 0.23]);
+        const count = crop === "jujube" ? 5 : crop === "durian" ? 2 : 3;
+        const r = ripe ? (crop === "jujube" ? 0.055 : crop === "durian" ? 0.14 : 0.095) : 0.05;
+        for (let i = 0; i < count; i++) {
+          const a = i * TAU / count + 0.5, x = Math.sin(a) * 0.28, z = Math.cos(a) * 0.28, y = 0.76 + (i % 2) * 0.1;
+          const color = ripe ? body : 0x9db86a;
+          if (crop === "pear") {
+            orb(color, [x, y, z], [r, r * 1.05, r]);
+            orb(color, [x, y + r * 1.35, z], [r * 0.6, r * 0.7, r * 0.6]);
+          } else if (crop === "jujube") {
+            add(new THREE.SphereGeometry(1, 9, 7), color, [x, y, z], [0.2, a, 0.1], [r * 0.8, r * 1.2, r * 0.8]);
+          } else if (crop === "durian") {
+            orb(color, [x, y, z], [r, r * 1.1, r]);
+            if (ripe) for (let k = 0; k < 10; k++) {
+              const phi = Math.acos(1 - 2 * (k + 0.5) / 10), theta = Math.PI * (1 + Math.sqrt(5)) * k;
+              const dir = new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta));
+              const spike = new THREE.ConeGeometry(0.02, 0.055, 5);
+              spike.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
+              add(spike, body, [x + dir.x * r, y + dir.y * r * 1.1, z + dir.z * r]);
+            }
+          } else {
+            orb(color, [x, y, z], [r, r * 0.95, r]);
+          }
+          stem([x, y + r + 0.03, z], 0.06, 0.01, 0.15);
+        }
+        break;
+      }
+      case "tulip": {
+        for (let i = 0; i < 3; i++) {
+          const a = i * TAU / 3 + 0.3, x = Math.sin(a) * 0.17, z = Math.cos(a) * 0.17;
+          stem([x, 0.3, z], 0.6, 0.02);
+          add(foldedLeaf(0.32, 0.055, 0.15, 0.1), leaf, [x, 0.04, z], [0, a + 1.2, 0]);
+          if (ripe) {
+            orb(body, [x, 0.64, z], [0.08, 0.1, 0.08]);
+            for (let k = 0; k < 3; k++) add(foldedLeaf(0.1, 0.045, 0.05, 0.055), body, [x, 0.68, z], [-1.05, k * TAU / 3 + a, 0]);
+          } else {
+            orb(0x8fbf6a, [x, 0.62, z], [0.05, 0.075, 0.05]);
+          }
+        }
+        break;
+      }
+      case "lily": {
+        stem([0, 0.38, 0], 0.76, 0.024);
+        for (let j = 0; j < 3; j++) add(foldedLeaf(0.2, 0.045, 0.06, 0.03), leaf, [0, 0.16 + j * 0.16, 0], [0, j * 2.1, 0]);
+        if (ripe) {
+          for (let k = 0; k < 6; k++) add(foldedLeaf(0.2, 0.06, 0.08, 0.1), body, [0, 0.76, 0], [-0.55, k * TAU / 6, 0]);
+          for (let k = 0; k < 3; k++) {
+            const a = k * TAU / 3;
+            stem([Math.sin(a) * 0.03, 0.83, Math.cos(a) * 0.03], 0.1, 0.006, 0.15, 0xd8cfbc);
+            orb(0xe8b23c, [Math.sin(a) * 0.05, 0.89, Math.cos(a) * 0.05], [0.016, 0.012, 0.016]);
+          }
+        } else {
+          orb(0xcfe0b8, [0, 0.8, 0], [0.045, 0.09, 0.045]);
+        }
+        break;
+      }
+      case "roseRed":
+      case "rosePink":
+      case "roseWhite":
+      case "roseYellow":
+      case "roseBlue":
+      case "rosePurple": {
+        stem([0, 0.4, 0], 0.8, 0.026);
+        add(foldedLeaf(0.2, 0.07, 0.06, 0.02), leaf, [0, 0.3, 0], [0, 0.8, 0]);
+        add(foldedLeaf(0.2, 0.07, 0.06, 0.02), leaf, [0, 0.46, 0], [0, 3.6, 0]);
+        if (ripe) {
+          orb(body, [0, 0.84, 0], [0.055, 0.065, 0.055]);
+          const inner = tint.setHex(body).offsetHSL(0, 0.02, -0.06).getHex();
+          const outer = tint.setHex(body).offsetHSL(0, 0, 0.06).getHex();
+          for (let k = 0; k < 4; k++) add(foldedLeaf(0.11, 0.05, 0.05, 0.04), inner, [0, 0.82, 0], [-0.95, k * TAU / 4 + 0.4, 0]);
+          for (let k = 0; k < 5; k++) add(foldedLeaf(0.14, 0.065, 0.06, 0.02), outer, [0, 0.8, 0], [-0.35, k * TAU / 5, 0]);
+        } else {
+          orb(0x8fbf6a, [0, 0.82, 0], [0.045, 0.06, 0.045]);
+          for (let k = 0; k < 3; k++) add(foldedLeaf(0.08, 0.028, 0.01, -0.015), leaf, [0, 0.8, 0], [-0.7, k * TAU / 3, 0]);
+        }
+        break;
+      }
+      case "pineapple": {
+        leaves(8, 0.04, 0.42, 0.07, 0.2, 0.16, 0.2);
+        const r = ripe ? 1 : 0.55;
+        const fruit = new THREE.SphereGeometry(1, 18, 12);
+        const fp = fruit.getAttribute("position");
+        const fc = new Float32Array(fp.count * 3);
+        const gold = new THREE.Color(ripe ? body : 0x9db86a), seam = new THREE.Color(ripe ? 0xb8842c : 0x6a8a4a);
+        for (let i = 0; i < fp.count; i++) {
+          const s = Math.sin(Math.atan2(fp.getZ(i), fp.getX(i)) * 6) + Math.sin(fp.getY(i) * 12);
+          const c = s > 0.7 ? seam : gold;
+          fc[i * 3] = c.r; fc[i * 3 + 1] = c.g; fc[i * 3 + 2] = c.b;
+        }
+        fruit.setAttribute("color", new THREE.BufferAttribute(fc, 3));
+        add(fruit, 0xffffff, [0, 0.3 * r + 0.06, 0], [0, 0, 0], [0.14 * r, 0.19 * r, 0.14 * r]);
+        leaves(5, 0.5 * r + 0.08, 0.16 * r, 0.035, 0.1, 0.1, 0.6);
+        break;
+      }
+      default: {
+        // —— 野菜：按原型建模 ——
+        const archetype = WILD_ARCHETYPE[crop] ?? "rosette";
+        const size = ripe ? 1 : 0.7;
+        if (archetype === "rosette" || archetype === "daisy" || archetype === "spike" || archetype === "puff") {
+          leaves(6, 0.03, 0.26 * size, 0.09, 0.08, 0.03, 0.4);
+          leaves(4, 0.05, 0.16 * size, 0.07, 0.1, 0.08, 1.2);
+        }
+        if (archetype === "rosette") {
+          orb(body, [0, 0.08 * size, 0], [0.05, 0.06, 0.05]);
+        } else if (archetype === "puff") {
+          stem([0, 0.17 * size, 0], 0.34 * size, 0.012);
+          orb(body, [0, 0.36 * size, 0], [0.075, 0.075, 0.075]);
+          for (let k = 0; k < 6; k++) {
+            const a = k * TAU / 6;
+            orb(tint.setHex(body).offsetHSL(0, 0, 0.08).getHex(), [Math.sin(a) * 0.06, 0.36 * size + Math.cos(a) * 0.05, Math.sin(a * 2) * 0.04], [0.03, 0.03, 0.03]);
+          }
+        } else if (archetype === "daisy") {
+          stem([0, 0.15 * size, 0], 0.3 * size, 0.012);
+          orb(0xf2c94c, [0, 0.32 * size, 0], [0.035, 0.03, 0.035]);
+          for (let k = 0; k < 6; k++) add(foldedLeaf(0.07, 0.025, 0.015, 0.01), body, [0, 0.32 * size, 0], [-0.25, k * TAU / 6, 0]);
+        } else if (archetype === "spike") {
+          for (let k = 0; k < 2; k++) {
+            const x = (k - 0.5) * 0.1;
+            stem([x, 0.18 * size, 0], 0.36 * size, 0.009, (k - 0.5) * 0.2);
+            add(new THREE.SphereGeometry(1, 7, 6), body, [x + (k - 0.5) * 0.07, 0.38 * size, 0], [0, 0, (k - 0.5) * 0.2], [0.018, 0.055, 0.018]);
+          }
+        } else if (archetype === "succulent") {
+          for (let i = 0; i < 4; i++) {
+            const a = i * TAU / 4 + 0.3;
+            add(new THREE.CylinderGeometry(0.012, 0.016, 0.22 * size, 5), leaf, [Math.sin(a) * 0.09, 0.05, Math.cos(a) * 0.09], [1.25, a, 0]);
+            for (let j = 0; j < 3; j++) orb(body, [Math.sin(a) * (0.08 + j * 0.06), 0.06 + j * 0.015, Math.cos(a) * (0.08 + j * 0.06)], [0.035, 0.02, 0.045]);
+          }
+        } else if (archetype === "fern") {
+          for (let i = 0; i < 3; i++) {
+            const a = i * TAU / 3 + 0.2, x = Math.sin(a) * 0.08, z = Math.cos(a) * 0.08;
+            stem([x, 0.16 * size, z], 0.32 * size, 0.014, 0.18);
+            add(new THREE.TorusGeometry(0.045, 0.013, 5, 10, Math.PI * 1.4), body, [x + 0.05, 0.34 * size, z], [0.3, a, 0.4]);
+            for (let j = 0; j < 3; j++) add(foldedLeaf(0.08, 0.025, 0.02, 0.01), leaf, [x, 0.1 + j * 0.07, z], [0, a + j, 0]);
+          }
+        } else if (archetype === "sprig") {
+          stem([0, 0.2 * size, 0], 0.4 * size, 0.016, 0, 0x8a6a4a);
+          for (let j = 0; j < 4; j++) {
+            const y = (0.14 + j * 0.08) * size;
+            add(foldedLeaf(0.12, 0.04, 0.03, 0.02), j % 2 ? body : leaf, [0, y, 0], [0, j * 1.9, 0]);
+            add(foldedLeaf(0.12, 0.04, 0.03, 0.02), j % 2 ? leaf : body, [0, y, 0], [0, j * 1.9 + Math.PI, 0]);
+          }
+        } else if (archetype === "coin") {
+          stem([0, 0.18 * size, 0], 0.36 * size, 0.014, 0, 0x8a6a4a);
+          for (let k = 0; k < 7; k++) {
+            const a = k * 2.4, r = 0.05 + (k % 3) * 0.03;
+            add(new THREE.CylinderGeometry(0.042, 0.042, 0.01, 9), body, [Math.sin(a) * r, (0.26 + (k % 4) * 0.045) * size, Math.cos(a) * r], [0.4 + k * 0.2, a, 0.2]);
+          }
+        } else if (archetype === "bell") {
+          stem([0, 0.2 * size, 0], 0.4 * size, 0.014, 0.1);
+          for (let k = 0; k < 5; k++) {
+            const t = k / 4;
+            orb(body, [0.06 + t * 0.05, (0.36 - t * 0.14) * size, (k % 2 - 0.5) * 0.05], [0.032, 0.045, 0.032]);
+          }
+          add(foldedLeaf(0.12, 0.04, 0.03, 0.02), leaf, [0, 0.3 * size, 0], [0, 2.2, 0]);
+        } else if (archetype === "herb") {
+          stem([0, 0.19 * size, 0], 0.38 * size, 0.014);
+          for (let j = 0; j < 3; j++) {
+            const y = (0.12 + j * 0.09) * size;
+            add(foldedLeaf(0.14, 0.055, 0.04, 0.02), leaf, [0, y, 0], [0, j * 1.6 + 0.5, 0]);
+            add(foldedLeaf(0.14, 0.055, 0.04, 0.02), leaf, [0, y, 0], [0, j * 1.6 + 0.5 + Math.PI, 0]);
+          }
+          orb(body, [0, 0.4 * size, 0], [0.03, 0.05, 0.03]);
+        } else if (archetype === "allium") {
+          for (let k = 0; k < 4; k++) {
+            const a = k * TAU / 4 + 0.4;
+            stem([Math.sin(a) * 0.04, 0.16 * size, Math.cos(a) * 0.04], 0.32 * size, 0.011, 0.16 * Math.sin(a));
+          }
+          orb(0xe8e8d8, [0, 0.04, 0], [0.04, 0.05, 0.04]);
+          orb(body, [0.05, 0.34 * size, 0], [0.035, 0.035, 0.035]);
+        } else if (archetype === "celery") {
+          for (let k = 0; k < 3; k++) {
+            const a = k * TAU / 3, x = Math.sin(a) * 0.06, z = Math.cos(a) * 0.06;
+            stem([x, 0.16 * size, z], 0.32 * size, 0.016, 0.1 * Math.sin(a));
+            leaves(3, 0.32 * size, 0.1, 0.04, 0.04, 0.02, a, 0.05);
+          }
+        }
+        break;
+      }
     }
-    if (mutation && ripe) {
+    if (mutation && ripe && !isWildMutation(mutation)) {
       // 形状和发光纹样分别构建，日光下也能读出剪影。
       for (let i = 0; i < 3; i++) {
         const a = i * TAU / 3 + 0.4;
@@ -208,6 +475,21 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   }
   const merged = mergeGeometries(pieces)!;
   pieces.forEach((part) => part.dispose());
+  // 野菜变异是整株材质变化：阴阳按左右双分，长生做玉质渐变，生长期也可见
+  if (mutation && isWildMutation(mutation)) {
+    const out = new THREE.Color();
+    if (wildMutationFamily(mutation) === "yinyang") {
+      const black = new THREE.Color(0x26262e), white = new THREE.Color(0xf4f1e8);
+      recolorVertices(merged, (x, _y, _z, base) =>
+        out.copy(black).lerp(white, smoothstep(-0.05, 0.05, x)).multiplyScalar(0.88 + 0.24 * base.g));
+    } else {
+      const deep = new THREE.Color(0x5fae8a), pale = new THREE.Color(0xd6f5e2);
+      recolorVertices(merged, (x, y, z, base) => {
+        const vein = 0.5 + 0.5 * Math.sin(x * 14 + z * 11 + y * 6);
+        return out.copy(deep).lerp(pale, smoothstep(0, 0.9, y) * 0.7 + vein * 0.3).multiplyScalar(0.9 + 0.18 * base.g);
+      });
+    }
+  }
   return merged;
 }
 

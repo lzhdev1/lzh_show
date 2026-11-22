@@ -61,8 +61,133 @@ export function CropIcon({ crop, size = 20 }: { crop: CropId; size?: number }) {
           <path d="M12 8.6V5.6" stroke={leaf} strokeWidth="2.2" strokeLinecap="round" />
         </svg>
       );
+    case "eggplant":
+      return (
+        <svg {...common}>
+          <path d="M9 8.2c-1.8 2.4-2.6 5-2 7.6.7 3 3 4.8 5.6 4.4 3-.5 4.8-3.4 4.2-6.6-.5-2.8-2.4-5-4.6-6.2Z" fill={body} />
+          <path d="M8.4 8.6l3.4-2 3.6 1.6-1.2 2.4-3.2.4-2.6-2.4Z" fill={leaf} />
+          <path d="M11.6 6.4c.2-1.6 1-2.6 2.4-3" stroke={leaf} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+        </svg>
+      );
+    case "bean":
+      return (
+        <svg {...common}>
+          <path d="M7 5.4c-1.6 4.4-1.4 9 .8 13.4" stroke={body} strokeWidth="3.4" strokeLinecap="round" fill="none" />
+          <path d="M12.4 4.6c-1 4.8-.6 9.6 1.4 14.2" stroke={body} strokeWidth="3.4" strokeLinecap="round" fill="none" />
+          <path d="M17.6 6c-.4 4.2.2 8.2 2 11.8" stroke={leaf} strokeWidth="3.2" strokeLinecap="round" fill="none" />
+        </svg>
+      );
+    case "chili":
+      return (
+        <svg {...common}>
+          <path d="M14.8 7.4c2.6 1.4 3.6 4.4 2.4 7.4-1.4 3.4-5 5.4-9.4 5 3.4-1.4 5.6-3.6 6.4-6.6.5-2 .4-4-.4-5.8Z" fill={body} />
+          <path d="M13.6 7.6c-.4-1.8.2-3.2 1.8-4" stroke={leaf} strokeWidth="1.9" strokeLinecap="round" fill="none" />
+          <path d="M12.4 7.2l2.8-.6.8 2.2-2.6.8-1-2.4Z" fill={leaf} />
+        </svg>
+      );
+    case "watermelon":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="13.4" r="7" fill={body} />
+          <path d="M8.4 7.4c-1 3.8-1 8 0 12M12 6.4v14M15.6 7.4c1 3.8 1 8 0 12" stroke="#245c2c" strokeWidth="1.7" fill="none" strokeLinecap="round" />
+          <path d="M12 6.4c.4-1.4 1.4-2.2 2.8-2.4" stroke={leaf} strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        </svg>
+      );
+    case "peach":
+      return (
+        <svg {...common}>
+          <path d="M12 8.6c1.4-1.2 3.4-1.4 5-.4 2.2 1.4 2.8 4.4 1.4 7-1.6 3-4.4 4.8-6.4 5.6-2-.8-4.8-2.6-6.4-5.6-1.4-2.6-.8-5.6 1.4-7 1.6-1 3.6-.8 5 .4Z" fill={body} />
+          <path d="M12 9v10.6" stroke="#d97f84" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M12.4 7.8c.4-2 1.8-3.2 3.8-3.4-.2 2-1.6 3.2-3.8 3.4Z" fill={leaf} />
+        </svg>
+      );
+    case "pear":
+      return (
+        <svg {...common}>
+          <path d="M12 5.6c1.6 0 2.6 1.2 2.8 3 .2 1.6 1 2.6 2 3.8 1.6 2 1.4 5-.6 6.6-2.2 1.8-6.2 1.8-8.4 0-2-1.6-2.2-4.6-.6-6.6 1-1.2 1.8-2.2 2-3.8.2-1.8 1.2-3 2.8-3Z" fill={body} />
+          <path d="M12 5.4V3.2" stroke="#8a6a3c" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M12.6 4.6c1.4-1 2.8-1 4 .2-1.4 1-2.8 1-4-.2Z" fill={leaf} />
+        </svg>
+      );
+    case "apricot":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="13.8" r="6.6" fill={body} />
+          <path d="M12 7.4c-1 2-1 4.2 0 6.4" stroke="#d18a2e" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+          <path d="M12.4 7c.4-1.8 1.6-2.8 3.4-3-.2 1.8-1.4 2.8-3.4 3Z" fill={leaf} />
+        </svg>
+      );
+    case "jujube":
+      return (
+        <svg {...common}>
+          <ellipse cx="8.2" cy="14.6" rx="3" ry="4" fill={body} />
+          <ellipse cx="15.8" cy="14.6" rx="3" ry="4" fill={body} />
+          <ellipse cx="12" cy="10.6" rx="3" ry="4" fill={body} />
+          <path d="M12 6.4V4M8.2 10.4 7 8.6m8.8 1.8 1.2-1.8" stroke={leaf} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case "tulip":
+      return (
+        <svg {...common}>
+          <path d="M7.4 5.4v5.2c0 3 2 5 4.6 5s4.6-2 4.6-5V5.4l-2.4 2.2L12 5l-2.2 2.6-2.4-2.2Z" fill={body} />
+          <path d="M12 15.6V21" stroke={leaf} strokeWidth="1.9" strokeLinecap="round" />
+          <path d="M12 19c-2.6-.2-4.2-1.4-4.8-3.6 2.6.2 4.2 1.4 4.8 3.6Z" fill={leaf} />
+        </svg>
+      );
+    case "lily":
+      return (
+        <svg {...common}>
+          <g fill={body} stroke="#d8cfbc" strokeWidth=".7">
+            <path d="M12 12C10 8.4 10 5.6 12 3.4c2 2.2 2 5 0 8.6Z" />
+            <path d="M12 12c3.8-1.6 6.6-1.2 8.4 1-2.4 1.6-5.2 1.2-8.4-1Z" />
+            <path d="M12 12c-3.8-1.6-6.6-1.2-8.4 1 2.4 1.6 5.2 1.2 8.4-1Z" />
+            <path d="M12 12c2.6 3 3 5.8 1.4 8.2-2.2-1.8-2.6-4.6-1.4-8.2Z" />
+            <path d="M12 12c-2.6 3-3 5.8-1.4 8.2 2.2-1.8 2.6-4.6 1.4-8.2Z" />
+          </g>
+          <circle cx="12" cy="12" r="1.7" fill="#e8b23c" />
+        </svg>
+      );
+    case "roseRed":
+    case "rosePink":
+    case "roseWhite":
+    case "roseYellow":
+    case "roseBlue":
+    case "rosePurple":
+      return (
+        <svg {...common}>
+          <path d="M12 13.4V21" stroke={leaf} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M12 18c-2.4-.2-3.8-1.2-4.4-3.2 2.4.2 3.8 1.2 4.4 3.2Z" fill={leaf} />
+          <circle cx="12" cy="8.6" r="5.6" fill={body} />
+          <path d="M12 8.6c-1.6-.2-2.4-1.2-2.2-2.6 1.6.2 2.4 1.2 2.2 2.6Zm0 0c1.8.4 2.8 1.6 2.6 3.2-1.8-.4-2.8-1.6-2.6-3.2Zm0 0c-1.4 1.2-2.8 1.2-4-.2 1.4-1.2 2.8-1.2 4 .2Z" fill="#00000022" />
+          <circle cx="12" cy="8.6" r="1.6" fill="#00000026" />
+        </svg>
+      );
+    case "pineapple":
+      return (
+        <svg {...common}>
+          <ellipse cx="12" cy="14.6" rx="5.4" ry="6.4" fill={body} />
+          <path d="M8 10.8l8 7.6M16 10.8l-8 7.6M12 8.4v12.4" stroke="#b8842c" strokeWidth="1.1" />
+          <path d="M12 8.2C10.4 6 10.2 4 11.2 2.2c1.4 1.4 1.8 3.4 1 6Zm0 0c2.4-1.4 4.4-1.4 6 .2-1.8 1.2-3.8 1.2-6-.2Zm0 0c-2.4-1.4-4.4-1.4-6 .2 1.8 1.2 3.8 1.2 6-.2Z" fill={leaf} />
+        </svg>
+      );
+    case "durian":
+      return (
+        <svg {...common}>
+          <path d="M12 4.6l1.5 2 2.4-.8.4 2.5 2.5.4-.8 2.4 2 1.5-2 1.5.8 2.4-2.5.4-.4 2.5-2.4-.8-1.5 2-1.5-2-2.4.8-.4-2.5-2.5-.4.8-2.4-2-1.5 2-1.5-.8-2.4 2.5-.4.4-2.5 2.4.8Z" fill={body} />
+          <circle cx="12" cy="12.6" r="4.6" fill="#cdb86a" />
+          <path d="M12 4.4V2.4" stroke="#8a6a3c" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
     default:
-      return null;
+      // 野菜共用一版嫩芽图标，按品种配色区分
+      return (
+        <svg {...common}>
+          <path d="M12 21v-8.4" stroke={leaf} strokeWidth="2" strokeLinecap="round" />
+          <path d="M12 13c-3.8.2-6-1.6-6.6-5.2 3.8-.2 6 1.6 6.6 5.2Z" fill={leaf} />
+          <path d="M12 12.6c.4-3.8 2.4-5.8 6-6.2-.4 3.8-2.4 5.8-6 6.2Z" fill={body} />
+          <circle cx="12" cy="6.4" r="1.6" fill={body} />
+        </svg>
+      );
   }
 }
 

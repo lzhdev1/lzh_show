@@ -7,12 +7,15 @@ import { createRanchScene } from "../scene/ranchScene";
 import { RANCH_ENTRANCE } from "../scene/ranchLayout";
 import { saddleHeight } from "../scene/ranchAnimals";
 import { createPlots, disposePlots, plotIdAt, plotPosition, updatePlots, PLOT_SIZE, bedHeightAt } from "../scene/plots";
+import { createForageScene } from "../scene/forageScene";
 import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
 import { WORLD_HALF } from "../scene/layout";
 import { ranchBounds } from "../scene/ranchLayout";
 import { setLocalPresence, useSocial } from "./social";
+import { useAction } from "./actionStore";
+import { ACTIONS, ACTION_IDS, isActionId } from "../scene/actionMotion";
 import { useGame } from "./state";
 import { setStandingPlot } from "./fieldInteraction";
 import { farmInput, releaseTouchInput } from "./input";
@@ -33,6 +36,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
   const plots = createPlots();
   view.scene.add(plots.group);
+  const forageScene = createForageScene(world.obstacles, plots.library);
+  view.scene.add(forageScene.group);
 
   const riverAudio = createRiverAudio();
 
@@ -77,6 +82,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const pointer = new THREE.Vector2();
   const keys = new Set<string>();
   const inputDir = new THREE.Vector3();
+  const actionKeys = new Map(ACTION_IDS.map(id => [ACTIONS[id].key.toLowerCase(), id]));
+  const isSpectating = () => useSocial.getState().visit?.mode === "spectate";
 
   // —— 键盘 ——
   const isTyping = (target: EventTarget | null) => {
@@ -97,6 +104,11 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       controls.reset();
       return;
     }
+    const actionId = actionKeys.get(key);
+    if (actionId) {
+      if (!e.repeat && !isSpectating()) player.playAction(actionId);
+      return;
+    }
     if (["q", "e", "shift", "w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       e.preventDefault();
       keys.add(key);
@@ -112,12 +124,21 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
   // The panel closes after choosing a destination. Start walking on the first
   // unblocked frame so dismissing the panel cannot cancel the new route.
-  let destination: "ranch" | "wild" | null = null;
+  let destination: "ranch" | "wild" | "forage" | null = null;
   const visitRanch = () => { destination = "ranch"; };
   const findWildlife = () => { destination = "wild"; };
+  const findForage = () => { destination = "forage"; };
   const entrance = new THREE.Vector3(RANCH_ENTRANCE.x, 0, RANCH_ENTRANCE.z);
   window.addEventListener("ttfarm:visit-ranch", visitRanch);
   window.addEventListener("ttfarm:find-wildlife", findWildlife);
+  window.addEventListener("ttfarm:find-forage", findForage);
+  const onActionEvent = (event: Event) => {
+    const id = (event as CustomEvent).detail;
+    if (!isSpectating() && isActionId(id)) player.playAction(id);
+  };
+  const onStopActionEvent = () => player.stopAction();
+  window.addEventListener("ttfarm:action", onActionEvent);
+  window.addEventListener("ttfarm:stop-action", onStopActionEvent);
   const focusVisit = (event: Event) => {
     const visit = useSocial.getState().visit;
     if (!visit) return;
@@ -153,6 +174,11 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const animal = ranchScene.pickWild(raycaster);
     if (animal) {
       player.moveTo(animal, undefined, false, true);
+      return;
+    }
+    const patch = forageScene.pickPatch(raycaster);
+    if (patch) {
+      player.moveTo(patch, undefined, false, true);
       return;
     }
     const plotHits = raycaster.intersectObjects(plots.meshes, false);
@@ -247,9 +273,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
     if (!farmInput.blocked) {
       if (destination) {
-        const goal = destination === "ranch" ? entrance : ranchScene.nearestWildPoint();
+        const goal = destination === "ranch" ? entrance : destination === "wild" ? ranchScene.nearestWildPoint() : forageScene.nearestPatchPoint();
         if (goal) player.moveTo(goal, undefined, false, true);
-        else useGame.getState().notify("这批野生动物已全部收服，稍后再来看看");
+        else useGame.getState().notify(destination === "forage" ? "这一批野菜已经被采完了，稍后再来看看" : "这批野生动物已全部收服，稍后再来看看");
         destination = null;
       }
       inputDir.addScaledVector(screenRight, farmInput.x).addScaledVector(forward, farmInput.forward);
@@ -268,11 +294,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       spectatorFocus.z = THREE.MathUtils.clamp(spectatorFocus.z, -WORLD_HALF, WORLD_HALF);
     } else {
       player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running);
+      const currentAction = player.currentAction;
+      if (useAction.getState().current !== currentAction) useAction.setState({ current: currentAction });
       if (elapsed >= nextPresence) {
         nextPresence = elapsed + .08;
         const { x, y, z } = player.root.position;
         setLocalPresence({ x,y,z, yaw:player.root.rotation.y, moving:player.isMoving, running:player.isRunning,
           jumping:player.isJumping, swimming:player.swimAmount > .45,
+          action:player.currentAction, actionTime:player.actionClock,
           mount:mount ? {species:mount.species,element:mount.element} : null });
       }
     }
@@ -302,6 +331,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     peers.update(players, dt, elapsed, focus);
     peers.localRide(visit?.mode === "friend" ? mount : undefined, player, dt, elapsed);
     ranchScene.update(elapsed, dt, wallTime, herd, player.root, player.isMoving, rider, spectator ? spectatorFocus : undefined, peers.emitAuras, player.isRunning);
+    forageScene.update(elapsed, wallTime, useGame.getState().forage, focus, !visit);
     if (ranchLevel !== herd.level) {
       if (!spectator) player.adjustToChangedFences();
       ranchLevel = herd.level;
@@ -339,6 +369,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     window.removeEventListener("blur", onBlur);
     window.removeEventListener("ttfarm:visit-ranch", visitRanch);
     window.removeEventListener("ttfarm:find-wildlife", findWildlife);
+    window.removeEventListener("ttfarm:find-forage", findForage);
+    window.removeEventListener("ttfarm:action", onActionEvent);
+    window.removeEventListener("ttfarm:stop-action", onStopActionEvent);
     window.removeEventListener("ttfarm:visit-focus", focusVisit);
     controls.dispose();
     riverAudio.dispose();
@@ -346,6 +379,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     peers.clear();
     horseTrail.dispose();
     ranchScene.dispose();
+    forageScene.dispose();
     world.dispose();
     player.dispose();
     disposePlots(plots);

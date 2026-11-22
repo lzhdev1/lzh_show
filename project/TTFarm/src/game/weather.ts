@@ -1,9 +1,12 @@
 export const ELEMENTS = ["thunder", "frost", "flame", "gold", "earth", "wind"] as const;
 export const SPIRITS = ["rosette", "nocturne", "coral", "orbit", "bamboo"] as const;
+/** 野菜专属变异：阴阳与长生，各三级（星辰数 / 金龙数） */
+export const WILD_MUTATIONS = ["yinyang1", "yinyang2", "yinyang3", "longlife1", "longlife2", "longlife3"] as const;
 export type Spirit = typeof SPIRITS[number];
 type Element = typeof ELEMENTS[number];
 type Legacy = "amber" | "mist" | "pearl";
-export type Mutation = Element | Spirit | Legacy;
+export type WildMutation = typeof WILD_MUTATIONS[number];
+export type Mutation = Element | Spirit | Legacy | WildMutation;
 
 export const MUTATIONS = {
   thunder: { label: "雷霆", multiplier: 2, fruit: 0x9d76ff, leaf: 0x6585d7 },
@@ -21,6 +24,13 @@ export const MUTATIONS = {
   amber: { label: "金穗", multiplier: 2, fruit: 0xffc855, leaf: 0xa7bc62 },
   mist: { label: "雾晶", multiplier: 3, fruit: 0xbda6ef, leaf: 0x73aab5 },
   pearl: { label: "雨珠", multiplier: 2, fruit: 0x80dfdc, leaf: 0x59ad8a },
+  // 野菜专属：阴阳（黑白双分 + 星辰环绕）、长生（玉质 + 金龙环绕）。
+  yinyang1: { label: "阴阳·一星", multiplier: 4, fruit: 0xe8e6f0, leaf: 0x9aa0b0 },
+  yinyang2: { label: "阴阳·二星", multiplier: 8, fruit: 0xe8e6f0, leaf: 0x9aa0b0 },
+  yinyang3: { label: "阴阳·三星", multiplier: 16, fruit: 0xe8e6f0, leaf: 0x9aa0b0 },
+  longlife1: { label: "长生·一龙", multiplier: 5, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
+  longlife2: { label: "长生·二龙", multiplier: 10, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
+  longlife3: { label: "长生·三龙", multiplier: 20, fruit: 0x9fdcb8, leaf: 0x7cc9a0 },
 } as const;
 
 export const WEATHER = {
@@ -94,4 +104,31 @@ export function rollMutation(weather: WeatherKind, random = Math.random): Mutati
     if (draw < 0) return element;
   }
   return ELEMENTS[ELEMENTS.length - 1];
+}
+
+export function isWildMutation(value: Mutation): value is WildMutation {
+  return (WILD_MUTATIONS as readonly Mutation[]).includes(value);
+}
+
+/** 变异级别：阴阳看星辰数，长生看金龙数，都是 1–3 */
+export function wildMutationTier(value: WildMutation): 1 | 2 | 3 {
+  return Number(value.slice(-1)) as 1 | 2 | 3;
+}
+
+export function wildMutationFamily(value: WildMutation): "yinyang" | "longlife" {
+  return value.startsWith("yinyang") ? "yinyang" : "longlife";
+}
+
+/** 野菜播种抽签：14% 变异，阴阳/长生各半；级别 68% / 25% / 7%。 */
+export const WILD_MUTATION_CHANCE = 0.14;
+/** 必中抽签：只决定家族与级别，供野外菜丛生成复用 */
+export function pickWildMutation(random = Math.random): WildMutation {
+  const family = random() < 0.5 ? "yinyang" : "longlife";
+  const tier = random();
+  const level = tier < 0.68 ? 1 : tier < 0.93 ? 2 : 3;
+  return `${family}${level}` as WildMutation;
+}
+export function rollWildMutation(random = Math.random): WildMutation | null {
+  if (random() >= WILD_MUTATION_CHANCE) return null;
+  return pickWildMutation(random);
 }

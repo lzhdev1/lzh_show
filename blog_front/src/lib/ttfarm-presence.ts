@@ -37,7 +37,9 @@ export async function heartbeat(client: Queryable, self: number, body: Record<st
     && ((candidate.species === "horse" && candidate.element === null) || (typeof candidate.element === "string" && candidate.element.length<10))
     ? {species: candidate.species, element: candidate.element} : null;
   const pose = {x:coordinate(body.x,256), y:coordinate(body.y,128), z:coordinate(body.z,256), yaw:coordinate(body.yaw,1e8)%(Math.PI*2),
-    moving:body.moving === true, running:body.running === true, swimming:body.swimming === true, jumping:body.jumping === true, mount};
+    moving:body.moving === true, running:body.running === true, swimming:body.swimming === true, jumping:body.jumping === true, mount,
+    action: typeof body.action === "string" && ["punch","kick","cheer","dance","lie","faint","sit"].includes(body.action) ? body.action : null,
+    actionTime: typeof body.actionTime === "number" && Number.isFinite(body.actionTime) ? Math.min(Math.max(body.actionTime, 0), 86400) : 0};
   await client.query(`INSERT INTO farm_presence(user_id,owner_id,pose) VALUES($1,$2,$3)
     ON CONFLICT (user_id) DO UPDATE SET owner_id=EXCLUDED.owner_id,pose=EXCLUDED.pose,seen_at=now()`, [self,owner,pose]);
   const farm = await client.query("SELECT revision FROM farm_states WHERE user_id=$1",[owner]);

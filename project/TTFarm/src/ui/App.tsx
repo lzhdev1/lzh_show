@@ -11,10 +11,13 @@ import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
 import { farmInput, releaseTouchInput } from "../game/input";
 import { ControlGuide, ReturnToLoginButton, TouchControls, WeatherBadge } from "./FieldControls";
+import { ActionTrigger } from "./ActionPanel";
 import { FarmPanel } from "./FarmPanel";
 import { RanchPanel, RanchTrigger, RanchHUD } from "./RanchPanel";
+import { ForageHUD } from "./ForageHUD";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
+import { CodexPanel, CodexTrigger } from "./CodexPanel";
 import { FarmGuests, VisitHUD } from "./VisitHUD";
 import "./social.css";
 
@@ -41,13 +44,14 @@ export function App() {
   const [ranchOpen, setRanchOpen] = useState(false);
   const [rankingOpen, setRankingOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [codexOpen, setCodexOpen] = useState(false);
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   const away = !!visit;
   useEffect(() => {
     if (!away && token) return;
     setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
-    setProfileOpen(false); setFarmOpen(false); setRanchOpen(false);
+    setProfileOpen(false); setFarmOpen(false); setRanchOpen(false); setCodexOpen(false);
   }, [away, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
@@ -64,13 +68,13 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
-  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen);
+  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen);
   useEffect(() => {
     if (!panelOpen) return;
     const dismiss = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return;
       setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
-      setRanchOpen(false); setFriendsOpen(false);
+      setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false);
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -108,6 +112,7 @@ export function App() {
         </button>
 
         <div className="top-right">
+          <CodexTrigger onClick={() => setCodexOpen(true)} />
           <button className="icon-btn rank-trigger" aria-label="金币排行榜" title="金币排行榜" onClick={() => setRankingOpen(true)}>
             <TrophyIcon /><span>排行</span>
           </button>
@@ -129,6 +134,7 @@ export function App() {
         {selectedPlot === null && <>
           <WeatherBadge onOpen={() => setFarmOpen(true)} />
           <ControlGuide />
+          <ActionTrigger />
           <RanchTrigger onClick={() => setRanchOpen(true)} />
           <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
         </>}
@@ -139,6 +145,7 @@ export function App() {
         <TouchControls />
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
+        <ForageHUD />
       </>}
 
       <div className="dock">
@@ -147,7 +154,8 @@ export function App() {
           <span>种子</span>
         </div>
         <div className="seed-scroll">
-          {CROP_LIST.map((crop) => {
+          {/* 野菜种子只有捡到过才占格子，避免 20 个空位挤爆种子栏 */}
+          {CROP_LIST.filter((crop) => !crop.wild || (seeds[crop.id] ?? 0) > 0).map((crop) => {
             const locked = level < crop.unlockLevel;
             return (
               <button
@@ -179,6 +187,7 @@ export function App() {
       {profileOpen && <ProfilePanel onClose={() => setProfileOpen(false)} />}
       {farmOpen && <FarmPanel onClose={() => setFarmOpen(false)} />}
       {ranchOpen && <RanchPanel onClose={() => setRanchOpen(false)} />}
+      {codexOpen && <CodexPanel onClose={() => setCodexOpen(false)} />}
       {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
       {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
       </>}

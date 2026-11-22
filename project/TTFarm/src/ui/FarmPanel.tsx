@@ -2,8 +2,9 @@ import { useState } from "react";
 import { PLOT_COUNT, landPriceOf, useGame } from "../game/state";
 import { CloseIcon, CoinIcon, LandIcon } from "./icons";
 import { useClock } from "../game/clock";
-import { ELEMENTS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
+import { ELEMENTS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, WILD_MUTATION_CHANCE, WILD_MUTATIONS, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
 import { formatRemain } from "../game/growth";
+import { FORAGE_SEED_CHANCE, forageEndsAt } from "../game/forage";
 import { FarmDecorPanel } from "./FarmDecorPanel";
 
 const money = (value: number) => value.toLocaleString("zh-CN");
@@ -68,6 +69,23 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
           <ul>{ELEMENTS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
           <p>变异中有 {Math.round(SPIRIT_SHARE * 100)}% 会长成精灵。五位精灵在各种天气中都有机会出现，出售每份收成可得八倍金币。</p>
           <ul>{SPIRITS.map(id => <li key={id}>{MUTATIONS[id].label}</li>)}</ul>
+        </details>
+
+        <h3 className="section-title">野外野菜</h3>
+        <div className="row">
+          <div className="row-main">
+            <strong>下一批野菜 · {formatRemain(forageEndsAt(now) - now)}后刷新</strong>
+            <span className="muted small">
+              野外每 10 分钟长出 18 丛野菜，走近即可采摘；每次采摘有 {Math.round(FORAGE_SEED_CHANCE * 100)}% 捡到种子，可以种回农场。
+              约一成菜丛自带阴阳或长生变异，采到就是变异收成。
+            </span>
+          </div>
+          <button className="btn mini" onClick={() => { window.dispatchEvent(new Event("ttfarm:find-forage")); onClose(); }}>去寻找</button>
+        </div>
+        <details className="crop-almanac">
+          <summary>野菜变异图鉴</summary>
+          <p>野菜只会发生两种变异：阴阳（半黑半白、星辰环绕）与长生（玉质云雾、金龙环绕）。种下野菜种子有 {Math.round(WILD_MUTATION_CHANCE * 100)}% 概率变异，级别越高越稀有。</p>
+          <ul>{WILD_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
         </details>
         <h3 className="section-title">扩建</h3>
         {locked.length > 0 ? (

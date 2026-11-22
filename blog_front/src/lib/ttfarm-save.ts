@@ -1,8 +1,9 @@
 import type { Queryable } from "./ttfarm-auth";
-import { CROPS } from "@farm-rules/crops";
+import { CROPS, cropMutationValid } from "@farm-rules/crops";
 import { MAX_WATER, PLOT_COUNT, START_UNLOCKED } from "@farm-rules/growth";
 import { normalizeRanch as readRanch } from "@farm-rules/ranch";
-import { MUTATIONS as CROP_MUTATIONS } from "@farm-rules/weather";
+import { normalizeForage as readForage } from "@farm-rules/forage";
+import { MUTATIONS as CROP_MUTATIONS, isMutation } from "@farm-rules/weather";
 
 /** 测试期金币：新号直接给一大笔，方便试扩建 */
 export const START_COINS = 99_999_999;
@@ -53,6 +54,7 @@ export interface FarmSave {
   bottomId: string;
   decor: ReturnType<typeof readDecor>;
   ranch: ReturnType<typeof readRanch>;
+  forage: ReturnType<typeof readForage>;
   selectedSeed: string;
 }
 
@@ -81,6 +83,7 @@ export function initialSave(nickname = "农场主"): FarmSave {
     bottomId: "field",
     decor: readDecor(null),
     ranch: readRanch(null),
+    forage: readForage(null),
     selectedSeed: "radish",
   };
 }
@@ -116,13 +119,16 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
   for (let id = 0; id < PLOT_COUNT; id += 1) {
     const old = rawPlots.find((p) => p && Number(p.id) === id) as Partial<PlotState> | undefined;
     const crop = typeof old?.crop === "string" && CROP_IDS.includes(old.crop) ? old.crop : null;
+    const mutation = crop && typeof old?.mutation === "string" && MUTATIONS.includes(old.mutation)
+      && isMutation(old.mutation) && cropMutationValid(crop as keyof typeof CROPS, old.mutation)
+      ? old.mutation : null;
     plots.push({
       id,
       unlocked: Boolean(old?.unlocked),
       crop,
       plantedAt: crop ? int(old?.plantedAt, 0, 9_999_999_999_999, 0) : 0,
       watered: crop ? int(old?.watered, 0, MAX_WATER, 0) : 0,
-      mutation: crop && old?.mutation && MUTATIONS.includes(old.mutation) ? old.mutation : null,
+      mutation,
     });
   }
 
@@ -143,6 +149,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
     bottomId: stageSet || !isBasicOutfit(src.bottomId) ? outfitId : src.bottomId,
     decor: readDecor(src.decor),
     ranch: readRanch(src.ranch),
+    forage: readForage(src.forage),
     selectedSeed: typeof src.selectedSeed === "string" && CROP_IDS.includes(src.selectedSeed)
       ? src.selectedSeed
       : "radish",
@@ -163,10 +170,11 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
     bottom_id: string | null;
     decor: FarmSave["decor"];
     ranch: FarmSave["ranch"];
+    forage: FarmSave["forage"];
     save_version: number;
     revision: number;
   }>(
-    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.save_version, s.revision,
+    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.forage, s.save_version, s.revision,
             CASE WHEN u.nickname_key IS NULL THEN '' ELSE u.nickname END AS nickname, u.avatar_id
        FROM farm_states s JOIN users u ON u.id = s.user_id WHERE s.user_id = $1`,
     [userId]
@@ -196,6 +204,7 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
       bottomId: row.bottom_id,
       decor: row.decor,
       ranch: row.ranch,
+      forage: row.forage,
     },
     row.nickname
   ) ?? initialSave(nickname);
@@ -203,11 +212,11 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
 }
 
 export async function saveState(pool: Queryable, userId: number, save: FarmSave,
-                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, expectedRevision: number | null = null): Promise<number | null> {
+                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, includeForage = true, expectedRevision: number | null = null): Promise<number | null> {
   const result = await pool.query(
     `WITH written AS (
-     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, save_version, revision, updated_at)
-     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb,
+     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, forage, save_version, revision, updated_at)
+     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb, $18::jsonb,
             CASE WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
      ON CONFLICT (user_id) DO UPDATE SET
        coins = EXCLUDED.coins,
@@ -225,6 +234,7 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
        END,
        decor = CASE WHEN $12 THEN EXCLUDED.decor ELSE farm_states.decor END,
        ranch = CASE WHEN $16 THEN EXCLUDED.ranch ELSE farm_states.ranch END,
+       forage = CASE WHEN $19 THEN EXCLUDED.forage ELSE farm_states.forage END,
        save_version = GREATEST(farm_states.save_version, EXCLUDED.save_version),
        revision = farm_states.revision + 1, updated_at = now()
      WHERE ($16 OR farm_states.save_version < 2)
@@ -250,6 +260,8 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
       JSON.stringify(save.ranch),
       includeRanch,
       expectedRevision,
+      JSON.stringify(save.forage),
+      includeForage,
     ]
   );
   return result.rows[0]?.revision ?? null;

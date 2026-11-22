@@ -1,4 +1,4 @@
-import { CROP_LIST, harvestLots, harvestValue, levelFromXp } from "../game/crops";
+import { SHOP_CROPS, harvestLots, harvestValue, levelFromXp } from "../game/crops";
 import "./varieties.css";
 import { useGame } from "../game/state";
 import { CloseIcon, CoinIcon, CropIcon } from "./icons";
@@ -39,8 +39,9 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
         <p className="modal-sub">买种子、卖收成，扩建地块去「农场」</p>
 
         <h3 className="section-title">种子</h3>
+        <p className="modal-sub">野菜的种子不卖——去野外采摘，有机会捡回来种</p>
         <ul className="list">
-          {CROP_LIST.map((crop) => {
+          {SHOP_CROPS.map((crop) => {
             const locked = level < crop.unlockLevel;
             return (
               <li key={crop.id} className={locked ? "row locked" : "row"}>

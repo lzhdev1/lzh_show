@@ -4,9 +4,11 @@ import { FarmApiError, ttfarmApi, type AccountUser, type RemoteState } from "../
 import { mergeFarmSave } from "./saveMerge";
 import { useGame } from "./state";
 import { isMutation } from "./weather";
+import { cropMutationValid, type CropId } from "./crops";
 import { normalizeAppearance } from "./appearance";
 import { normalizeDecor } from "./decor";
 import { normalizeRanch } from "./ranch";
+import { normalizeForage } from "./forage";
 
 interface AccountStore {
   token: string | null;
@@ -30,7 +32,7 @@ function applyRemoteState(state: RemoteState): void {
     crop: plot.crop,
     plantedAt: plot.plantedAt,
     watered: plot.watered,
-    mutation: plot.crop && isMutation(plot.mutation) ? plot.mutation : null,
+    mutation: plot.crop && isMutation(plot.mutation) && cropMutationValid(plot.crop as CropId, plot.mutation) ? plot.mutation : null,
   }));
 
   useGame.setState({
@@ -43,6 +45,7 @@ function applyRemoteState(state: RemoteState): void {
     ...normalizeAppearance(state.avatarId, state.outfitId, state.bottomId),
     decor: normalizeDecor(state.decor),
     ranch: normalizeRanch(state.ranch),
+    forage: normalizeForage(state.forage),
     selectedSeed: state.selectedSeed,
   });
 }
@@ -62,6 +65,7 @@ function pickSave() {
     bottomId: s.bottomId,
     decor: s.decor,
     ranch: s.ranch,
+    forage: s.forage,
     selectedSeed: s.selectedSeed,
   };
 }
@@ -211,6 +215,7 @@ export function startAutoSave(): () => void {
       state.bottomId === prev.bottomId &&
       state.decor === prev.decor &&
       state.ranch === prev.ranch &&
+      state.forage === prev.forage &&
       state.selectedSeed === prev.selectedSeed
     )) return;
     const { user, token } = useAccount.getState();

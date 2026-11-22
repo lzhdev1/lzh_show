@@ -3,8 +3,9 @@ import type { CropId } from "../game/crops";
 import { cropStage, growthProgress, PLOT_COLS, PLOT_ROWS, PLOT_SPACING } from "../game/growth";
 export { plotIdAt, PLOT_SPACING } from "../game/growth";
 import { createCropLibrary } from "./crops3d";
-import { isSpirit, type Mutation } from "../game/weather";
+import { isSpirit, isWildMutation, type Mutation } from "../game/weather";
 import { createCropAuras } from "./cropAuras";
+import { createWildAuras } from "./wildAuras";
 import { PALETTE, clay } from "./materials";
 import { lumpy } from "./models";
 import type { PlotState } from "../game/growth";
@@ -118,6 +119,7 @@ export interface Plots {
   library: ReturnType<typeof createCropLibrary>;
   materials: ReturnType<typeof createFieldMaterials>;
   auras: ReturnType<typeof createCropAuras>;
+  wildAuras: ReturnType<typeof createWildAuras>;
 }
 
 /** 一张麦穗标记供所有成熟地块共用，尖端指向所属菜垄。 */
@@ -310,8 +312,10 @@ export function createPlots(): Plots {
   group.add(rim);
 
   const auras = createCropAuras(visuals.map(v => v.group.position));
-  group.add(auras.points);
-  return { group, visuals, meshes, library: createCropLibrary(), materials, auras };
+  group.add(auras.group);
+  const wildAuras = createWildAuras();
+  group.add(wildAuras.group);
+  return { group, visuals, meshes, library: createCropLibrary(), materials, auras, wildAuras };
 }
 
 /** 每帧把 store 状态同步给 3D：结构变化才重建作物，其余只改显隐与颜色 */
@@ -324,6 +328,7 @@ export function updatePlots(
 ): void {
   plots.library.wind.value = t;
   plots.auras.setTime(t);
+  plots.wildAuras.update(t);
   for (let i = 0; i < plots.visuals.length; i += 1) {
     const visual = plots.visuals[i];
     const state = states[visual.id];
@@ -365,7 +370,17 @@ export function updatePlots(
       }
     }
     if (visual.cropMesh) visual.cropMesh.visible = Boolean(state.crop);
-    if (stage !== visual.stage || state.mutation !== visual.mutation) plots.auras.setPlot(visual.id,state.mutation,stage);
+    if (stage !== visual.stage || state.mutation !== visual.mutation) {
+      plots.auras.setPlot(visual.id,state.mutation,stage);
+      // 阴阳/长生走独立的柔光特效系统，生长期就可见
+      if (state.crop && state.mutation && isWildMutation(state.mutation) && stage >= 2) {
+        const center = visual.group.position.clone();
+        center.y += 0.3;
+        plots.wildAuras.setEmitter(`plot-${visual.id}`, center, state.mutation);
+      } else {
+        plots.wildAuras.setEmitter(`plot-${visual.id}`, null, null);
+      }
+    }
     visual.cropId = state.crop;
     visual.mutation = state.mutation;
     visual.stage = stage;
@@ -382,6 +397,7 @@ export function updatePlots(
 /** 释放所有地块资源（页面卸载时调用，demo 里主要防止热更新残留） */
 export function disposePlots(plots: Plots): void {
   plots.auras.dispose();
+  plots.wildAuras.dispose();
   const geometries = new Set<THREE.BufferGeometry>();
   const crops = new Set<THREE.Object3D>();
   plots.visuals.forEach(({ cropMesh }) => { if (cropMesh) crops.add(cropMesh); });

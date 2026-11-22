@@ -2,6 +2,7 @@ import * as THREE from "three";
 import data from "./locomotion.json";
 import type { AvatarMotion } from "./rig";
 import { createSwimStroke } from "./swimMotion";
+import { createActionSampler } from "./actionMotion";
 
 export const motionBones = data.bones;
 type PackedClip = typeof data.walk;
@@ -16,6 +17,7 @@ function unpack(clip: PackedClip) {
 const walk = unpack(data.walk), run = unpack(data.run), jump = unpack(data.jump), idle = unpack(data.idle);
 const { lerp } = THREE.MathUtils;
 const sampleSwim = createSwimStroke(motionBones);
+const sampleAction = createActionSampler(motionBones);
 const hips = motionBones.indexOf("hips"), spine = motionBones.indexOf("spine");
 const chest = motionBones.indexOf("chest"), neck = motionBones.indexOf("neck"), head = motionBones.indexOf("head");
 const leftArm = motionBones.indexOf("leftUpperArm"), rightArm = motionBones.indexOf("rightUpperArm");
@@ -142,6 +144,12 @@ export function createCapturedPose() {
         * m.moving, jumpCursor.curve(jump.shift), m.jumpWeight) * (1 - m.swimming);
       pose.flight = runCursor.curve(run.flight) * m.running * m.moving * (1 - m.jumpWeight);
       pose.headAboveWater = m.swimming > 0 ? sampleSwim(bones, m.swimPhase, m.moving, m.swimming) : 0;
+      // 表情/打击动作最后混合：Player 保证动作期间 locomotion 已回到 idle。
+      if (m.action && (m.actionWeight ?? 0) > 0.001) {
+        const extra = sampleAction(bones, m.action, m.actionTime ?? 0, m.actionWeight!);
+        pose.flight += extra.lift;
+        pose.shift += extra.shift;
+      }
     },
   };
   return pose;

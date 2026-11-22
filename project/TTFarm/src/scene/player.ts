@@ -2,7 +2,8 @@ import * as THREE from "three";
 import type { AvatarId, OutfitId } from "../game/appearance";
 import { HORSE_SPEED_FACTOR, type AnimalSpecies } from "../game/ranch";
 import { walkingRoute } from "../game/walkingRoute";
-import type { AvatarMotion, AvatarRig } from "./rig";
+import type { ActionId, AvatarMotion, AvatarRig } from "./rig";
+import { ACTIONS, actionWeight } from "./actionMotion";
 import { builtinModelUrl, getCustomModel, onCustomModelChange } from "./avatarModel";
 import { createFieldAvatar } from "./fieldAvatar";
 import { advanceBridge, sampleTravelSurface } from "../game/waterTravel";
@@ -36,6 +37,8 @@ export class Player {
   private readonly direction = new THREE.Vector3();
   private jumpHeight = 0;
   private jumpTime = -1;
+  private actionId: ActionId | null = null;
+  private actionTime = 0;
   private motion: AvatarMotion = {
     phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0, swimming: 0, swimPhase: 0,
   };
@@ -81,6 +84,21 @@ export class Player {
   }
   get isRunning() { return this.motion.running > 0.45 && this.moving; }
   get isJumping() { return this.jumpTime >= 0; }
+  get currentAction() { return this.actionId; }
+  get actionClock() { return this.actionTime; }
+
+  /** 触发一个动作；骑乘、游泳、跳跃中不响应。移动会自动取消动作。 */
+  playAction(id: ActionId): boolean {
+    if (this.motion.saddleHeight || this.swimAmount > 0.35 || this.jumpTime >= 0) return false;
+    this.cancelTarget();
+    this.actionId = id;
+    this.actionTime = 0;
+    return true;
+  }
+
+  stopAction(): void {
+    this.actionId = null;
+  }
 
   relocate(x: number, z: number, yaw: number, onDeck = false): void {
     this.cancelTarget();
@@ -89,6 +107,7 @@ export class Player {
     this.facing = yaw;
     this.speed = this.jumpHeight = 0;
     this.jumpTime = -1;
+    this.actionId = null;
     this.moving = false;
     const surface = sampleTravelSurface(x, z, onDeck, this.fieldHeightAt);
     this.motion = { phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0,
@@ -205,7 +224,10 @@ export class Player {
   }
 
   jump(): void {
-    if (this.jumpTime < 0 && this.swimAmount < 0.35) this.jumpTime = 0;
+    if (this.jumpTime < 0 && this.swimAmount < 0.35) {
+      this.jumpTime = 0;
+      this.actionId = null;
+    }
   }
 
   update(dt: number, t: number, inputDir: THREE.Vector3 | null, running = false): void {
@@ -302,6 +324,18 @@ export class Player {
     }
     const support = THREE.MathUtils.lerp(surface.floorY, surface.waterY, motion.swimming);
     this.groundY = THREE.MathUtils.damp(this.groundY, support, 16, dt);
+    // 动作状态机：移动输入、跳跃、下水、骑乘都会打断；一次性动作播完自动收尾。
+    if (this.actionId) {
+      if (strength > 0 || this.jumpTime >= 0 || motion.swimming > 0.35 || riding) this.actionId = null;
+      else {
+        this.actionTime += dt;
+        const duration = ACTIONS[this.actionId].duration;
+        if (duration !== null && this.actionTime >= duration) this.actionId = null;
+      }
+    }
+    motion.action = this.actionId;
+    motion.actionTime = this.actionTime;
+    motion.actionWeight = this.actionId ? actionWeight(this.actionId, this.actionTime) : 0;
     this.root.position.set(this.position.x, this.groundY + this.jumpHeight * (1 - motion.swimming), this.position.z);
     this.root.rotation.y = this.facing;
     this.rig.animate?.(dt, t, motion);

@@ -12,6 +12,8 @@
 .variety-mark.gold, .variety-mark.orbit { color: #8f621b; }
 .variety-mark.earth, .variety-mark.bamboo { color: #567343; }
 .variety-mark.wind { color: #287b6e; }
+.variety-mark.yinyang1, .variety-mark.yinyang2, .variety-mark.yinyang3 { color: #4a4a5e; }
+.variety-mark.longlife1, .variety-mark.longlife2, .variety-mark.longlife3 { color: #2e7d5b; }
 .crop-almanac { margin: 10px 0; padding: 10px 12px; background: #f5f1e6; border-radius: 12px; font-size: .85rem; }
 .crop-almanac summary { cursor: pointer; color: #526744; font-weight: 700; }
 .crop-almanac p { line-height: 1.6; margin: 10px 0; }

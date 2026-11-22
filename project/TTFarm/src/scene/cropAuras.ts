@@ -1,135 +1,217 @@
 import * as THREE from "three";
-import { ELEMENTS, MUTATIONS, SPIRITS, type Mutation } from "../game/weather";
+import { MUTATIONS, isWildMutation, type Mutation } from "../game/weather";
+import { cloudTexture, softDotTexture } from "./wildAuras";
 
-const motifs = [...ELEMENTS, ...SPIRITS] as const;
-const PER_PLOT = 22, CELL = 64;
+/**
+ * 普通作物变异（元素 / 精灵）的柔光特效：与野菜变异同一套语言——
+ * 大面积低透明度云絮、升腾的雾、细小光尘、慢速呼吸光晕。
+ * 不再使用图标 glyphs 与十字芒线条；每种变异只改配色与运动配方。
+ */
 
-function motifTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = CELL*4;
-  const ctx = canvas.getContext("2d")!;
-  for (const [index, mutation] of motifs.entries()) {
-    ctx.save();
-    ctx.translate((index%4+.5)*CELL,(Math.floor(index/4)+.5)*CELL);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = ctx.lineJoin = "round";
-    const tint = "#" + MUTATIONS[mutation].fruit.toString(16).padStart(6,"0");
-    const bloom = ctx.createRadialGradient(0,0,0,0,0,29);
-    bloom.addColorStop(0,tint+"bc"); bloom.addColorStop(.33,tint+"61"); bloom.addColorStop(1,tint+"00");
-    ctx.fillStyle=bloom; ctx.fillRect(-32,-32,64,64);
-    ctx.fillStyle=tint; ctx.strokeStyle="#fff7dc"; ctx.shadowColor=tint; ctx.shadowBlur=6;
-    function glyph(path: string, fill = true) {
-      const shape = new Path2D(path);
-      if(fill) ctx.fill(shape);
-      ctx.stroke(shape);
-    }
-    switch(mutation) {
-      case "thunder": glyph("M5 -23L-13 2H-2L-8 22L15 -6H4Z"); break;
-      case "frost":
-        for(let j=0;j<6;j++){glyph("M0 0V-20M0 -10L-5 -15M0 -10L5 -15",false); ctx.rotate(Math.PI/3);}
-        break;
-      case "flame": glyph("M1 -21C0 -12 13 -7 7 1Q13 -2 14 -6C23 10 8 22 -3 19C-21 15 -19 1 -12 -5Q-12 3 -7 4Q-10 -8 1 -21Z");break;
-      case "gold": glyph("M0 -22L15 -3L0 21L-15 -3ZM-15 -3H15M0 -22L-5 -3L0 21L5 -3Z");break;
-      case "earth": glyph("M0 19L-14 8L-7 -1L0 2L9 -3L15 8ZM0 2C-17 0 -18 -9 -17 -13Q-3 -13 0 -3Q4 -17 17 -17Q16 -3 0 2");break;
-      case "wind": glyph("M-20 5C-12 -9 -3 -12 9 -8Q22 -4 22 -15C23 5 8 6 -1 4Q-11 2 -20 5ZM-14 11Q-2 6 6 10Q13 15 18 7",false);break;
-      case "rosette":
-        for(let j=0;j<5;j++){glyph("M0 -1C-13 -10 -7 -24 0 -17C10 -24 12 -10 0 -1Z");ctx.rotate(Math.PI*2/5);}
-        break;
-      case "nocturne": glyph("M8 -20C-13 -19 -21 3 -7 15Q5 25 19 12Q5 17 -2 6Q-9 -9 8 -20Z");break;
-      case "coral": glyph("M0 -20C2 -12 16 0 14 9C12 22 -10 23 -14 10C-18 0 -4 -11 0 -20ZM-8 5Q-7 13 1 14");break;
-      case "orbit": glyph("M0 -19L4 -6L17 -9L10 2L18 13L4 10L-3 22L-5 8L-20 8L-9 -2L-15 -13L-2 -9Z");break;
-      case "bamboo": glyph("M-15 20L11 -21M-6 7Q-19 5 -17 -8Q-6 -5 -6 7M1 -4Q3 -17 13 -20Q16 -8 1 -4M-3 6Q6 -4 18 -2Q13 8 -3 6",false);break;
-    }
-    ctx.restore();
-  }
-  const tex=new THREE.CanvasTexture(canvas);
-  tex.colorSpace=THREE.SRGBColorSpace;
-  return tex;
+/** [升雾, 环云, 光尘, 飘落, 速度] —— 决定每种变异的气质 */
+const RECIPES: Record<string, [number, number, number, number, number]> = {
+  thunder: [10, 4, 12, 0, 1.6],
+  frost: [4, 6, 4, 12, 0.5],
+  flame: [16, 4, 8, 0, 1.25],
+  gold: [6, 12, 8, 0, 0.8],
+  earth: [14, 6, 4, 0, 0.6],
+  wind: [4, 14, 6, 0, 1.4],
+  rosette: [12, 8, 6, 0, 0.8],
+  nocturne: [4, 12, 6, 0, 0.55],
+  coral: [6, 10, 4, 6, 0.7],
+  orbit: [4, 12, 8, 0, 1.1],
+  bamboo: [12, 8, 4, 0, 0.75],
+};
+function recipeOf(mutation: Mutation) {
+  const key = mutation === "amber" ? "gold" : mutation === "mist" ? "wind" : mutation === "pearl" ? "coral" : mutation;
+  return RECIPES[key] ?? RECIPES.gold;
 }
 
-/** 全部菜地共用一次绘制。只在作物阶段变化时上传该地块的图案和亮度。 */
+const MIST_VERTEX = `
+  uniform float t, pixelScale;
+  attribute vec3 aCenter, aColor;
+  attribute float aSeed, aSize, aMode, aSpeed;
+  varying vec3 vColor;
+  varying float vAlpha;
+  void main() {
+    float life = fract(t * (0.09 + aSeed * 0.05) * aSpeed + aSeed * 7.31);
+    float ang = aSeed * 6.2831 + t * (0.22 + aSeed * 0.18) * aSpeed;
+    vec3 p = aCenter;
+    if (aMode < 0.5) {
+      float r = 0.14 + 0.34 * life;
+      p += vec3(cos(ang) * r, 0.06 + life * 0.9, sin(ang) * r);
+      vAlpha = sin(life * 3.14159) * 0.46;
+    } else if (aMode < 1.5) {
+      float r = 0.44 + 0.1 * sin(t * 0.4 + aSeed * 9.0);
+      p += vec3(cos(ang) * r, 0.24 + 0.16 * sin(t * 0.6 + aSeed * 12.0), sin(ang) * r);
+      vAlpha = 0.26 + 0.1 * sin(t * 0.7 + aSeed * 20.0);
+    } else if (aMode < 2.5) {
+      float r = 0.1 + 0.24 * aSeed;
+      p += vec3(cos(ang * 1.7) * r, 0.08 + life * 1.5, sin(ang * 1.7) * r);
+      vAlpha = sin(life * 3.14159) * 0.6;
+    } else {
+      // 霜 / 珠：从冠层慢慢飘落、化开
+      float r = 0.16 + 0.3 * aSeed;
+      p += vec3(cos(ang) * r, 0.95 - life * 0.85, sin(ang) * r);
+      vAlpha = sin(life * 3.14159) * 0.42;
+    }
+    vColor = aColor;
+    vec4 eye = viewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * eye;
+    float swell = aMode < 1.5 ? 0.7 + 0.6 * life : 1.0;
+    gl_PointSize = clamp(pixelScale * aSize * swell / max(1.0, -eye.z), 2.0, 260.0);
+  }`;
+const MIST_FRAGMENT = `
+  uniform sampler2D map;
+  varying vec3 vColor;
+  varying float vAlpha;
+  void main() {
+    float a = texture2D(map, gl_PointCoord).a * vAlpha;
+    if (a < 0.015) discard;
+    gl_FragColor = vec4(vColor, a);
+    #include <colorspace_fragment>
+  }`;
+
+interface PlotAura {
+  mutation: Mutation;
+  stage: number;
+  halos: THREE.Sprite[];
+}
+
+/** 全部菜地共用一次绘制；阶段 / 变异变化时重建该地块的柔光配方。 */
 export function createCropAuras(centers: THREE.Vector3[]) {
-  const count = centers.length*PER_PLOT;
-  const centersAndSeed = new Float32Array(count*3), kinds = new Float32Array(count*2);
-  for(const [id, center] of centers.entries()) {
-    for(let j=0;j<PER_PLOT;j++) {
-      const i=id*PER_PLOT+j;
-      centersAndSeed.set([center.x,(j+.5)/PER_PLOT,center.z],i*3);
-      kinds[i*2]=-1;
+  const group = new THREE.Group();
+  group.name = "crop-mutation-auras";
+  const dot = softDotTexture();
+  const cloud = cloudTexture();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(0), 3));
+  const uniforms = { t: { value: 0 }, pixelScale: { value: 240 }, map: { value: cloud } };
+  const mat = new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    vertexShader: MIST_VERTEX, fragmentShader: MIST_FRAGMENT,
+  });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  points.renderOrder = 2;
+  group.add(points);
+
+  const plots = new Map<number, PlotAura>();
+  const white = new THREE.Color(0xffffff);
+
+  function rebuild() {
+    const rows: number[][] = [];
+    for (const [id, aura] of plots) {
+      const center = centers[id];
+      if (!center) continue;
+      const [rise, orbit, dust, fall, speed] = recipeOf(aura.mutation);
+      const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
+      const puff = fruit.clone().lerp(white, 0.45);
+      const cloudTint = fruit.clone().lerp(white, 0.7);
+      const mote = fruit.clone().lerp(white, 0.25);
+      const flake = fruit.clone().lerp(white, 0.6);
+      const s = 0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28);
+      const c = center.clone();
+      c.y += 0.1;
+      const seedBase = (id * 0.618) % 1;
+      const push = (color: THREE.Color, size: number, mode: number, i: number) => {
+        rows.push([c.x, c.y, c.z, color.r, color.g, color.b, size * s, mode, (seedBase + i * 0.271) % 1, speed]);
+      };
+      for (let i = 0; i < rise; i++) push(puff, 1.5 + (i % 3) * 0.4, 0, i);
+      for (let i = 0; i < orbit; i++) push(cloudTint, 1.7 + (i % 3) * 0.5, 1, i + 40);
+      for (let i = 0; i < dust; i++) push(mote, 0.34, 2, i + 80);
+      for (let i = 0; i < fall; i++) push(flake, 0.5 + (i % 2) * 0.2, 3, i + 120);
+    }
+    const count = rows.length;
+    const position = new Float32Array(count * 3);
+    const aCenter = new Float32Array(count * 3);
+    const aColor = new Float32Array(count * 3);
+    const aSeed = new Float32Array(count);
+    const aSize = new Float32Array(count);
+    const aMode = new Float32Array(count);
+    const aSpeed = new Float32Array(count);
+    rows.forEach((row, i) => {
+      aCenter.set(row.slice(0, 3), i * 3);
+      aColor.set(row.slice(3, 6), i * 3);
+      aSize[i] = row[6];
+      aMode[i] = row[7];
+      aSeed[i] = row[8];
+      aSpeed[i] = row[9];
+    });
+    geo.setAttribute("position", new THREE.BufferAttribute(position, 3));
+    geo.setAttribute("aCenter", new THREE.BufferAttribute(aCenter, 3));
+    geo.setAttribute("aColor", new THREE.BufferAttribute(aColor, 3));
+    geo.setAttribute("aSeed", new THREE.BufferAttribute(aSeed, 1));
+    geo.setAttribute("aSize", new THREE.BufferAttribute(aSize, 1));
+    geo.setAttribute("aMode", new THREE.BufferAttribute(aMode, 1));
+    geo.setAttribute("aSpeed", new THREE.BufferAttribute(aSpeed, 1));
+    points.visible = count > 0;
+  }
+
+  function rebuildHalos() {
+    for (const aura of plots.values()) {
+      aura.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
+      aura.halos = [];
+    }
+    for (const [id, aura] of plots) {
+      const center = centers[id];
+      if (!center) continue;
+      const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
+      const s = 0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28);
+      const add = (color: THREE.Color, opacity: number, size: number, y: number) => {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: dot, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false,
+        }));
+        sprite.position.set(center.x, center.y + y * s, center.z);
+        sprite.scale.setScalar(size * s);
+        sprite.userData.baseScale = size * s;
+        sprite.userData.baseOpacity = opacity;
+        group.add(sprite);
+        aura.halos.push(sprite);
+      };
+      add(fruit.clone().lerp(white, 0.3), 0.2, 1.6, 0.4);
+      add(fruit.clone().lerp(white, 0.7), 0.16, 0.9, 0.16);
     }
   }
-  const geo=new THREE.BufferGeometry();
-  geo.setAttribute("position",new THREE.BufferAttribute(centersAndSeed,3));
-  const state=new THREE.BufferAttribute(kinds,2).setUsage(THREE.DynamicDrawUsage);
-  geo.setAttribute("motif",state);
-  const texture=motifTexture();
-  const uniforms={t:{value:0},pixelScale:{value:180},atlas:{value:texture}};
-  const mat=new THREE.ShaderMaterial({
-    uniforms, transparent:true, depthWrite:false, toneMapped:false,
-    vertexShader:`
-      uniform float t,pixelScale; attribute vec2 motif;
-      varying float tile,alpha,rotation,spark;
-      void main(){
-        tile=motif.x; float stage=motif.y;
-        if(tile<0. || position.y>stage){ gl_Position=vec4(4.,4.,4.,1.); gl_PointSize=1.; alpha=0.; rotation=0.; spark=0.; return; }
-        spark=mod(floor(position.y*22.),3.);
-        float seed=fract(position.y*173.31+.13*position.x-.09*position.z);
-        float clock=t+position.x*.17;
-        float age=fract(seed+clock*(tile==2.?.48:.25));
-        float phi=position.y*59.71+clock*(tile==5.?2.45:.83);
-        float radius=(.38+.46*seed)*(.55+stage*.5);
-        float h=.24+age*(tile>=6.?1.61:.98)*(stage+.06);
-        if(tile==0.){ phi+=.12*floor(age*7.); h=.28+.17*floor(age*6.);}
-        if(tile==1.){ h=.35+(1.-age)*1.07; phi+=.13*sin(clock*1.3); }
-        if(tile==2.) radius*=1.-age*.60;
-        if(tile==3.) h=.31+.65*seed+.13*sin(phi*2.);
-        if(tile==4.) h=.21+.62*pow(age,1.6);
-        if(tile==5.){h=.26+age*1.05;radius+=.30*age;}
-        float glint=sin(3.14159*age);
-        alpha=(.28+.69*glint)*(.55+.45*stage);
-        rotation=tile==0.?0.:sin(phi)*.35;
-        vec3 p=vec3(position.x+radius*cos(phi),h,position.z+radius*sin(phi));
-        vec4 eye=viewMatrix*vec4(p,1.);
-        gl_Position=projectionMatrix*eye;
-        float size=spark<.5?.78:(spark<1.5?.39:.22);
-        gl_PointSize=clamp(pixelScale*(.5+.55*seed)*(.62+.5*glint)*size/max(1.,-eye.z),2.,40.);
-      }`,
-    fragmentShader:`
-      uniform sampler2D atlas; varying float tile,alpha,rotation,spark;
-      void main(){
-        vec2 p=gl_PointCoord-.5; float c=cos(rotation),s=sin(rotation);
-        p=mat2(c,-s,s,c)*p+.5;
-        if(min(p.x,p.y)<0. || max(p.x,p.y)>1.)discard;
-        vec2 cell=vec2(mod(tile,4.),floor(tile/4.));
-        vec2 uv=(cell+p)/4.; uv.y=1.-uv.y;
-        vec4 pixel=texture2D(atlas,uv);
-        if(spark>.5) {
-          vec2 d=abs(p-.5)*2.;
-          float ray=1.-smoothstep(.03,.21,pow(d.x,.64)*pow(d.y,.64)*4.);
-          float glow=exp(-3.*dot(d,d));
-          vec2 center=(cell+.5)/4.; center.y=1.-center.y;
-          vec3 hue=texture2D(atlas,center).rgb;
-          pixel=vec4(mix(hue,vec3(1.),.42),(.75*ray+.35*glow)*(1.-smoothstep(.42,1.,length(d))));
+
+  return {
+    group,
+    setTime(t: number) {
+      uniforms.t.value = t;
+      uniforms.pixelScale.value = Math.min(330, window.innerHeight * 0.43);
+      for (const aura of plots.values()) {
+        for (const halo of aura.halos) {
+          const breath = 1 + 0.09 * Math.sin(t * 0.8 + halo.position.x);
+          halo.scale.setScalar((halo.userData.baseScale as number) * breath);
+          halo.material.opacity = (halo.userData.baseOpacity as number) * (0.85 + 0.15 * Math.sin(t * 0.9 + halo.position.z));
         }
-        if(pixel.a*alpha<.025)discard;
-        gl_FragColor=vec4(pixel.rgb,pixel.a*alpha);
-        #include <colorspace_fragment>
-      }`,
-  });
-  const points=new THREE.Points(geo,mat);
-  points.frustumCulled=false; points.renderOrder=2; points.visible=false;
-  const active=new Set<number>();
-  return {points,
-    setTime(t:number) { uniforms.t.value=t;uniforms.pixelScale.value=Math.min(330,window.innerHeight*.43); },
-    setPlot(id:number, mutation:Mutation|null, stage:number) {
-      const index = mutation === "amber" ? 3 : mutation === "mist" ? 1 : mutation === "pearl" ? 5 : motifs.findIndex(m=>m===mutation);
-      const enabled=index>=0 && stage>=0;
-      if(enabled) active.add(id); else active.delete(id);
-      points.visible=active.size>0;
-      for(let j=0;j<PER_PLOT;j++) state.setXY(id*PER_PLOT+j,enabled?index:-1,Math.min(1,.18+stage*.28));
-      state.addUpdateRange(id*PER_PLOT*2,PER_PLOT*2);
-      state.needsUpdate=true;
+      }
     },
-    dispose(){texture.dispose();mat.dispose();geo.dispose();},
+    setPlot(id: number, mutation: Mutation | null, stage: number) {
+      const existing = plots.get(id);
+      // 野菜变异走 wildAuras 的黑白雾 / 玉云，这里不叠加
+      if (!mutation || stage < 0 || isWildMutation(mutation)) {
+        if (existing) {
+          existing.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
+          plots.delete(id);
+          rebuild();
+        }
+        return;
+      }
+      if (existing && existing.mutation === mutation && existing.stage === stage) return;
+      if (existing) existing.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
+      plots.set(id, { mutation, stage, halos: [] });
+      rebuild();
+      rebuildHalos();
+    },
+    dispose() {
+      for (const aura of plots.values()) aura.halos.forEach(h => h.material.dispose());
+      plots.clear();
+      geo.dispose();
+      mat.dispose();
+      dot.dispose();
+      cloud.dispose();
+      group.clear();
+    },
   };
 }

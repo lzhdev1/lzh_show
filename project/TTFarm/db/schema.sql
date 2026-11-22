@@ -79,6 +79,9 @@ ALTER TABLE farm_states
   ADD COLUMN IF NOT EXISTS decor JSONB NOT NULL DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS ranch JSONB NOT NULL DEFAULT '{"level":1,"animals":[],"ridingId":null}'::jsonb;
 
+-- 野菜采摘记录：rotation 是刷新轮次，taken 是本轮已采的菜丛编号
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS forage JSONB NOT NULL DEFAULT '{"rotation":0,"taken":[]}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);
 

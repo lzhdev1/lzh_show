@@ -1,0 +1,173 @@
+import { useMemo, useState, type CSSProperties } from "react";
+import { CROPS, harvestKey, type CropId } from "../game/crops";
+import {
+  ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
+} from "../game/codex";
+import { MUTATIONS } from "../game/weather";
+import { useGame } from "../game/state";
+import { CloseIcon, CropIcon } from "./icons";
+import "./codex.css";
+
+function BookIcon({ size = 20 }: { size?: number }) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} fill="none" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5.4c2.6-1 5.4-1 8 .4 2.6-1.4 5.4-1.4 8-.4v13c-2.6-1-5.4-1-8 .4-2.6-1.4-5.4-1.4-8-.4Z" fill="#f6ecd8" stroke="#7d6a45" strokeWidth="1.4"/>
+    <path d="M12 5.8v13" stroke="#7d6a45" strokeWidth="1.3"/>
+    <path d="M6.4 9.2c1.3-.3 2.6-.2 3.8.3M6.4 12.4c1.3-.3 2.6-.2 3.8.3M6.4 15.6c1.3-.3 2.6-.2 3.8.3" stroke="#b39a68" strokeWidth="1.2"/>
+    <path d="M13.8 9.6c1.2-.5 2.5-.6 3.8-.3M13.8 12.8c1.2-.5 2.5-.6 3.8-.3" stroke="#b39a68" strokeWidth="1.2"/>
+  </svg>;
+}
+
+export function CodexTrigger({ onClick }: { onClick: () => void }) {
+  return <button className="icon-btn labeled" onClick={onClick} aria-label="打开图鉴" title="图鉴">
+    <BookIcon /><span>图鉴</span>
+  </button>;
+}
+
+const TABS: { key: CodexTab; label: string }[] = [
+  { key: "crop", label: "作物" },
+  { key: "wild", label: "野菜" },
+  { key: "mutation", label: "变异" },
+  { key: "animal", label: "动物" },
+];
+
+const FAMILY_LABEL = { element: "元素变异", spirit: "精灵变异", legacy: "旧版变异", wild: "野菜变异" } as const;
+
+function seconds(ms: number) {
+  const s = Math.round(ms / 1000);
+  return s >= 60 ? `${Math.floor(s / 60)}分${s % 60 ? `${s % 60}秒` : ""}` : `${s}秒`;
+}
+
+export function CodexPanel({ onClose }: { onClose: () => void }) {
+  const seeds = useGame((s) => s.seeds);
+  const harvest = useGame((s) => s.harvest);
+  const ranch = useGame((s) => s.ranch);
+  const [tab, setTab] = useState<CodexTab>("crop");
+  const [query, setQuery] = useState("");
+
+  const q = query.trim();
+  // 有关键词时跨全部四类一起搜，免得用户还得先猜该切哪个页签
+  const searching = q.length > 0;
+  const plants = useMemo(() => CODEX_PLANTS
+    .filter((entry) => searching || (tab === "crop" ? entry.kind === "crop" : entry.kind === "wild"))
+    .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)), [tab, q, searching]);
+  const mutations = useMemo(() => CODEX_MUTATIONS
+    .filter((entry) => !q || entry.label.includes(q) || entry.blurb.includes(q)
+      || FAMILY_LABEL[entry.family].includes(q)), [q]);
+  const animals = useMemo(() => CODEX_ANIMALS
+    .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)
+      || entry.favorite.name.includes(q) || mountLabel(entry).includes(q)), [q]);
+
+  const plantOwned = (id: CropId) => {
+    const parts: string[] = [];
+    if ((seeds[id] ?? 0) > 0) parts.push(`种子 ×${seeds[id]}`);
+    const plain = harvest[harvestKey(id, null)] ?? 0;
+    if (plain > 0) parts.push(`收成 ×${plain}`);
+    if (parts.length === 0) {
+      for (const mutation of Object.keys(MUTATIONS) as (keyof typeof MUTATIONS)[]) {
+        const count = harvest[harvestKey(id, mutation)] ?? 0;
+        if (count > 0) { parts.push(`${MUTATIONS[mutation].label} ×${count}`); break; }
+      }
+    }
+    return parts.join(" · ");
+  };
+  const mutationOwned = (id: keyof typeof MUTATIONS) => CODEX_PLANTS
+    .reduce((sum, entry) => sum + (harvest[harvestKey(entry.crop, id)] ?? 0), 0);
+  const animalOwned = (species: string) => ranch.animals.filter((item) => item.species === species).length;
+
+  return <div className="modal-scrim" onClick={onClose}>
+    <section className="modal codex-panel" role="dialog" aria-modal="true" aria-label="图鉴" onClick={(event) => event.stopPropagation()}>
+      <div className="modal-head">
+        <BookIcon size={28}/><h2>图鉴</h2>
+        <span className="codex-count">{searching
+          ? `匹配 ${plants.length + mutations.length + animals.length} 条`
+          : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length} 条`}</span>
+        <button className="icon-btn ghost" onClick={onClose} aria-label="关闭图鉴"><CloseIcon/></button>
+      </div>
+
+      <div className="farm-tabs">
+        {TABS.map((item) => <button key={item.key} aria-pressed={tab === item.key}
+          onClick={() => setTab(item.key)}>{item.label}</button>)}
+      </div>
+
+      <input className="codex-search" value={query} onChange={(event) => setQuery(event.target.value)}
+        placeholder="搜名字或关键词，比如「坐骑」「阴阳」" aria-label="搜索图鉴"/>
+
+      {(tab === "crop" || tab === "wild" || searching) && <>
+        {searching && <h3 className="codex-group">作物与野菜 · {plants.length}</h3>}
+        <ul className="codex-list">
+        {plants.map((entry) => {
+          const def = CROPS[entry.crop];
+          const owned = plantOwned(entry.crop);
+          return <li key={entry.crop} className="codex-card">
+            <div className="codex-head">
+              <span className="codex-icon"><CropIcon crop={entry.crop} size={22}/></span>
+              <div className="codex-title">
+                <strong>{def.name}</strong>
+                <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.yields} 份 · 生长 {seconds(def.growMs)}{def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
+              </div>
+              {owned ? <span className="codex-owned">{owned}</span> : <span className="codex-owned muted">未持有</span>}
+            </div>
+            <p className="codex-text">{entry.blurb}</p>
+            {entry.lures.length > 0
+              ? <div className="codex-tags"><span className="codex-taglabel">会引来</span>
+                {entry.lures.map((lure) => <span className="codex-chip" key={lure.species}>
+                  {ANIMAL_PORTRAITS[lure.species]} {lure.name}</span>)}
+              </div>
+              : <div className="codex-tags"><span className="codex-taglabel">会引来</span>
+                <span className="codex-none">暂无（野生动物对它没兴趣）</span></div>}
+          </li>;
+        })}
+        {plants.length === 0 && <li className="codex-empty">没有匹配的条目</li>}
+      </ul></>}
+
+      {(tab === "mutation" || searching) && <>
+        {searching && <h3 className="codex-group">变异 · {mutations.length}</h3>}
+        <ul className="codex-list">
+        {mutations.map((entry) => {
+          const count = mutationOwned(entry.id);
+          return <li key={entry.id} className="codex-card">
+            <div className="codex-head">
+              <span className="codex-icon mutation" style={{ "--mutation-tint": `#${MUTATIONS[entry.id].fruit.toString(16).padStart(6, "0")}` } as CSSProperties}>
+                ×{entry.multiplier}
+              </span>
+              <div className="codex-title">
+                <strong>{entry.label}</strong>
+                <small>{FAMILY_LABEL[entry.family]} · 收成售价倍率 ×{entry.multiplier}</small>
+              </div>
+              {count > 0 ? <span className="codex-owned">收成 ×{count}</span> : <span className="codex-owned muted">未持有</span>}
+            </div>
+            <p className="codex-text">{entry.blurb}</p>
+          </li>;
+        })}
+        {mutations.length === 0 && <li className="codex-empty">没有匹配的条目</li>}
+      </ul></>}
+
+      {(tab === "animal" || searching) && <>
+        {searching && <h3 className="codex-group">动物 · {animals.length}</h3>}
+        <ul className="codex-list">
+          {animals.map((entry) => {
+            const count = animalOwned(entry.species);
+            return <li key={entry.species} className="codex-card">
+              <div className="codex-head">
+                <span className="codex-icon animal">{ANIMAL_PORTRAITS[entry.species]}</span>
+                <div className="codex-title">
+                  <strong>{entry.name}</strong>
+                  <small>{entry.mount === "never" ? "野生伙伴 · 不可骑乘" : "野生伙伴 · 可作坐骑"}</small>
+                </div>
+                {count > 0 ? <span className="codex-owned">牧场 ×{count}</span> : <span className="codex-owned muted">未收服</span>}
+              </div>
+              <p className="codex-text">{entry.blurb}</p>
+              <div className="codex-tags">
+                <span className="codex-taglabel">被引诱</span>
+                <span className="codex-chip"><CropIcon crop={entry.favorite.crop} size={13}/> {entry.favorite.name} · 1 份</span>
+                <span className="codex-taglabel">坐骑</span>
+                <span className={`codex-chip${entry.mount === "never" ? "" : " good"}`}>{mountLabel(entry)}</span>
+              </div>
+            </li>;
+          })}
+        </ul>
+        <p className="codex-note">{MOUNT_RULE}元素变异动物对非最爱的作物要 2 份诱饵，最爱的作物 1 份就够。</p>
+      </>}
+    </section>
+  </div>;
+}

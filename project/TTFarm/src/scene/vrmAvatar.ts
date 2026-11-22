@@ -105,12 +105,13 @@ export async function loadVrmRig(url: string, builtin: boolean, avatar: AvatarId
       if (legacy) { q.x = -q.x; q.z = -q.z; }
     }
     if (dressArmAngle && !m.saddleHeight) {
-      const idle = (1 - m.moving) * (1 - m.jumpWeight) * (1 - m.swimming);
+      const idle = (1 - m.moving) * (1 - m.jumpWeight) * (1 - m.swimming) * (1 - (m.actionWeight ?? 0));
       const angle = dressArmAngle * idle;
       leftArm?.quaternion.premultiply(roll.setFromAxisAngle(forward, angle));
       rightArm?.quaternion.premultiply(roll.setFromAxisAngle(forward, -angle));
     }
-    const grip = (1 + 1.1 * m.running * (1 - m.jumpWeight)) * (1 - 0.8 * m.swimming);
+    const fist = m.action === "punch" ? 1 + 1.6 * (m.actionWeight ?? 0) : 1;
+    const grip = (1 + 1.1 * m.running * (1 - m.jumpWeight)) * (1 - 0.8 * m.swimming) * fist;
     for (const finger of fingers) finger.node.rotation.z = finger.curl * grip;
     visual.position.x = pose.shift;
     blinkClock += dt;

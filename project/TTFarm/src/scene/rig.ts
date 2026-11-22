@@ -1,6 +1,9 @@
 import type * as THREE from "three";
 import type { AvatarId, OutfitId } from "../game/appearance";
 
+/** 一次性打击动作与可持续的表情动作；移动、跳跃、骑乘、游泳会取消它们。 */
+export type ActionId = "punch" | "kick" | "cheer" | "dance" | "lie" | "faint" | "sit";
+
 export interface AvatarMotion {
   /** Left heel strike is phase zero in both locomotion clips. */
   phase: number;
@@ -18,6 +21,12 @@ export interface AvatarMotion {
   saddleHeight?: number;
   /** Submerged terrain beneath each shoe, including sloping banks. */
   waterFloor?: (x: number, z: number) => number;
+  /** 当前动作；null 表示回到常规 locomotion。 */
+  action?: ActionId | null;
+  /** 动作开始以来的秒数。 */
+  actionTime?: number;
+  /** 0..1 的动作混合权重，淡入淡出由 Player/peers 统一计算。 */
+  actionWeight?: number;
 }
 
 export interface AvatarRig {

@@ -6,6 +6,7 @@ import type { CropId } from "./crops";
 import type { FarmDecor } from "./decor";
 import type { PlotState } from "./growth";
 import type { AnimalElement, AnimalSpecies, RanchState } from "./ranch";
+import type { ActionId } from "../scene/rig";
 import { useGame } from "./state";
 
 export interface FriendUser {
@@ -27,6 +28,8 @@ export interface SocialPose {
   swimming: boolean;
   jumping: boolean;
   mount?: { species: AnimalSpecies; element: AnimalElement | null } | null;
+  action?: ActionId | null;
+  actionTime?: number;
 }
 
 export interface SocialPlayer extends SocialPose {

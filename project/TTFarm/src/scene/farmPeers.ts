@@ -5,7 +5,8 @@ import { Player } from "./player";
 import { createHorseTrail } from "./horseTrail";
 import { createAnimalLibrary, saddleHeight } from "./ranchAnimals";
 import type { WorldObstacles } from "./obstacles";
-import type { AvatarMotion } from "./rig";
+import type { AvatarMotion, ActionId } from "./rig";
+import { ACTIONS, actionWeight, isActionId } from "./actionMotion";
 import type { createRanchAuras } from "./ranchAuras";
 import type { RanchAnimal } from "../game/ranch";
 
@@ -52,6 +53,7 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
     let horseTrail: ReturnType<typeof createHorseTrail> | undefined;
     let last: SocialPlayer | undefined, elapsed = 0, duration = .8, yawFrom = sample.yaw, yawDelta = 0;
     let jumpTime = 0;
+    let actionId: ActionId | null = null, actionTime = 0;
     const motion: AvatarMotion = { phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0, swimming: 0, swimPhase: 0 };
     return {
       aura(auras: Auras, time: number) {
@@ -107,6 +109,22 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
         jumpTime += dt;
         motion.jumpPhase = Math.min(1, jumpTime / 1.22);
         motion.jumpWeight = THREE.MathUtils.damp(motion.jumpWeight, next.jumping ? 1 : 0, 9, dt);
+        // 动作回放：心跳之间本地推进动作时钟；对方移动/下水/骑乘时立即打断。
+        const nextAction = next.moving || next.swimming || next.mount ? null : isActionId(next.action) ? next.action : null;
+        if (nextAction !== actionId) { actionId = nextAction; actionTime = next.actionTime ?? 0; }
+        else if (actionId) actionTime += dt;
+        if (actionId) {
+          const duration = ACTIONS[actionId].duration;
+          if (duration !== null && actionTime >= duration) actionId = null;
+        }
+        if (actionId) {
+          motion.action = actionId;
+          motion.actionTime = actionTime;
+          motion.actionWeight = actionWeight(actionId, actionTime);
+        } else {
+          motion.actionWeight = THREE.MathUtils.damp(motion.actionWeight ?? 0, 0, 12, dt);
+          if ((motion.actionWeight ?? 0) < 0.02) { motion.action = null; motion.actionWeight = 0; }
+        }
         mount?.animate(time, motion.phase * 2 * Math.PI, motion.moving * (.54 + .46 * motion.running), root.position.distanceToSquared(focus));
         motion.saddleHeight = mount?.seatHeight ?? 0;
         label.sprite.position.y = 1.92 + Math.max(0, motion.saddleHeight - .6);
