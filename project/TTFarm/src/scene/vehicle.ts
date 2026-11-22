@@ -15,16 +15,18 @@ export interface VehicleInput {
 export class PlayerVehicle {
   readonly root: THREE.Group;
   private wheels: THREE.Group[];
+  private frontWheels: THREE.Group[];
   private heading: number;
   private speed = 0;
   private readonly model;
-  private readonly bodyRadius = 1.02;
+  private readonly bodyRadius = 1.05;
 
   constructor(car: OwnedCar, x: number, z: number, heading: number) {
     this.model = carModelOf(car.model);
-    const built = buildDetailedCar(car.color, car.model);
+    const built = buildDetailedCar(car.color, car.model, car.plate);
     this.root = built.root;
     this.wheels = built.wheels;
+    this.frontWheels = built.frontWheels;
     this.root.scale.setScalar(this.model.scale);
     this.root.position.set(x, 0, z);
     this.heading = heading;
@@ -99,6 +101,11 @@ export class PlayerVehicle {
     this.root.rotation.y = this.heading;
     const spin = (this.speed / 0.37) * dt;
     for (const wheel of this.wheels) wheel.rotation.z -= spin;
+    // 前轮随方向轻微摆动，侧窗里能看出车在转向
+    const steerAngle = -input.steer * 0.4;
+    for (const wheel of this.frontWheels) {
+      wheel.rotation.y = THREE.MathUtils.damp(wheel.rotation.y, steerAngle, 7, dt);
+    }
   }
 
   dispose() {

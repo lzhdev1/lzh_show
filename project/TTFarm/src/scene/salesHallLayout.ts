@@ -31,12 +31,12 @@ export function salesHallHeight(x: number, z: number): number {
 export const SHOPPER_ROUTE = [
   { x: 48.5, z: 56.6 },
   { x: 45.2, z: 55.4 },
-  { x: 43.4, z: 51.5 },
-  { x: 40.0, z: 49.8 },
-  { x: 34.0, z: 49.6 },
-  { x: 27.0, z: 49.4 },
-  { x: 21.0, z: 49.3 },
-  { x: 18.0, z: 47.2 },
+  { x: 43.4, z: 52.6 },
+  { x: 40.0, z: 52.2 },
+  { x: 34.0, z: 52.0 },
+  { x: 27.0, z: 52.0 },
+  { x: 21.0, z: 51.6 },
+  { x: 18.0, z: 47.6 },
   { x: 16.6, z: 43.0 },
   { x: 16.3, z: 35.0 },
   { x: 17.2, z: 27.5 },
@@ -46,3 +46,6 @@ export const SHOPPER_ROUTE = [
   { x: 23.0, z: 14.6 },
   { x: 21.6, z: 13.0 },
 ] as const;
+
+/** 送货车在售货大厅北门外的停车位 */
+export const HALL_PARKING = { x: 24.2, z: 19.6 } as const;

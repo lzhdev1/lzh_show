@@ -1,15 +1,16 @@
 import * as THREE from "three";
 import { TownBuilder } from "./townBuild";
 import { buildCar, CAR_COLORS } from "./townCar";
-import { AVENUES, CROSSES, townSurfaceHeight, walkNodes, type RouteNode } from "./townLayout";
+import { townSurfaceHeight, walkNodes, type RouteNode } from "./townLayout";
 import { bridgeHeightAt } from "../layout";
-import { SHOPPER_ROUTE, inSalesHall, SALES_HALL } from "../salesHallLayout";
+import { HALL_PARKING, SHOPPER_ROUTE, inSalesHall, SALES_HALL } from "../salesHallLayout";
 
 /** NPC 与循环车的固定参数都放这里，方便手感调优 */
 const WALK_SPEED = 0.78;
-const CAR_CRUISE = 3.0;
-const CAR_SLOW = 8.5;
-const CAR_RADIUS = 1.55;
+const CAR_CRUISE = 3.1;
+const DELIVERY_SPEED = 2.5;
+const SHOP_PARK = 11;
+const CITY_PARK = 5;
 const SHOPPER_SPEED = 1.0;
 const SHOPPER_PAUSE = 7;
 const SHOPPER_COUNT = 4;
@@ -220,44 +221,125 @@ class Shopper {
   }
 }
 
-interface Lane {
-  axis: "x" | "z";
-  fixed: number;
-  from: number; to: number;
-  dir: 1 | -1;
-  stops: number[];
-  signal: "ew" | "ns";
-  color: number;
-  scale: number;
+/**
+ * 城内车辆闭环：绕中央街—东街—北大道之间的街区顺时针行驶。
+ * 车辆只在这条闭环上走，不会从桥头突然出现或瞬移回起点。
+ */
+const CITY_LOOP: RouteNode[] = [
+  { x: 86, z: 50.2 },
+  { x: 118, z: 50.2 },
+  { x: 123.6, z: 50.6 },
+  { x: 127.8, z: 54.2 },
+  { x: 127.8, z: 106 },
+  { x: 124.6, z: 109.4 },
+  { x: 119, z: 111.8 },
+  { x: 87, z: 111.8 },
+  { x: 83.2, z: 109.6 },
+  { x: 80.2, z: 105.8 },
+  { x: 80.2, z: 56.2 },
+  { x: 83.2, z: 52.4 },
+  { x: 86, z: 50.2 },
+];
+
+/**
+ * 唯一会过桥的车：城市主大道 → 水泥桥 → 河岸步道 → 售货大厅北门停车。
+ * 到点后停 11 秒再原路返回，不会在农场里乱转。
+ */
+const DELIVERY_ROUTE: RouteNode[] = [
+  { x: 52, z: 52 },
+  { x: 45.5, z: 52 },
+  { x: 43.0, z: 52 },
+  { x: 40.0, z: 52 },
+  { x: 30.5, z: 52 },
+  { x: 21.0, z: 52 },
+  { x: 18.0, z: 49.2 },
+  { x: 16.6, z: 44.0 },
+  { x: 16.4, z: 36.0 },
+  { x: 17.4, z: 29.0 },
+  { x: 19.4, z: 23.0 },
+  { x: 21.8, z: 20.4 },
+  { x: HALL_PARKING.x, z: HALL_PARKING.z },
+];
+
+function curveOf(points: RouteNode[], closed: boolean) {
+  return new THREE.CatmullRomCurve3(
+    points.map(p => new THREE.Vector3(p.x, 0, p.z)),
+    closed,
+    "catmullrom",
+    closed ? 0.32 : 0.24,
+  );
 }
 
-class Traffic {
-  constructor(readonly lane: Lane, start: number, private mesh: THREE.Group) {
-    this.pos = start;
-    mesh.scale.setScalar(lane.scale);
-    mesh.position.y = 0.08;
-    mesh.rotation.y = lane.axis === "x" ? (lane.dir > 0 ? 0 : Math.PI) : (lane.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
+function roadHeightAt(x: number, z: number) {
+  const bridge = bridgeHeightAt(x, z);
+  if (bridge !== undefined) return bridge;
+  return Math.max(townSurfaceHeight(x, z), 0.02) + 0.06;
+}
+
+class RouteCar {
+  private readonly curve: THREE.CatmullRomCurve3;
+  private readonly total: number;
+  private t: number;
+  speed = CAR_CRUISE;
+  constructor(start: number, private mesh: THREE.Group) {
+    this.curve = curveOf(CITY_LOOP, true);
+    this.total = this.curve.getLength();
+    this.t = start;
+    this.sample();
   }
-  pos: number;
-  speed = 0;
-  update(dt: number, signal: "green" | "yellow" | "red") {
-    let wanted = CAR_CRUISE;
-    let nearest = Infinity;
-    for (const stop of this.lane.stops) {
-      const gap = this.lane.dir > 0 ? stop - this.pos : this.pos - stop;
-      if (gap > 0 && gap < nearest) nearest = gap;
+  private sample() {
+    const point = this.curve.getPointAt(this.t);
+    const tangent = this.curve.getTangentAt(this.t);
+    this.mesh.position.set(point.x, roadHeightAt(point.x, point.z), point.z);
+    this.mesh.rotation.y = Math.atan2(tangent.x, tangent.z);
+  }
+  update(dt: number) {
+    this.t = (this.t + (this.speed * dt) / this.total) % 1;
+    this.sample();
+  }
+}
+
+class DeliveryVan {
+  private readonly curve: THREE.CatmullRomCurve3;
+  private readonly total: number;
+  private t = 0;
+  private dir: 1 | -1 = 1;
+  private pause = 0;
+  constructor(private mesh: THREE.Group) {
+    this.curve = curveOf(DELIVERY_ROUTE, false);
+    this.total = this.curve.getLength();
+    this.mesh.position.y = 0.08;
+    this.sample();
+  }
+  private sample() {
+    const point = this.curve.getPointAt(this.t);
+    const tangent = this.curve.getTangentAt(this.t);
+    this.mesh.position.set(point.x, roadHeightAt(point.x, point.z), point.z);
+    const forward = this.dir > 0 ? 1 : -1;
+    this.mesh.rotation.y = Math.atan2(tangent.x * forward, tangent.z * forward);
+  }
+  update(dt: number) {
+    if (this.pause > 0) {
+      this.pause -= dt;
+      if (this.pause <= 0) {
+        this.dir = this.dir > 0 ? -1 : 1;
+      }
+      return;
     }
-    if (signal !== "green" && nearest < CAR_SLOW) {
-      wanted = Math.min(wanted, Math.max(0, (nearest - 1.1) * 0.72));
-    } else if (nearest < CAR_RADIUS) {
-      wanted = Math.min(wanted, 1.1);
+    this.t += (this.dir * DELIVERY_SPEED * dt) / this.total;
+    if (this.t >= 1) {
+      this.t = 1;
+      this.pause = SHOP_PARK;
+      this.sample();
+      return;
     }
-    this.speed = THREE.MathUtils.damp(this.speed, wanted, wanted < this.speed ? 7 : 2.4, dt);
-    this.pos += this.speed * this.lane.dir * dt;
-    if (this.pos > this.lane.to) this.pos = this.lane.from;
-    if (this.pos < this.lane.from) this.pos = this.lane.to;
-    if (this.lane.axis === "x") this.mesh.position.x = this.pos;
-    else this.mesh.position.z = this.pos;
+    if (this.t <= 0) {
+      this.t = 0;
+      this.pause = CITY_PARK;
+      this.sample();
+      return;
+    }
+    this.sample();
   }
 }
 
@@ -271,9 +353,10 @@ export function createTownLife(
 export class TownLife {
   private walkers: Walker[] = [];
   private shoppers: Shopper[] = [];
-  private traffic: Traffic[] = [];
+  private cityCars: RouteCar[] = [];
+  private delivery: DeliveryVan | null = null;
   readonly group = new THREE.Group();
-  constructor(signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" }, seed = 1009) {
+  constructor(_signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" }, seed = 1009) {
     const graph = walkNodes();
     const r = mulberry(seed);
     for (let i = 0; i < 24; i++) {
@@ -287,38 +370,26 @@ export class TownLife {
       this.group.add(shopper.person.node);
     }
 
-    const lane = (axis: "x" | "z", fixed: number, from: number, to: number, dir: 1 | -1, color: number, scale: number): Lane => {
-      const stops: number[] = [];
-      if (axis === "x") {
-        for (const c of CROSSES) stops.push(c.x + (dir > 0 ? -c.half - 4.0 : c.half + 4.0));
-      } else {
-        for (const a of AVENUES) stops.push(a.z + (dir > 0 ? -a.half - 4.0 : a.half + 4.0));
-      }
-      return { axis, fixed, from, to, dir, stops, signal: axis === "x" ? "ew" : "ns", color, scale };
-    };
-    const lanes: Lane[] = [
-      lane("x", 50.2, 44, 139, 1, CAR_COLORS[0], 0.98),
-      lane("x", 53.8, 44, 139, -1, CAR_COLORS[2], 1.02),
-      lane("x", 108.2, 46, 139, 1, CAR_COLORS[3], 1.05),
-      lane("x", 111.8, 46, 139, -1, CAR_COLORS[4], 0.94),
-      lane("z", 83.8, 23, 139, 1, CAR_COLORS[1], 1.0),
-      lane("z", 80.2, 23, 139, -1, CAR_COLORS[5], 0.96),
-      lane("z", 127.8, 23, 139, 1, CAR_COLORS[6], 1.04),
-      lane("z", 124.2, 23, 139, -1, CAR_COLORS[7], 0.92),
-    ];
-    lanes.forEach((l, i) => {
-      const mesh = buildCar(l.color);
-      const start = l.from + ((i * 13.7 + 9) % (l.to - l.from));
-      this.traffic.push(new Traffic(l, start, mesh));
+    // 城内 5 台循环车：沿街区外圈闭环，不越桥、不落地到广场
+    const styles: Array<"city" | "tourer" | "sport"> = ["city", "tourer", "city", "sport", "tourer"];
+    for (let i = 0; i < styles.length; i++) {
+      const mesh = buildCar(CAR_COLORS[(i + 1) % CAR_COLORS.length], styles[i]);
+      mesh.scale.setScalar(0.98 + (i % 3) * 0.03);
+      const car = new RouteCar(i / styles.length, mesh);
+      this.cityCars.push(car);
       this.group.add(mesh);
-    });
-    this.signalStates = signalStates;
+    }
+
+    // 唯一过桥车：送到售货大厅门口停车
+    const van = buildCar(0xefe8d8, "tourer");
+    van.scale.setScalar(1.04);
+    this.delivery = new DeliveryVan(van);
+    this.group.add(van);
   }
-  private signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" };
   update(dt: number, t: number) {
-    const signals = this.signalStates(t);
     for (const w of this.walkers) w.update(dt, t);
     for (const s of this.shoppers) s.update(dt, t);
-    for (const c of this.traffic) c.update(dt, signals[c.lane.signal]);
+    for (const c of this.cityCars) c.update(dt);
+    this.delivery?.update(dt);
   }
 }

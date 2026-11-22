@@ -29,6 +29,71 @@
   bottom: calc(163px + env(safe-area-inset-bottom));
   transform: none;
 }
+
+/* 城内汽车店导览：底栏上方一条横向任务条，不挡摇杆和跳跃 */
+.town-guide {
+  position: fixed;
+  left: 50%;
+  bottom: calc(112px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 7px 8px 7px 13px;
+  border: 1px solid #d8cfb5;
+  border-radius: 15px;
+  background: #fcf7e9ee;
+  box-shadow: 0 7px 22px #34432b2b;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.town-guide-kicker {
+  color: #8a7558;
+  font-size: 10px;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+.town-guide strong {
+  color: #384b37;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.town-guide strong em {
+  color: #7b7462;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+.town-guide-go {
+  pointer-events: auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #a9bd8c;
+  border-radius: 10px;
+  background: #eaf1d9;
+  color: #3f5c37;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.town-guide-go:hover { background: #dfecc9; }
+
+@media (max-width: 560px) {
+  .town-guide {
+    top: calc(72px + env(safe-area-inset-top));
+    bottom: auto;
+    gap: 6px;
+    padding: 6px 7px 6px 10px;
+  }
+  .town-guide-kicker { display: none; }
+  .town-guide strong { font-size: 12px; }
+}
+
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
   .hud[data-input="touch"] .town-action { bottom: calc(89px + env(safe-area-inset-bottom)); right: 12px; }
+  .town-guide { top: auto; bottom: calc(98px + env(safe-area-inset-bottom)); }
 }

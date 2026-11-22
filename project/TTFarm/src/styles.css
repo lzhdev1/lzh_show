@@ -1144,6 +1144,19 @@ button {
   .chat-compose input { font-size: 16px; }
 }
 
+/* 手机端：发言 / 驾驶入口抬到跳跃键上方，避免两个 56~66px 的圆形按钮互相压住 */
+@media (max-width: 820px) {
+  .chat-dock {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(166px + env(safe-area-inset-bottom));
+  }
+  .chat-card { max-height: min(50vh, 380px); }
+}
+@media (max-width: 820px) and (max-height: 520px) and (orientation: landscape) {
+  .chat-dock { bottom: calc(116px + env(safe-area-inset-bottom)); }
+  .chat-card { max-height: min(42vh, 260px); }
+}
+
 /* ---------- 移动端功能菜单 ---------- */
 
 .top-tools { display: flex; align-items: center; gap: 8px; }

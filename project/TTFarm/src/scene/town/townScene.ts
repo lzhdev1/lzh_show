@@ -199,7 +199,6 @@ export function createTown(obstacles: WorldObstacles): Town {
   garden(62, 30, 9, 6, [[59.8, 30], [64.4, 29.2]]);
   garden(70, 135, 8, 5, [[67, 134], [72.5, 136.5]]);
   garden(116, 134, 7, 5, [[113.5, 133], [118, 136]]);
-  garden(136, 128, 5, 7, [[136, 128]]);
   addBench(props, 92, 78.4, 0);
   addBench(props, 101, 28.4, 0);
   addBench(props, 62, 26.7, 0);
@@ -236,6 +235,15 @@ export function createTown(obstacles: WorldObstacles): Town {
   gateSign.position.set(gateX - 0.42, 5.55, 52);
   gateSign.rotation.y = -Math.PI / 2;
   group.add(gateSign);
+
+  // 城门内侧的汽车店路牌：从桥上来的人一眼能看到“星野汽车 → 中央街”
+  props.cylinder(0.07, 0.1, 3.25, 0x4e5a58, { x: 49.0, y: 1.62, z: 57.8 }, 8);
+  obstacles.addCircle(49.0, 57.8, 0.22);
+  const dealerWayTex = signTexture("星野汽车 → 中央街", "#eaf1df", "#33493c", "#9a7a53");
+  const dealerWay = new THREE.Mesh(new THREE.PlaneGeometry(2.15, 0.48), signMaterial(dealerWayTex));
+  dealerWay.position.set(49.0, 3.15, 57.8);
+  dealerWay.rotation.y = -Math.PI / 2;
+  group.add(dealerWay);
 
   const propsGroup = props.build(true, true);
   group.add(propsGroup);

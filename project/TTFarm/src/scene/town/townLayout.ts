@@ -100,6 +100,9 @@ export const TOWERS: TowerDef[] = [
   { id: "tower-g", x: 59, z: 128, w: 9, d: 10, h: 22, color: 0xd8bfa5, accent: 0x97694d, face: "+z" },
   // —— 东街尾 ——
   { id: "tower-h", x: 136, z: 98, w: 7, d: 10, h: 24, color: 0xcad2c4, accent: 0x5c7468, face: "-x" },
+  // —— 东街补建：把 x126~140 的空街区填满 ——
+  { id: "tower-east-a", x: 134, z: 25, w: 7, d: 5, h: 27, color: 0xe2d5c0, accent: 0x8d6750, face: "-x" },
+  { id: "tower-east-b", x: 134, z: 91.5, w: 7, d: 5, h: 29, color: 0xd3d8ca, accent: 0x5c7468, face: "-x" },
 ];
 
 /** 中层公寓：填街区纵深，楼高 12~16m，带阳台，和塔楼拉开层次 */
@@ -111,6 +114,13 @@ export const MIDRISES: TowerDef[] = [
   { id: "mid-north-b", x: 92, z: 98, w: 6, d: 7, h: 15, color: 0xc9cbbc, accent: 0x687669, face: "-z" },
   { id: "mid-north-c", x: 92, z: 134, w: 6, d: 6, h: 13, color: 0xd7c2a8, accent: 0x896b52, face: "+z" },
   { id: "mid-east", x: 136, z: 66, w: 6, d: 8, h: 13, color: 0xd2c7b6, accent: 0x74685a, face: "-x" },
+  // —— 东街与北城补建 ——
+  { id: "mid-east-a", x: 134, z: 31.5, w: 6, d: 5, h: 14, color: 0xd8c9b2, accent: 0x7b6b58, face: "-x" },
+  { id: "mid-east-b", x: 134, z: 85.5, w: 6, d: 5, h: 15, color: 0xcfd3c4, accent: 0x65756a, face: "-x" },
+  { id: "mid-east-c", x: 133.5, z: 120.5, w: 6, d: 6, h: 14, color: 0xdcc8ae, accent: 0x85664f, face: "-x" },
+  { id: "mid-east-d", x: 133.5, z: 134, w: 6, d: 6, h: 16, color: 0xcdd3c9, accent: 0x5e756c, face: "-x" },
+  { id: "mid-north-w", x: 48, z: 128, w: 6, d: 7, h: 15, color: 0xd6bfa7, accent: 0x8c604b, face: "+x" },
+  { id: "mid-north-e", x: 122, z: 131, w: 6, d: 6, h: 15, color: 0xd1c5b3, accent: 0x74695a, face: "-z" },
 ];
 
 export const SHOPS: ShopDef[] = [
@@ -146,6 +156,12 @@ export const SHOPS: ShopDef[] = [
   { id: "shop-mart-a", name: "东街 24H", x: 135, z: 40, w: 6, d: 9, h: 7.6, color: 0xe7dfcb, accent: 0x4c7a6d, face: "-x", kind: "mart24", enterable: "mart24" },
   { id: "shop-laundry", name: "净衣洗衣", x: 135, z: 57, w: 6, d: 8, h: 6.8, color: 0xd2dce0, accent: 0x5c7580, face: "-x", kind: "laundry" },
   { id: "shop-nightfood", name: "灯火夜宵", x: 135, z: 75, w: 6, d: 8, h: 7.2, color: 0xe4c9a9, accent: 0xaa6b3e, face: "-x", kind: "nightfood" },
+
+  // —— 东街中段与北城补店 ——
+  { id: "shop-east-c", name: "东街水果", x: 134, z: 80, w: 4, d: 3.5, h: 6.8, color: 0xdfd2a8, accent: 0x7f904f, face: "-x", kind: "grocery" },
+  { id: "shop-east-e", name: "东街小铺", x: 134, z: 127, w: 5.5, d: 4, h: 7.0, color: 0xdcc7a2, accent: 0x9a6a3c, face: "-x", kind: "grocery" },
+  { id: "shop-north-w", name: "北门花店", x: 48, z: 136, w: 6, d: 4, h: 7.0, color: 0xdccab8, accent: 0xb06a62, face: "+x", kind: "flower" },
+  { id: "shop-south-e", name: "南街茶点", x: 118, z: 27, w: 5, d: 4, h: 6.8, color: 0xcdd9b6, accent: 0x5d8a74, face: "-x", kind: "tea" },
 ];
 
 export const POCKET_PARK = { x: 115.5, z: 70, radius: 4.2 } as const;
@@ -157,6 +173,8 @@ export const DEALERSHIP = {
   color: 0xf0e4cf, accent: 0x3f5562, glass: 0xbfe0e6,
   /** 北面 z=46 玻璃门的门洞中心与净宽 */
   doorX: 72.6, doorWidth: 2.2,
+  /** 东面 x=76 朝中央街的自动门：门洞中心 z 与净宽 */
+  eastDoorZ: 41.4, eastDoorWidth: 2.4,
 } as const;
 
 /** 街区块铺装（整块铺地，避免楼间露出草地） */

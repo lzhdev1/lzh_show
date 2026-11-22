@@ -102,30 +102,20 @@ const curve = new THREE.CatmullRomCurve3(
 export const RIVER_POINTS: THREE.Vector3[] = curve.getSpacedPoints(160);
 
 /**
- * 桥：架在河道上的一段，中心取曲线 0.52 处。
- * along 是跨河方向（沿河的法线），across 是顺河方向。
+ * 桥：对准河东小城主大道（z=52）架设，桥面 7.2m 与主大道同宽。
+ * 东坡道端点 x≈43.1，正好压在城市道路起点 x=42.6 上，不再错位。
+ * along 是跨河方向（正东），across 是顺河方向。
  */
-const bridgeIndex = Math.round(RIVER_POINTS.length * 0.52);
-const bridgePoint = RIVER_POINTS[bridgeIndex];
-const bridgePrev = RIVER_POINTS[bridgeIndex - 2];
-const bridgeNext = RIVER_POINTS[bridgeIndex + 2];
-const tangent = new THREE.Vector3(
-  bridgeNext.x - bridgePrev.x,
-  0,
-  bridgeNext.z - bridgePrev.z
-).normalize();
-const normal = new THREE.Vector3(-tangent.z, 0, tangent.x);
-
 export const BRIDGE = {
-  x: bridgePoint.x,
-  z: bridgePoint.z,
-  /** 跨河方向单位向量 */
-  nx: normal.x,
-  nz: normal.z,
+  x: 30.5,
+  z: 52,
+  /** 跨河方向单位向量：正东，和城市入口完全对齐 */
+  nx: 1,
+  nz: 0,
   /** 桥体沿跨河方向的半长（要比河宽长，两端各搭到岸上） */
   halfLength: 9.6,
-  /** 桥面半宽：6.8m，两侧各留 0.75m 人行道，车辆可双向通过 */
-  halfWidth: 3.4,
+  /** 桥面半宽：7.2m，两侧各留 0.78m 人行道，车辆可双向通过 */
+  halfWidth: 3.6,
   /** 桥面高度 */
   deckY: 0.62,
   rampLength: 3.0,

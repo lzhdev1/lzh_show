@@ -9,10 +9,11 @@ import { saddleHeight } from "../scene/ranchAnimals";
 import { createPlots, disposePlots, plotIdAt, plotPosition, updatePlots, PLOT_SIZE, bedHeightAt } from "../scene/plots";
 import { createForageScene } from "../scene/forageScene";
 import { createTown } from "../scene/town/townScene";
-import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect } from "../scene/town/townLayout";
+import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect, inTown } from "../scene/town/townLayout";
 import { createSalesHall } from "../scene/salesHall";
 import { salesHallHeight, inSalesHall, HALL_COUNTER } from "../scene/salesHallLayout";
 import { useTownInteraction, type TownPlace } from "./townInteraction";
+import { useTownNav } from "./townNav";
 import { useDrive } from "./drive";
 import { PlayerVehicle } from "../scene/vehicle";
 import { onBridge } from "../scene/layout";
@@ -232,6 +233,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   });
   let lastDecor = initial.decor;
   let nextPresence = 0;
+  let nextNav = 0;
 
   // —— 主循环 ——
   let raf = 0;
@@ -282,6 +284,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     useGame.getState().setRiding(null);
     useGame.getState().setActiveCar(id);
     useDrive.getState().setDriving(true);
+    useTownNav.getState().clear();
     useGame.getState().notify(`已上车：${car.plate}`);
     controls.reset();
   };
@@ -330,6 +333,24 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const requestedCar = useDrive.getState().consume();
     if (requestedCar) startDriving(requestedCar);
     if (vehicle && !useDrive.getState().driving) stopDriving();
+
+    // 城市导览：UI 请求「带我去星野汽车」，自动寻路到中央街东门口
+    const navTarget = useTownNav.getState().consume();
+    if (navTarget === "dealer") {
+      if (vehicle) {
+        useGame.getState().notify("先结束驾驶，再走去汽车店", "warn");
+      } else if (useTownInteraction.getState().place) {
+        useGame.getState().notify("先走出店铺再导航", "warn");
+      } else {
+        // 先到东门外的人行道，再从门口走进店，避免从农场一路直接切过河。
+        const doorOutside = new THREE.Vector3(DEALERSHIP.x + DEALERSHIP.w / 2 + 1.55, 0, DEALERSHIP.eastDoorZ);
+        player.moveTo(doorOutside, () => {
+          player.moveTo(new THREE.Vector3(DEALERSHIP.x + DEALERSHIP.w / 2 - 0.45, 0, DEALERSHIP.eastDoorZ), undefined, false, false);
+          useGame.getState().notify("已到星野汽车东门，正在进店");
+        }, false, false);
+        useGame.getState().notify("正在前往星野汽车：沿主大道到中央街，店门在东侧");
+      }
+    }
 
     inputDir.set(0, 0, 0);
     view.camera.getWorldDirection(forward);
@@ -462,6 +483,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
     updatePlots(plots, sceneState.plots, standingPlot ?? inspectedPlot, growthTime, elapsed);
 
+    // 城市导览的坐标与可见性：桥上也算“接近城市”，提前显示汽车店入口
+    if (elapsed >= nextNav) {
+      nextNav = elapsed + 0.22;
+      const px = vehicle ? vehicle.x : player.root.position.x;
+      const pz = vehicle ? vehicle.z : player.root.position.z;
+      useTownNav.getState().setPose(px, pz, inTown(px, pz) || onBridge(px, pz, 1.2));
+    }
+
     const cameraBase = vehicle
       ? vehicle.root.position.y + 0.15
       : player.cameraGroundY - 0.87 * player.swimAmount + Math.max(0, seat - 0.6);
@@ -482,11 +511,13 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     town.update(dt, elapsed);
     view.renderer.render(view.scene, view.camera);
   };
+
   raf = requestAnimationFrame(frame);
 
   const dispose = () => {
     cancelAnimationFrame(raf);
     setStandingPlot(null);
+    useTownNav.getState().clear();
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
     window.removeEventListener("blur", onBlur);

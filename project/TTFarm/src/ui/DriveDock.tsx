@@ -2,6 +2,7 @@ import { useState } from "react";
 import { carModelOf } from "../game/garage";
 import { useDrive } from "../game/drive";
 import { useGame } from "../game/state";
+import { useTownNav } from "../game/townNav";
 import "./drive.css";
 
 /** 发言按钮上方的驾驶入口：展开车库列表，选车直接上路 */
@@ -13,6 +14,7 @@ export function DriveDock() {
   const driving = useDrive((s) => s.driving);
   const start = useDrive((s) => s.start);
   const stop = useDrive((s) => s.stop);
+  const requestDealer = useTownNav((s) => s.request);
 
   if (driving) {
     return (
@@ -33,10 +35,13 @@ export function DriveDock() {
             <span className="muted small">{cars.length}/6</span>
           </header>
           {cars.length === 0 ? (
-            <p className="drive-empty">
-              车库还空着。去河东「星野汽车」提一台
+            <div className="drive-empty">
+              <p>车库还空着。去河东「星野汽车」提一台。</p>
+              <button type="button" className="drive-find" onClick={() => { requestDealer("dealer"); setOpen(false); }}>
+                带我去星野汽车
+              </button>
               <span className="drive-coins">现有 {coins.toLocaleString("zh-CN")} 金币</span>
-            </p>
+            </div>
           ) : (
             <ul className="drive-list">
               {cars.map((car) => {

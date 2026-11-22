@@ -77,6 +77,21 @@
 .drive-main .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .drive-empty { margin: 6px 2px 10px; color: #74735f; font-size: 12px; line-height: 1.6; }
+.drive-empty p { margin: 0 0 7px; }
+.drive-find {
+  min-height: 34px;
+  margin-bottom: 6px;
+  padding: 0 12px;
+  border: 1px solid #b9c89d;
+  border-radius: 10px;
+  background: #eef4df;
+  color: #3f5c37;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.drive-find:hover { background: #e3edcd; }
 .drive-coins { display: block; color: #8b6b34; font-weight: 700; }
 .drive-tip { margin: 9px 2px 2px; color: #8a8877; font-size: 11px; line-height: 1.5; }
 
