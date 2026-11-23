@@ -1,12 +1,14 @@
 import { CROPS, harvestKey, produceName } from "./crops";
 import { FORAGE_SEED_CHANCE, FORAGE_XP, HERB_FORAGE_XP, HERB_SEED_CHANCE, forageRotationAt, wildPatchesAt, type ForageState } from "./forage";
 import { setNearbyPatch, useForageInteraction } from "./forageInteraction";
+import { bagAddCheck } from "./backpack";
 
 interface ForageData {
   forage: ForageState;
   harvest: Record<string, number>;
   seeds: Record<string, number>;
   xp: number;
+  backpackLevel: number;
 }
 interface ForageContext extends ForageData {
   notify: (text: string, tone?: "ok" | "warn") => void;
@@ -18,7 +20,7 @@ export interface ForageActions {
 export function createForageActions(set: (value: Partial<ForageData>) => void, get: () => ForageContext): ForageActions {
   return {
     foragePatch(id) {
-      const { forage, harvest, seeds, xp, notify } = get();
+      const { forage, harvest, seeds, xp, backpackLevel, notify } = get();
       const now = Date.now();
       const rotation = forageRotationAt(now);
       const patch = wildPatchesAt(now).find((item) => item.id === id);
@@ -31,6 +33,16 @@ export function createForageActions(set: (value: Partial<ForageData>) => void, g
       const key = harvestKey(def.id, patch.mutation);
       const herb = Boolean(def.herb);
       const seedDrop = Math.random() < (herb ? HERB_SEED_CHANCE : FORAGE_SEED_CHANCE);
+      const harvestRoom = bagAddCheck(harvest, key, 1, backpackLevel);
+      if (!harvestRoom.ok) {
+        return notify(`杂物背包已满（${harvestRoom.used}/${harvestRoom.slots} 格），先升级背包或卖掉一批`, "warn");
+      }
+      if (seedDrop) {
+        const seedRoom = bagAddCheck(seeds, def.id, 1, backpackLevel);
+        if (!seedRoom.ok) {
+          return notify(`种子背包已满（${seedRoom.used}/${seedRoom.slots} 格），先升级背包`, "warn");
+        }
+      }
       set({
         xp: xp + (herb ? HERB_FORAGE_XP : FORAGE_XP),
         harvest: { ...harvest, [key]: (harvest[key] ?? 0) + 1 },

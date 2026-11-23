@@ -5,7 +5,7 @@ import { observeHomeRevision, useAccount } from "../game/account";
 import { startSocialSync, useSocial } from "../game/social";
 import { startChatSync } from "../game/chat";
 import { LoginPage } from "./LoginPage";
-import { CoinIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
+import { BagIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
 import { PlotAction } from "./PlotAction";
 import { ShopPanel } from "./ShopPanel";
@@ -26,6 +26,7 @@ import { ChatDock } from "./ChatDock";
 import { MarketPanel } from "./MarketPanel";
 import { CarStorePanel } from "./CarStorePanel";
 import { TownHUD } from "./TownHUD";
+import { BackpackPanel } from "./BackpackPanel";
 import "./social.css";
 
 export function App() {
@@ -54,6 +55,7 @@ export function App() {
   const [codexOpen, setCodexOpen] = useState(false);
   const [marketOpen, setMarketOpen] = useState(false);
   const [carStoreOpen, setCarStoreOpen] = useState(false);
+  const [backpackOpen, setBackpackOpen] = useState(false);
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   useEffect(() => startChatSync(), []);
@@ -62,7 +64,7 @@ export function App() {
     if (!away && token) return;
     setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
     setProfileOpen(false); setFarmOpen(false); setRanchOpen(false); setCodexOpen(false);
-    setMarketOpen(false); setCarStoreOpen(false);
+    setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false);
   }, [away, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
@@ -71,7 +73,6 @@ export function App() {
   }, []);
 
   const avatarId = useGame((s) => s.avatarId);
-  const coins = useGame((s) => s.coins);
   const driving = useDrive((s) => s.driving);
   const xp = useGame((s) => s.xp);
   const seeds = useGame((s) => s.seeds);
@@ -80,13 +81,13 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
-  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen || marketOpen || carStoreOpen);
+  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen || marketOpen || carStoreOpen || backpackOpen);
   useEffect(() => {
     if (!panelOpen) return;
     const dismiss = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return;
       setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
-      setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false); setMarketOpen(false); setCarStoreOpen(false);
+      setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false); setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false);
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -154,10 +155,9 @@ export function App() {
               <TrophyIcon /><span>排行</span>
             </button>
           </div>
-          <div className="coin-pill" aria-label={`金币 ${coins}`}>
-            <CoinIcon />
-            <b>{coins.toLocaleString("zh-CN")}</b>
-          </div>
+          <button className="bag-trigger" onClick={() => setBackpackOpen(true)} aria-label="打开背包">
+            <BagIcon /><span>背包</span>
+          </button>
           {!away && <HudMenu items={menuItems}>
             <div className="hud-menu-actions"><ActionTrigger /></div>
             <ControlGuide />
@@ -235,6 +235,7 @@ export function App() {
       {codexOpen && <CodexPanel onClose={() => setCodexOpen(false)} />}
       {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
       {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
+      {backpackOpen && <BackpackPanel onClose={() => setBackpackOpen(false)} />}
       </>}
 
       <ChatDock />

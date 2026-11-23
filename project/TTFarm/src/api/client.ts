@@ -50,6 +50,7 @@ export interface RemoteState {
   ranch?: RanchState;
   forage?: ForageState;
   garage?: GarageState;
+  backpackLevel?: number;
 }
 
 export interface AuthResult {

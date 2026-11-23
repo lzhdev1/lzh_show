@@ -11,6 +11,7 @@ import { normalizeForage, type ForageState } from "./forage";
 import { createForageActions, type ForageActions } from "./forageActions";
 import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
+import { backpackSlots, backpackUpgradeCost, bagAddCheck, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
@@ -41,6 +42,7 @@ interface GameData {
   harvest: Record<string, number>;
   meat: Record<string, number>;
   garage: GarageState;
+  backpackLevel: number;
   nickname: string;
   avatarId: AvatarId;
   outfitId: OutfitId;
@@ -67,6 +69,8 @@ interface GameActions extends RanchActions, ForageActions {
   /** 在星野汽车购车；成功扣金币并写入车库 */
   buyCar: (model: CarModelId, color: number) => boolean;
   setActiveCar: (id: string | null) => void;
+  /** 背包升一级：四类各 +10 格，最高 15 级 */
+  upgradeBackpack: () => void;
   expand: () => void;
   /** 一次扩建 count 块地（金币不够或没有空地时返回失败原因） */
   expandBy: (count: number) => boolean;
@@ -110,6 +114,7 @@ export function initialData(): GameData {
     harvest: emptyRecord(0),
     meat: {},
     garage: { cars: [], activeId: null },
+    backpackLevel: 1,
     nickname: "农场主",
     avatarId: "xiaosui",
     outfitId: "field",
@@ -173,6 +178,11 @@ export const useGame = create<GameStore>()(
         const cost = def.seedPrice * qty;
         if (get().coins < cost) {
           get().notify("金币不够啦", "warn");
+          return;
+        }
+        const room = bagAddCheck(get().seeds, crop, qty, get().backpackLevel);
+        if (!room.ok) {
+          get().notify(`种子背包已满（${room.used}/${room.slots} 格），先升级背包`, "warn");
           return;
         }
         set((s) => ({
@@ -244,6 +254,11 @@ export const useGame = create<GameStore>()(
         }
         const def = CROPS[plot.crop];
         const key = harvestKey(def.id, plot.mutation);
+        const room = bagAddCheck(get().harvest, key, def.yields, get().backpackLevel);
+        if (!room.ok) {
+          get().notify(`杂物背包已满（${room.used}/${room.slots} 格），先升级背包或卖掉一批`, "warn");
+          return;
+        }
         const before = levelFromXp(get().xp);
         const after = levelFromXp(get().xp + def.xp);
         set((s) => ({
@@ -350,6 +365,22 @@ export const useGame = create<GameStore>()(
         }));
       },
 
+      upgradeBackpack: () => {
+        const level = normalizeBackpackLevel(get().backpackLevel);
+        const cost = backpackUpgradeCost(level);
+        if (cost === null) {
+          get().notify(`背包已经是 ${BAG_MAX_LEVEL} 级，无法再升级`, "warn");
+          return;
+        }
+        if (get().coins < cost) {
+          get().notify(`升级背包还差 ${cost - get().coins} 金币`, "warn");
+          return;
+        }
+        const next = level + 1;
+        set((s) => ({ coins: s.coins - cost, backpackLevel: next }));
+        get().notify(`背包升至 Lv${next}，每类 ${backpackSlots(next)} 格`);
+      },
+
       expand: () => {
         const next = get().plots.find((p) => !p.unlocked);
         if (!next) {
@@ -417,6 +448,7 @@ export const useGame = create<GameStore>()(
         harvest: s.harvest,
         meat: s.meat,
         garage: s.garage,
+        backpackLevel: s.backpackLevel,
         nickname: s.nickname,
         avatarId: s.avatarId,
         outfitId: s.outfitId,
@@ -452,6 +484,7 @@ export const useGame = create<GameStore>()(
           harvest: { ...base.harvest, ...saved.harvest },
           meat: normalizeMeat(saved.meat),
           garage: normalizeGarage(saved.garage),
+          backpackLevel: normalizeBackpackLevel(saved.backpackLevel),
         };
       },
     }

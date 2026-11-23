@@ -273,6 +273,36 @@ export function ShopIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+export function BagIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M6.2 8.2h11.6l1.3 11.2H4.9L6.2 8.2Z" fill="#e7c98f" stroke="#7d613c" strokeWidth="1.4" />
+      <path d="M8.4 8.2V6.8a3.6 3.6 0 0 1 7.2 0v1.4" stroke="#7d613c" strokeWidth="1.8" fill="none" />
+      <path d="M6.9 12.2h10.2M5.8 17.2h12.4" stroke="#b38a4f" strokeWidth="1.2" />
+      <rect x="10.2" y="13.6" width="3.6" height="3" rx=".8" fill="#6d9855" stroke="#4f7a40" strokeWidth="1" />
+    </svg>
+  );
+}
+
+export function EquipmentIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 3.6l6.4 2.5v5.5c0 4-2.6 6.8-6.4 8.8-3.8-2-6.4-4.8-6.4-8.8V6.1L12 3.6Z" fill="#c7d8dd" stroke="#637b83" strokeWidth="1.4" />
+      <path d="M12 7.2v8.6M8.2 11.2h7.6" stroke="#637b83" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ItemIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M9.2 4.2h5.6v2.2l1.3 2.2v10.2H7.9V8.6l1.3-2.2V4.2Z" fill="#c9e5dc" stroke="#557f73" strokeWidth="1.4" />
+      <path d="M9.8 11.2h4.4v5.2H9.8z" fill="#71b897" />
+      <path d="M8.4 3.8h7.2" stroke="#557f73" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>

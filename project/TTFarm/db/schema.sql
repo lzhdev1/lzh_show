@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS farm_states (
   seeds         JSONB        NOT NULL DEFAULT '{}'::jsonb,
   harvest       JSONB        NOT NULL DEFAULT '{}'::jsonb,
   selected_seed VARCHAR(32)  NOT NULL DEFAULT 'radish',
+  backpack_level INTEGER     NOT NULL DEFAULT 1,
   save_version  INTEGER      NOT NULL DEFAULT 1,
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -84,6 +85,9 @@ ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS forage JSONB NOT NULL DEFAULT '
 
 -- 车库随账号存档，cars 数组与 activeId 均由服务端归一化后落库
 ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS garage JSONB NOT NULL DEFAULT '{"cars":[],"activeId":null}'::jsonb;
+
+-- 背包等级：Lv1 每类 30 格，每升一级 +10，最高 Lv15
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS backpack_level INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);

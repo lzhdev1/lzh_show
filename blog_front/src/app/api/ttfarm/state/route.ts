@@ -27,7 +27,8 @@ export async function PUT(req: Request) {
       const raw = body.state as Record<string, unknown>;
       if ("revision" in raw && (!Number.isSafeInteger(raw.revision) || (raw.revision as number)<0)) throw new FarmError(400, "存档版本有误");
       const revision = await saveState(client,user.id,save,"outfitId" in raw,"decor" in raw,"bottomId" in raw,
-        "ranch" in raw, "forage" in raw, "garage" in raw, typeof raw.revision === "number" ? raw.revision : null);
+        "ranch" in raw, "forage" in raw, "garage" in raw, "backpackLevel" in raw,
+        typeof raw.revision === "number" ? raw.revision : null);
       if (revision === null) throw new FarmError(409,"农场有更新，请载入最新进度", {state:await loadSave(client,user.id,user.nickname)});
       if (writeId) {
         await client.query("INSERT INTO farm_owner_writes(user_id,write_id,revision) VALUES($1,$2,$3)",[user.id,writeId,revision]);
