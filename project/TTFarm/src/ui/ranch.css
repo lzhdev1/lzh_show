@@ -106,8 +106,28 @@
 .ranch-empty { margin: 9px 1px 2px; line-height: 1.7; color: #635e50; font-size: 13px; }
 .ranch-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
 .ranch-list li { flex-wrap: wrap; padding: 7px; background: #fffaf0; border: 1px solid #e5ddca; border-radius: 11px; }
+.ranch-list li.pinned { background: linear-gradient(120deg, #fffaf0, #fdf1dc); border-color: #dcc59e; box-shadow: inset 0 0 0 1px #f4e6cb; }
 .resident-name { flex: 1; min-width: 84px; }
-.resident-actions { margin-left: auto; gap: 3px; }
+.resident-name strong { display: flex; align-items: center; gap: 5px; }
+.pin-tag { padding: 1px 6px; border-radius: 999px; background: #f2dfb8; color: #795426; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; }
+.resident-actions { margin-left: auto; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.pin-button {
+  min-height: 44px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  color: #806a4d;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pin-button svg { opacity: 0.58; }
+.pin-button.active { background: #f8e9cc; border-color: #e3c99b; color: #8b5521; font-weight: 700; }
+.pin-button.active svg { opacity: 1; }
 .release-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #765f4b; }
 .sell-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #3f6b45; font-weight: 650; }
 .butcher-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #a35c3d; font-weight: 650; }

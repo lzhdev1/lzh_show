@@ -34,7 +34,7 @@ export const ANIMAL_ELEMENTS = {
 export type AnimalElement = keyof typeof ANIMAL_ELEMENTS;
 export interface RanchAnimal { id: string; species: AnimalSpecies; element: AnimalElement | null }
 export interface WildAnimal extends RanchAnimal { slot: number }
-export interface RanchState { level: number; animals: RanchAnimal[]; ridingId: string | null }
+export interface RanchState { level: number; animals: RanchAnimal[]; ridingId: string | null; pinnedMounts: string[] }
 
 export const RANCH_MAX_LEVEL = 10;
 export const WILD_CLEARINGS = [[2,20],[-1,25],[13,33],[-24,9],[-11,-21],[15,-23],[-33,34],
@@ -82,7 +82,14 @@ export function normalizeRanch(value?: unknown): RanchState {
     if (animals.length === ranchCapacity(level)) break;
   }
   const riding = level >= MOUNT_UNLOCK_LEVEL && animals.find((animal) => animal.id === src.ridingId && isMountAnimal(animal));
-  return { level, animals, ridingId: riding ? riding.id : null };
+  // 置顶顺序即数组顺序：新置顶的排最前；只保留仍在本栏的坐骑
+  const mounts = new Set(animals.filter(isMountAnimal).map((animal) => animal.id));
+  const pinnedMounts: string[] = [];
+  for (const id of Array.isArray(src.pinnedMounts) ? src.pinnedMounts : []) {
+    if (typeof id !== "string" || !mounts.has(id) || pinnedMounts.includes(id)) continue;
+    pinnedMounts.push(id);
+  }
+  return { level, animals, ridingId: riding ? riding.id : null, pinnedMounts };
 }
 
 const SPECIES = Object.keys(ANIMALS) as AnimalSpecies[];

@@ -33,6 +33,14 @@ function PawIcon() {
   </svg>;
 }
 
+function PinIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none"
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 3h6l-1 5 3 3H7l3-3-1-5Z"/>
+    <path d="M12 11v9"/>
+  </svg>;
+}
+
 export function RanchTrigger({ onClick }: { onClick: () => void }) {
   return <button type="button" className="ranch-trigger" aria-label="打开牧场" onClick={onClick}>
     <RanchIcon /><b>牧场</b>
@@ -94,6 +102,7 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
   const coins = useGame((s) => s.coins);
   const upgrade = useGame((s) => s.upgradeRanch);
   const setRiding = useGame((s) => s.setRiding);
+  const toggleMountPin = useGame((s) => s.toggleMountPin);
   const release = useGame((s) => s.releaseAnimal);
   const sell = useGame((s) => s.sellAnimal);
   const butcher = useGame((s) => s.butcherAnimal);
@@ -102,7 +111,15 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
   const [selling, setSelling] = useState<string | null>(null);
   const [butchering, setButchering] = useState<string | null>(null);
   const hasStable = ranch.level >= MOUNT_UNLOCK_LEVEL;
-  const stable = hasStable ? ranch.animals.filter(isMountAnimal) : [];
+  const pinnedMounts = ranch.pinnedMounts ?? [];
+  const stable = hasStable ? ranch.animals.filter(isMountAnimal).sort((a, b) => {
+    const ai = pinnedMounts.indexOf(a.id);
+    const bi = pinnedMounts.indexOf(b.id);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  }) : [];
   const residents = tab === "stable" ? stable : ranch.animals.filter((animal) => !hasStable || !isMountAnimal(animal));
   const capacity = ranchCapacity(ranch.level);
   const cost = ranchUpgradeCost(ranch.level);
@@ -136,10 +153,11 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
         ? "带上收获的作物，靠近野生动物后投喂。收服的动物会自动回到牧场。"
         : hasStable ? "收服一匹野马就能在这里骑乘。五行变异的狼、熊、虎、狮子、大象和熊猫也可作为坐骑。"
         : "牧场升至 3 级后，已收服的野马和适合骑乘的五行变异动物会自动进入坐骑栏。"}</p>
-        : <ul className="ranch-list">{residents.map((animal) =>
-          <li key={animal.id}>
+        : <ul className="ranch-list">{residents.map((animal) => {
+          const pinned = tab === "stable" && pinnedMounts.includes(animal.id);
+          return <li key={animal.id} className={pinned ? "pinned" : ""}>
             <AnimalPortrait animal={animal}/>
-            <div className="resident-name"><strong>{animalName(animal)}</strong><small>
+            <div className="resident-name"><strong>{animalName(animal)}{pinned && <span className="pin-tag">置顶</span>}</strong><small>
               {animal.element ? ANIMAL_ELEMENTS[animal.element].label + "系变异" : "普通动物"}
               {isMountAnimal(animal) && (ranch.ridingId === animal.id ? " · 骑乘中" : hasStable ? " · 可骑乘" : " · 3级可骑乘")}
               {animal.species === "horse" && ` · ${HORSE_SPEED_FACTOR} 倍移速`}
@@ -157,6 +175,11 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
               <button className="btn mini" onClick={() => { release(animal.id); setReleasing(null); }}>确认放归</button>
               <button className="btn mini" onClick={() => setReleasing(null)}>取消</button>
             </div> : <div className="resident-actions">
+              {tab === "stable" && <button className={`pin-button${pinned ? " active" : ""}`} aria-pressed={pinned}
+                aria-label={pinned ? `取消置顶${animalName(animal)}` : `置顶${animalName(animal)}`}
+                onClick={() => toggleMountPin(animal.id)}>
+                <PinIcon/><span>{pinned ? "已置顶" : "置顶"}</span>
+              </button>}
               {tab === "stable" && <button className="btn mini" onClick={() => {
                 if (ranch.ridingId === animal.id) setRiding(null);
                 else if (setRiding(animal.id)) onClose();
@@ -167,7 +190,8 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
                 aria-label={`${animalName(animal)}出栏，得到${meatName(animal.species, animal.element)}`}>出栏</button>
               <button className="release-button" onClick={() => { setReleasing(animal.id); setSelling(null); setButchering(null); }} aria-label={`放归${animalName(animal)}`}>放归</button>
             </div>}
-          </li>)}</ul>}
+          </li>;
+        })}</ul>}
     </section>
   </div>;
 }

@@ -9,6 +9,7 @@ export interface RanchActions {
   upgradeRanch: () => void;
   tameWild: (id: string, baitKey: string) => void;
   setRiding: (id: string | null) => boolean;
+  toggleMountPin: (id: string) => void;
   releaseAnimal: (id: string) => void;
   sellAnimal: (id: string) => void;
   /** 出栏：动物转为肉品库存，去河岸售货大厅卖 */
@@ -56,11 +57,20 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       set({ ranch: { ...ranch, ridingId: id } });
       return true;
     },
+    toggleMountPin(id) {
+      const { ranch } = get();
+      const animal = ranch.animals.find((owned) => owned.id === id);
+      if (!animal || !isMountAnimal(animal)) return;
+      const pinned = ranch.pinnedMounts ?? [];
+      const next = pinned.includes(id) ? pinned.filter((mountId) => mountId !== id) : [id, ...pinned];
+      set({ ranch: { ...ranch, pinnedMounts: next } });
+    },
     releaseAnimal(id) {
       const { ranch, notify } = get();
       const animal = ranch.animals.find((owned) => owned.id === id);
       if (!animal) return;
       set({ ranch: { ...ranch, ridingId: ranch.ridingId === id ? null : ranch.ridingId,
+        pinnedMounts: (ranch.pinnedMounts ?? []).filter((mountId) => mountId !== id),
         animals: ranch.animals.filter((owned) => owned.id !== id) } });
       notify(`已将${animalName(animal)}放归野外`);
     },
@@ -70,6 +80,7 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       if (!animal) return;
       const value = animalValue(animal);
       set({ coins: coins + value, ranch: { ...ranch, ridingId: ranch.ridingId === id ? null : ranch.ridingId,
+        pinnedMounts: (ranch.pinnedMounts ?? []).filter((mountId) => mountId !== id),
         animals: ranch.animals.filter((owned) => owned.id !== id) } });
       notify(`已卖出${animalName(animal)}，+${value} 金币`);
     },
@@ -83,6 +94,7 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
         ranch: {
           ...ranch,
           ridingId: ranch.ridingId === id ? null : ranch.ridingId,
+          pinnedMounts: (ranch.pinnedMounts ?? []).filter((mountId) => mountId !== id),
           animals: ranch.animals.filter((owned) => owned.id !== id),
         },
       });
