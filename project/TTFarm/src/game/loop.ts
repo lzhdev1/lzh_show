@@ -268,8 +268,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
   const startDriving = (id: string) => {
     if (vehicle) return;
-    if (useSocial.getState().visit) {
-      useGame.getState().notify("做客时不能开自己的车", "warn");
+    const visit = useSocial.getState().visit;
+    if (visit?.mode === "spectate") {
+      useGame.getState().notify("参观模式不能驾驶，回到自己的农场再上车", "warn");
       useDrive.getState().stop();
       return;
     }
@@ -292,6 +293,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     player.root.visible = false;
     player.cancelTarget();
     useGame.getState().setRiding(null);
+    if (visit) useSocial.setState({ visitOnFoot: true });
     useGame.getState().setActiveCar(id);
     useDrive.getState().setDriving(true);
     useTownNav.getState().clear();
