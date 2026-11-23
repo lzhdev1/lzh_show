@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
-import { farmInput, releaseStick, setSprintEnabled, sprintEnabled, subscribeSprint } from "../game/input";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { farmInput, releaseStick, setSprintEnabled } from "../game/input";
 import { getRainSoundEnabled, getRiverSoundEnabled, setRainSoundEnabled, setRiverSoundEnabled } from "../game/riverSoundSetting";
 import { useClock } from "../game/clock";
 import { useAccount } from "../game/account";
@@ -160,7 +160,6 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
   const active = useRef<number | null>(null);
   const origin = useRef({ x: 0, y: 0, radius: 1 });
   const stick = useRef<HTMLDivElement>(null);
-  const sprint = useSyncExternalStore(subscribeSprint, sprintEnabled, sprintEnabled);
   const release = () => {
     active.current = null;
     releaseStick();
@@ -215,13 +214,5 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
       onPointerCancel={(e) => { if (e.pointerId === active.current) release(); }}>
       <span className="stick-thumb" />
     </div>
-    {!spectating && <button type="button" className={`sprint-toggle${sprint ? " held" : ""}`}
-      aria-pressed={sprint} aria-label={sprint ? "取消冲刺，恢复常速" : "开启冲刺，按住摇杆可加速"}
-      onClick={() => {
-        setSprintEnabled(!farmInput.sprint);
-      }}>
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="#ffd97a" stroke="#fff0c4"/></svg>
-      <span>{sprint ? "常速" : "冲刺"}</span>
-    </button>}
   </div>;
 }

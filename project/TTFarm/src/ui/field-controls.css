@@ -66,7 +66,6 @@
 .guide-actions button[aria-pressed="false"] { background: #f1eee7; color: #5e665a; }
 .guide-copy p + p:last-child { margin-top: 6px; }
 .touch-guide, .touch-controls { display: none; }
-.sprint-toggle { display: none; }
 #scene:focus { outline: none; }
 
 .topbar {
@@ -169,48 +168,6 @@
   }
   .touch-stick[data-running] { border-color: #ffd571; }
   .touch-stick[data-running] .stick-thumb { background: #ffdc87; }
-  .sprint-toggle {
-    position: fixed;
-    left: calc(max(18px, env(safe-area-inset-left)) + 25px);
-    bottom: calc(186px + env(safe-area-inset-bottom));
-    z-index: 36;
-    width: 50px;
-    height: 50px;
-    display: grid;
-    place-items: center;
-    align-content: center;
-    gap: 0;
-    padding: 0;
-    border: 1.5px solid #fdf4d5c4;
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 34% 22%, #ffffff2e, transparent 56%),
-      linear-gradient(155deg, #42635b8f, #203a328f 74%);
-    box-shadow: 0 5px 16px #16271f5c, inset 0 1px 0 #ffffff75;
-    backdrop-filter: blur(9px) saturate(1.2);
-    -webkit-backdrop-filter: blur(9px) saturate(1.2);
-    color: #fff6d6;
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.05;
-    cursor: pointer;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  .sprint-toggle svg { display: block; width: 18px; height: 18px; }
-  .sprint-toggle span { display: block; }
-  .sprint-toggle.held {
-    border-color: #ffdf8f;
-    background:
-      radial-gradient(circle at 34% 22%, #ffe9a83d, transparent 58%),
-      linear-gradient(165deg, #7f9b6b9e, #4d704c9c);
-    box-shadow: 0 0 15px #ffd36e70, inset 0 2px 7px #1d32294d;
-    color: #fff1bb;
-  }
-  .sprint-toggle:active { transform: scale(.95); }
   .plot-action {
     left: auto;
     right: max(18px, env(safe-area-inset-right));
@@ -319,7 +276,6 @@
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
   .dock { width: min(55vw, 580px); }
   .hud[data-input='touch'] .touch-stick { bottom: calc(78px + env(safe-area-inset-bottom)); width: 88px; height: 88px; }
-  .hud[data-input='touch'] .sprint-toggle { left: calc(max(18px, env(safe-area-inset-left)) + 19px); bottom: calc(176px + env(safe-area-inset-bottom)); }
   .hud[data-input='touch'] .plot-action { bottom: calc(252px + env(safe-area-inset-bottom)); }
   .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 146px); }
   .modal { max-height: 100%; }

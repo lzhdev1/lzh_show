@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ACTIONS } from "../scene/actionMotion";
 import { requestAction, requestStopAction, useAction } from "../game/actionStore";
 import { BOOST_CARDS, BAITS, baitById } from "../game/items";
 import { isReady } from "../game/growth";
 import { useFishing } from "../game/fishing";
 import { useGame } from "../game/state";
-import { farmInput, setSprintEnabled } from "../game/input";
+import { farmInput, setSprintEnabled, sprintEnabled, subscribeSprint } from "../game/input";
 import { unlockFishingAudio } from "../scene/fishingAudio";
 import { ItemIcon, CloseIcon } from "./icons";
 import "./mobile-controls.css";
@@ -43,6 +43,7 @@ export function MobileControls() {
   const current = useAction(s => s.current);
   const preferred = useAction(s => s.preferred);
   const preferredMeta = ACTIONS[preferred];
+  const sprint = useSyncExternalStore(subscribeSprint, sprintEnabled, sprintEnabled);
   const [baitOpen, setBaitOpen] = useState(false);
   const [itemOpen, setItemOpen] = useState(false);
   const [itemId, setItemId] = useState<string | null>(null);
@@ -133,6 +134,13 @@ export function MobileControls() {
           <span><b>{card.name}<i>×{items[card.id] ?? 0}</i></b><small>{card.blurb}</small></span>
         </button>)}
     </div>}
+
+    <button type="button" className={`cluster-key sprint${sprint ? " held" : ""}`}
+      aria-pressed={sprint} aria-label={sprint ? "关闭冲刺，恢复常速" : "开启冲刺，移动时加速"}
+      onClick={() => setSprintEnabled(!farmInput.sprint)}>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="#ffd97a" stroke="#fff0c4"/></svg>
+      <span>{sprint ? "冲刺中" : "冲刺"}</span>
+    </button>
 
     <button type="button" className="cluster-key jump" aria-label="跳跃"
       onPointerDown={event => { if (event.button === 0) farmInput.jump = true; }}

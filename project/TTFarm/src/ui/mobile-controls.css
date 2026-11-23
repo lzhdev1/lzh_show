@@ -92,6 +92,10 @@
 
 .cluster-key.jump { right: 13px; top: 51px; }
 .cluster-key.utility { left: 51px; top: 127px; }
+/* 冲刺夹在跳跃与道具两个小键中间；48px 让出大按钮的指尖安全区。 */
+.cluster-key.sprint { left: 82px; top: 82px; width: 48px; height: 48px; }
+.cluster-key.sprint svg { width: 17px; height: 17px; }
+.cluster-key.sprint span { font-size: 10px; }
 
 .cluster-key.utility .utility-dot {
   width: 16px;
