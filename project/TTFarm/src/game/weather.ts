@@ -56,7 +56,8 @@ export const WEATHER = {
 } as const;
 export type WeatherKind = keyof typeof WEATHER;
 const kinds = Object.keys(WEATHER) as WeatherKind[];
-const INTERVAL = 180_000;
+export const WEATHER_INTERVAL_MS = 180_000;
+const INTERVAL = WEATHER_INTERVAL_MS;
 
 function shuffledForecast(block: number) {
   const bag = [...kinds];

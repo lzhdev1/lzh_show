@@ -23,6 +23,7 @@ import {
 import {
   codexFishKey,
   codexFromHoldings,
+  codexMushroomKey,
   codexMutationKey,
   codexPlantKey,
   markCodexCollected,
@@ -30,6 +31,8 @@ import {
   normalizeCodexCollection,
   type CodexCollection,
 } from "./codexCollection";
+import { MUSHROOMS } from "./mushrooms";
+import { announceSpecialCrop, isSpecialVarietyMutation } from "./specialNotice";
 import { fishById, normalizeFishingState, rodById, rodUnlocked } from "./fish";
 export { AVATARS, type AvatarId } from "./appearance";
 
@@ -115,6 +118,8 @@ interface GameActions extends RanchActions, ForageActions {
   unequipFishingRod: () => void;
   /** 把钓到的鱼放进鱼篓，同时点亮鱼类图鉴 */
   collectFish: (id: string) => boolean;
+  /** 采一朵菌：给金币、记账并点亮菌类图鉴 */
+  collectMushroom: (id: string) => boolean;
   /** 商店：买成长加速卡，放入背包「道具」页 */
   buyBoostCard: (id: string, qty?: number) => boolean;
   /** 商店：买鱼饵，放入背包「杂物」页；首次购买会自动选中 */
@@ -284,6 +289,7 @@ export const useGame = create<GameStore>()(
           ),
         }));
         get().notify(`种下了${def.name}${watered ? "，雨水已浇灌" : ""}`);
+        if (isSpecialVarietyMutation(mutation)) announceSpecialCrop(produceName(def, mutation));
       },
 
       water: (plotId) => {
@@ -663,6 +669,19 @@ export const useGame = create<GameStore>()(
           fishCaught: { ...s.fishCaught, [id]: (s.fishCaught[id] ?? 0) + 1 },
           codexCollected: markCodexCollected(s.codexCollected, [codexFishKey(id)]),
         });
+        return true;
+      },
+
+      collectMushroom: (id) => {
+        const species = MUSHROOMS[id];
+        if (!species) return false;
+        const s = get();
+        set({
+          coins: s.coins + species.price,
+          xp: s.xp + 3,
+          codexCollected: markCodexCollected(s.codexCollected, [codexMushroomKey(id)]),
+        });
+        s.notify(`采到${species.name}，+${species.price} 金币，已记入菌类图鉴`);
         return true;
       },
 

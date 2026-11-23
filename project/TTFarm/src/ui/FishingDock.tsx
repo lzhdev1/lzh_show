@@ -141,6 +141,7 @@ export function FishingDock() {
             {phase === "idle" ? "钓鱼" : phase === "casting" ? "抛竿" : phase === "waiting" ? "收竿" : phase === "bite" ? "提竿" : phase === "reeling" ? "起竿" : "渔获"}
           </span>
           {(phase === "bite" || phase === "reeling") && <i className="fishing-button-ring" />}
+          {phase === "bite" && <span className="fishing-bite-badge">咬钩！</span>}
         </button>
       </div>
       {phase === "idle" && <small className="fishing-rod-name">{rod.name}</small>}

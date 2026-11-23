@@ -1,0 +1,39 @@
+.mushroom-encounter {
+  border-color: #cdbb96;
+  background:
+    radial-gradient(circle at 100% 0, #ffe9b455, transparent 42%),
+    #fcf8eef7;
+  animation: mushroom-card-in .18s ease-out;
+}
+.mushroom-encounter.mutation-magic { border-color: #7a529b; box-shadow: 0 4px 20px #5e359844; }
+.mushroom-encounter.mutation-mist { border-color: #b6c79e; box-shadow: 0 4px 22px #7ec6c844; }
+.mushroom-encounter.mutation-spirit { border-color: #74b9a0; box-shadow: 0 4px 20px #4b9a7e44; }
+.mushroom-portrait {
+  --mushroom-tint: #caa87e;
+  border-color: color-mix(in srgb, var(--mushroom-tint) 55%, #b9a98a);
+  background: linear-gradient(145deg, #fffdf4 10%, color-mix(in srgb, var(--mushroom-tint) 24%, #f2e9d4));
+}
+.mushroom-mutation-line {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #6d5b4d;
+}
+.mushroom-mutation-line.magic { color: #6d3f9b; }
+.mushroom-mutation-line.mist { color: #8a5a18; }
+.mushroom-mutation-line.spirit { color: #237a64; }
+.mushroom-season-tip {
+  margin: 0;
+  font-size: 9.5px;
+  color: #968264;
+}
+.hud[data-input="touch"] .mushroom-encounter {
+  bottom: calc(274px + env(safe-area-inset-bottom));
+}
+@media (max-height: 520px) {
+  .hud[data-input="touch"] .mushroom-encounter { bottom: calc(236px + env(safe-area-inset-bottom)); }
+}
+@keyframes mushroom-card-in {
+  from { opacity: 0; transform: translateY(5px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}

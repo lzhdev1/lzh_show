@@ -23,6 +23,24 @@
   z-index: 2;
   border-width: 3px;
 }
+/* 常规态整簇做成磨砂玻璃，咬钩时让 phase-bite 的高亮橙红完全接管。 */
+.mobile-action-cluster .cluster-main:not(.phase-bite):not(.phase-reeling) {
+  border-color: #fdf4d5c4;
+  background:
+    radial-gradient(circle at 34% 22%, #ffffff2e, transparent 56%),
+    linear-gradient(155deg, #42635b8f, #203a328f 74%);
+  box-shadow:
+    0 6px 22px #16271f5c,
+    0 0 0 1px #ffffff1f,
+    inset 0 1px 0 #ffffff75,
+    inset 0 -7px 14px #12241d4d;
+  backdrop-filter: blur(10px) saturate(1.22);
+  -webkit-backdrop-filter: blur(10px) saturate(1.22);
+}
+.mobile-action-cluster .cluster-main.phase-bite {
+  border-width: 3px;
+  filter: drop-shadow(0 0 12px #ffb24acc);
+}
 .mobile-action-cluster .cluster-main .fishing-button-icon { height: 30px; }
 .mobile-action-cluster .cluster-main .fishing-button-label { font-size: 13px; letter-spacing: .02em; }
 .mobile-action-cluster .cluster-main.action-on { filter: saturate(1.12) brightness(1.03); }
@@ -37,13 +55,18 @@
   align-content: center;
   gap: 1px;
   padding: 0;
-  border: 2px solid #fff5dcca;
+  border: 1.5px solid #fdf4d5b8;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 34% 24%, #5d8077dd, transparent 55%),
-    linear-gradient(165deg, #3f5f58e8, #263f3ae8);
-  color: #fff7de;
-  box-shadow: 0 4px 13px #23362e55, inset 0 1px 0 #ffffff42, inset 0 -4px 8px #1a2d2540;
+    radial-gradient(circle at 34% 22%, #ffffff2b, transparent 56%),
+    linear-gradient(165deg, #45645b75, #223a3372);
+  color: #fff8df;
+  box-shadow:
+    0 4px 14px #192a224f,
+    inset 0 1px 0 #ffffff6b,
+    inset 0 -4px 9px #11221b38;
+  backdrop-filter: blur(8px) saturate(1.16);
+  -webkit-backdrop-filter: blur(8px) saturate(1.16);
   font: inherit;
   font-size: 10.5px;
   font-weight: 700;
@@ -59,15 +82,15 @@
 .cluster-key span { display: block; }
 .cluster-key:active, .cluster-key.held {
   transform: scale(.95);
-  border-color: #ffd98a;
+  border-color: #ffdf8f;
   background:
-    radial-gradient(circle at 34% 24%, #79a08ddd, transparent 55%),
-    linear-gradient(165deg, #5c8269ee, #3b614bf2);
-  box-shadow: 0 2px 7px #23362e66, inset 0 2px 7px #1d32294d;
+    radial-gradient(circle at 34% 22%, #ffe9a83d, transparent 58%),
+    linear-gradient(165deg, #7f9b6b9e, #4d704c9c);
+  box-shadow: 0 0 15px #ffd36e70, inset 0 2px 7px #1d32294d;
 }
+.cluster-key.held span { color: #fff1bb; }
 
 .cluster-key.jump { right: 13px; top: 51px; }
-.cluster-key.sprint { left: 73px; top: 73px; }
 .cluster-key.utility { left: 51px; top: 127px; }
 
 .cluster-key.utility .utility-dot {

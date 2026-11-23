@@ -241,3 +241,29 @@
   .fish-codex-art { height: 82px; }
   .fish-codex-art .fish-portrait { width: 116px !important; height: 70px !important; }
 }
+
+/* ---------- 菌类图鉴 ---------- */
+
+.mushroom-codex-list .mushroom-codex-card {
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+.mushroom-codex-art {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--mushroom-cap) 46%, #d9cfb5 54%);
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mushroom-cap) 20%, #fffdf2 80%), #f1ead6 74%);
+}
+.mushroom-codex-art.dim { filter: saturate(.35) opacity(.62); }
+.mushroom-codex-list .codex-head { margin: 0; align-items: flex-start; }
+.mushroom-codex-list .codex-title { min-width: 0; }
+.mushroom-codex-list .codex-text { margin: 3px 0 0; }
+@media (max-width: 560px) {
+  .mushroom-codex-list .mushroom-codex-card { grid-template-columns: 46px minmax(0, 1fr); }
+  .mushroom-codex-art { width: 46px; height: 46px; }
+}

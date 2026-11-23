@@ -2,8 +2,9 @@ import * as THREE from "three";
 import { forageRotationAt, wildPatchesAt, type ForageState, type WildPatch } from "../game/forage";
 import { setNearbyPatch } from "../game/forageInteraction";
 import { WILD_CLEARINGS } from "../game/ranch";
-import { CROPS } from "../game/crops";
+import { CROPS, produceName } from "../game/crops";
 import { isWildMutation } from "../game/weather";
+import { announceSpecialCrop, isSpecialVarietyMutation } from "../game/specialNotice";
 import type { createCropLibrary } from "./crops3d";
 import { createCropAuras } from "./cropAuras";
 import { FORAGE_ANCHORS } from "./forageAnchors";
@@ -45,7 +46,11 @@ function openScore(p: THREE.Vector3, obstacles: WorldObstacles) {
 }
 
 function spawnAt(patch: WildPatch, obstacles: WorldObstacles) {
-  const [cx, cz] = FORAGE_ANCHORS[patch.slot % FORAGE_ANCHORS.length];
+  // 每轮把锚点整体错开 5 位，同一种菜不会永远刷在同一片草地；
+  // 具体 offset 仍按 patch.id 散开，避免整批菜像被平移了一格。
+  const rotation = Number(patch.id.split("-")[1]) || 0;
+  const anchorIndex = (patch.slot + rotation * 5) % FORAGE_ANCHORS.length;
+  const [cx, cz] = FORAGE_ANCHORS[anchorIndex];
   const phase = hash(patch.id) * Math.PI * 2;
   const acceptable = (p: THREE.Vector3) => {
     if (Math.abs(p.x) > WORLD_HALF - 8 || Math.abs(p.z) > WORLD_HALF - 8) return false;
@@ -157,6 +162,9 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
       mesh.computeBoundingSphere();
       group.add(mesh);
       actors.set(patch.id, { patch, mesh, anchor });
+      if (patch.mutation && isSpecialVarietyMutation(patch.mutation)) {
+        announceSpecialCrop(produceName(CROPS[patch.crop], patch.mutation));
+      }
       if (patch.mutation && isWildMutation(patch.mutation)) {
         auras.setEmitter(patch.id, anchor.clone().add(new THREE.Vector3(0, 0.12, 0)), patch.mutation, 1.35);
       } else if (patch.mutation && CROPS[patch.crop].herb) {

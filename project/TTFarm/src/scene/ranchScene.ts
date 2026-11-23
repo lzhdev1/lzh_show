@@ -14,7 +14,9 @@ function hash(key:string) {
   return (n>>>0)/4294967296;
 }
 function spawnAt(animal:WildAnimal, obstacles:WorldObstacles) {
-  const [cx,cz]=WILD_CLEARINGS[animal.slot];
+  const rotation = Number(animal.id.split("-")[1]) || 0;
+  const index = (animal.slot + rotation * 7) % WILD_CLEARINGS.length;
+  const [cx,cz]=WILD_CLEARINGS[index];
   const phase=hash(animal.id)*Math.PI*2;
   for(let i=0;i<55;i++){
     const a=phase+i*2.40,r=Math.sqrt(i)*(animal.slot<2?.50:1.08)+.7;
@@ -35,6 +37,8 @@ interface Actor {
   seed:number;
   phase:number;
   range:number;
+  wanderLeg:number;
+  wanderTarget:THREE.Vector3;
 }
 
 export function createRanchScene(obstacles:WorldObstacles) {
@@ -47,7 +51,7 @@ export function createRanchScene(obstacles:WorldObstacles) {
   let lastRider:Rider|null=null;
   const actors=new Map<string,Actor>();
   const bursts:Array<{at:THREE.Vector3;time:number;element:AnimalElement|null}>=[];
-  const playerPosition=new THREE.Vector3(), target=new THREE.Vector3();
+  const playerPosition=new THREE.Vector3();
   const hit=new THREE.Vector3(), bound=new THREE.Sphere();
   const tau=Math.PI*2;
 
@@ -69,7 +73,7 @@ export function createRanchScene(obstacles:WorldObstacles) {
       }
       if(!actor){
         const seed=hash(animal.id);
-        actor={animal,wild,ridden,anchor:location(),range,seed,phase:tau*seed,rig:library.create(animal.species,animal.element,ridden)};
+        actor={animal,wild,ridden,anchor:location(),range,seed,phase:tau*seed,wanderLeg:-1,wanderTarget:location(),rig:library.create(animal.species,animal.element,ridden)};
         actor.rig.group.name=(wild?"wild-":"ranch-")+animal.species;
         actor.rig.group.userData.animalId=animal.id;
         actor.rig.group.position.copy(actor.anchor);
@@ -83,8 +87,13 @@ export function createRanchScene(obstacles:WorldObstacles) {
         }
         actor.anchor.copy(anchor);
         actor.range=range;
+        actor.wanderLeg=-1;
+        actor.wanderTarget.copy(anchor);
       } else if(!actor.wild){
-        actor.anchor.copy(location());actor.range=range;
+        const anchor=location();
+        actor.anchor.copy(anchor);actor.range=range;
+        actor.wanderLeg=-1;
+        actor.wanderTarget.copy(anchor);
       }
       actor.wild=wild;
       actor.rig.group.name=(wild?"wild-":ridden?"ridden-":"ranch-")+animal.species;
@@ -156,27 +165,39 @@ export function createRanchScene(obstacles:WorldObstacles) {
         p.copy(playerRoot.position);model.rotation.y=playerRoot.rotation.y;
         stride=moving?(running?1:.54):0;
       } else {
-        const cycle=t/(8+actor.seed*4)+actor.seed*17;
-        const leg=Math.floor(cycle);
-        const progress=THREE.MathUtils.smoothstep(cycle-leg,0,.60);
-        const a=(leg+progress)*2.7+actor.seed*tau;
-        const dx=actor.range*Math.cos(a),dz=actor.range*.69*Math.sin(2*a);
-        let tx=actor.anchor.x+dx,tz=actor.anchor.z+dz;
-        // 野生动物只在岸上走：椭圆路径快要压到水面时，沿河道法线推回岸边。
-        const shore=riverInfo(tx,tz);
-        if(shore.dist<RIVER_BED.waterLine+1.1) {
-          const push=RIVER_BED.waterLine+1.1-shore.dist;
-          tx+=shore.nx*push;tz+=shore.nz*push;
+        // 随机漫游：落点始终限制在 anchor + range 内，走到后立刻选下一个点；
+        // 不再沿固定八字循环，也不会长期站在同一处。
+        const leg = Math.floor(t / (5.2 + actor.seed * 2.8));
+        const travelNow = Math.hypot(actor.wanderTarget.x - p.x, actor.wanderTarget.z - p.z);
+        if (leg > actor.wanderLeg || travelNow <= 0.045) {
+          actor.wanderLeg = Math.max(actor.wanderLeg + 1, leg);
+          const a = hash(actor.animal.id + ":" + actor.wanderLeg) * tau;
+          const r = actor.wild
+            ? actor.range * (0.35 + hash(actor.animal.id + ":r:" + actor.wanderLeg) * 0.65)
+            : Math.max(actor.range, 0.36) * (0.45 + hash(actor.animal.id + ":r:" + actor.wanderLeg) * 0.55);
+          actor.wanderTarget.set(actor.anchor.x + Math.cos(a) * r, actor.anchor.y, actor.anchor.z + Math.sin(a) * r);
+          const shore = riverInfo(actor.wanderTarget.x, actor.wanderTarget.z);
+          if (shore.dist < RIVER_BED.waterLine + 1.35) {
+            const push = RIVER_BED.waterLine + 1.35 - shore.dist;
+            actor.wanderTarget.x += shore.nx * push;
+            actor.wanderTarget.z += shore.nz * push;
+          }
+          if (!obstacles.canWalk(p, actor.wanderTarget)) actor.wanderTarget.copy(actor.anchor);
         }
-        target.set(tx,actor.anchor.y,tz);
-        const travel=Math.hypot(target.x-p.x,target.z-p.z);
-        p.copy(target);
-        stride=dt>0?Math.min(.68,travel/dt*2.7):0;
-        if(stride>.09) {
-          const yaw=Math.atan2(-Math.sin(a),1.38*Math.cos(2*a));
-          const diff=THREE.MathUtils.euclideanModulo(yaw-model.rotation.y+Math.PI,tau)-Math.PI;
-          model.rotation.y+=diff*(1-Math.exp(-dt*3));
+        let strideNow = 0;
+        const travel = Math.hypot(actor.wanderTarget.x - p.x, actor.wanderTarget.z - p.z);
+        if (travel > 0.045) {
+          const speed = actor.wild ? 1.08 : 0.62;
+          const stepMotion = Math.min(travel, speed * dt);
+          const nx = p.x + (actor.wanderTarget.x - p.x) / travel * stepMotion;
+          const nz = p.z + (actor.wanderTarget.z - p.z) / travel * stepMotion;
+          p.set(nx, actor.anchor.y, nz);
+          strideNow = dt > 0 ? Math.min(.62, stepMotion / dt * 2.45) : 0;
+          const yaw = Math.atan2(nx - actor.wanderTarget.x + 0.0001, nz - actor.wanderTarget.z + 0.0001) + Math.PI;
+          const diff = THREE.MathUtils.euclideanModulo(yaw - model.rotation.y + Math.PI, tau) - Math.PI;
+          model.rotation.y += diff * (1 - Math.exp(-dt * 4));
         }
+        stride = strideNow;
       }
       const d=p.distanceToSquared(playerPosition);
       if(!spectatorFocus && actor.wild && d<closestDist && obstacles.canWalk(playerPosition,p)){

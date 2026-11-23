@@ -8,6 +8,7 @@ import { RANCH_ENTRANCE } from "../scene/ranchLayout";
 import { saddleHeight } from "../scene/ranchAnimals";
 import { createPlots, disposePlots, plotIdAt, plotPosition, updatePlots, PLOT_SIZE, bedHeightAt } from "../scene/plots";
 import { createForageScene } from "../scene/forageScene";
+import { createWildGarden } from "../scene/wildGarden";
 import { createTown } from "../scene/town/townScene";
 import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect, inTown } from "../scene/town/townLayout";
 import { createSalesHall } from "../scene/salesHall";
@@ -47,6 +48,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const initial = useGame.getState();
   const world = createWorld(initial.decor);
   view.scene.add(world.group);
+  const wildGarden = createWildGarden(world.obstacles);
+  view.scene.add(wildGarden.group);
   const town = createTown(world.obstacles);
   view.scene.add(town.group);
   const salesHall = createSalesHall(world.obstacles);
@@ -96,6 +99,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     Math.max(fieldHeightAt(x, z), bridgeHeightAt(x, z) ?? -Infinity);
   const player = new Player(initial.avatarId, world.obstacles, fieldHeightAt, initial.outfitId, initial.bottomId);
   view.scene.add(player.root);
+  // 本地验收专用：允许控制台把角色瞬移到菌圃，线上域名不会挂这个入口。
+  if (typeof location !== "undefined" && /^(127\.0\.0\.\d+|localhost)$/.test(location.hostname)) {
+    (window as Window & { __ttfarmTeleport?: (x: number, z: number) => void }).__ttfarmTeleport = (x, z) => player.relocate(x, z, 0);
+  }
   const fishingScene = createFishingScene(player);
   view.scene.add(fishingScene.group);
   const riverFish = createRiverFishScene();
@@ -167,14 +174,16 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
   // The panel closes after choosing a destination. Start walking on the first
   // unblocked frame so dismissing the panel cannot cancel the new route.
-  let destination: "ranch" | "wild" | "forage" | null = null;
+  let destination: "ranch" | "wild" | "forage" | "mushroom" | null = null;
   const visitRanch = () => { destination = "ranch"; };
   const findWildlife = () => { destination = "wild"; };
   const findForage = () => { destination = "forage"; };
+  const findMushrooms = () => { destination = "mushroom"; };
   const entrance = new THREE.Vector3(RANCH_ENTRANCE.x, 0, RANCH_ENTRANCE.z);
   window.addEventListener("ttfarm:visit-ranch", visitRanch);
   window.addEventListener("ttfarm:find-wildlife", findWildlife);
   window.addEventListener("ttfarm:find-forage", findForage);
+  window.addEventListener("ttfarm:find-mushroom", findMushrooms);
   const onActionEvent = (event: Event) => {
     const id = (event as CustomEvent).detail;
     if (!isSpectating() && isActionId(id)) player.playAction(id);
@@ -222,6 +231,11 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const patch = forageScene.pickPatch(raycaster);
     if (patch) {
       player.moveTo(patch, undefined, false, true);
+      return;
+    }
+    const mushroom = wildGarden.pickMushroom(raycaster);
+    if (mushroom) {
+      player.moveTo(mushroom, undefined, false, true);
       return;
     }
     const plotHits = raycaster.intersectObjects(plots.meshes, false);
@@ -433,9 +447,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
 
     if (!farmInput.blocked && !fishingBusy) {
       if (destination) {
-        const goal = destination === "ranch" ? entrance : destination === "wild" ? ranchScene.nearestWildPoint() : forageScene.nearestPatchPoint();
+        const goal = destination === "ranch" ? entrance
+          : destination === "wild" ? ranchScene.nearestWildPoint()
+          : destination === "forage" ? forageScene.nearestPatchPoint()
+          : wildGarden.nearestMushroomPoint();
         if (goal) player.moveTo(goal, undefined, false, true);
-        else useGame.getState().notify(destination === "forage" ? "这一批野菜已经被采完了，稍后再来看看" : "这批野生动物已全部收服，稍后再来看看");
+        else useGame.getState().notify(destination === "forage" ? "这一批野菜已经被采完了，稍后再来看看"
+          : destination === "mushroom" ? "这一场雨后还没有冒头的菌子，等下一场雨吧"
+          : "这批野生动物已全部收服，稍后再来看看");
         destination = null;
       }
       inputDir.addScaledVector(screenRight, farmInput.x).addScaledVector(forward, farmInput.forward);
@@ -535,6 +554,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     peers.localRide(visit?.mode === "friend" ? mount : undefined, player, dt, elapsed);
     ranchScene.update(elapsed, dt, wallTime, herd, player.root, player.isMoving, rider, spectator ? spectatorFocus : undefined, peers.emitAuras, player.isRunning);
     forageScene.update(elapsed, wallTime, useGame.getState().forage, focus, !visit);
+    wildGarden.update(elapsed, wallTime, focus, !visit);
     if (ranchLevel !== herd.level) {
       if (!spectator) player.adjustToChangedFences();
       ranchLevel = herd.level;
@@ -588,6 +608,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     window.removeEventListener("ttfarm:visit-ranch", visitRanch);
     window.removeEventListener("ttfarm:find-wildlife", findWildlife);
     window.removeEventListener("ttfarm:find-forage", findForage);
+    window.removeEventListener("ttfarm:find-mushroom", findMushrooms);
     window.removeEventListener("ttfarm:action", onActionEvent);
     window.removeEventListener("ttfarm:stop-action", onStopActionEvent);
     window.removeEventListener("ttfarm:visit-focus", focusVisit);
@@ -599,6 +620,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     horseTrail.dispose();
     ranchScene.dispose();
     forageScene.dispose();
+    wildGarden.dispose();
     fishingScene.dispose();
     riverFish.dispose();
     view.scene.remove(salesHall);

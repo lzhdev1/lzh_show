@@ -54,7 +54,7 @@ export function ControlGuide() {
     <button type="button" className="guide-trigger" aria-label="操作说明" aria-expanded={open} onClick={() => setOpen(!open)}>?</button>
     {open && <div className="guide-copy">
       <p className="desktop-guide"><b>移动</b> WASD / 方向键<br/><b>奔跑</b> 按住 Shift　<b>跳跃</b> 空格<br/><b>镜头</b> 左键或右键拖动，Q / E 左右转，滚轮缩放</p>
-      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆，推到外圈奔跑<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
+      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆，点左侧「冲刺」切换加速，再点恢复常速<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
       <p><b>种菜</b> 点选下方种子，走到菜地上点「撒种」。生长时可浇水，作物上方出成熟标志后，走到那块地上点「收获」。</p>
       <p><b>采野菜</b> 野外每 10 分钟长出一批野菜丛，走近点「采摘」获得野菜，还有机会捡到种子种回农场。「农场 → 野外野菜」可以带路。</p>
       <p><b>动作</b> J 出拳　K 踢腿　C 欢呼　X 跳舞　Z 坐下　V 躺下　B 晕倒，也可以点左上角「动作」按钮；移动或跳跃会取消动作。</p>
@@ -160,6 +160,7 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
   const active = useRef<number | null>(null);
   const origin = useRef({ x: 0, y: 0, radius: 1 });
   const stick = useRef<HTMLDivElement>(null);
+  const [sprint, setSprint] = useState(false);
   const release = () => {
     active.current = null;
     releaseStick();
@@ -173,9 +174,17 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
     return () => {
       window.removeEventListener("blur", release);
       document.removeEventListener("visibilitychange", release);
+      farmInput.sprint = false;
+      farmInput.running = false;
       release();
     };
   }, []);
+  useEffect(() => {
+    if (!spectating) return;
+    farmInput.sprint = false;
+    farmInput.running = false;
+    setSprint(false);
+  }, [spectating]);
 
   const move = (e: PointerEvent<HTMLDivElement>) => {
     if (active.current !== e.pointerId) return;
@@ -186,7 +195,7 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
     const magnitude = Math.min(1, Math.max(0, (distance - 0.10) / 0.90));
     farmInput.x = distance ? dx / distance * magnitude : 0;
     farmInput.forward = distance ? -dy / distance * magnitude : 0;
-    farmInput.running = farmInput.sprint || magnitude >= (farmInput.running ? 0.77 : 0.9);
+    farmInput.running = farmInput.sprint;
     e.currentTarget.toggleAttribute("data-running", farmInput.running);
     const clamp = Math.max(1, distance);
     e.currentTarget.style.setProperty("--stick-x", `${dx / clamp * radius}px`);
@@ -194,7 +203,7 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
   };
 
   return <div className="touch-controls">
-    <div ref={stick} className="touch-stick" aria-label={spectating ? "自由镜头平移摇杆" : "移动摇杆，推至外圈奔跑"}
+    <div ref={stick} className="touch-stick" aria-label={spectating ? "自由镜头平移摇杆" : "移动摇杆，点左侧冲刺可加速"}
       onPointerDown={(e) => {
         if (active.current !== null || e.button !== 0) return;
         active.current = e.pointerId;
@@ -209,5 +218,16 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
       onPointerCancel={(e) => { if (e.pointerId === active.current) release(); }}>
       <span className="stick-thumb" />
     </div>
+    {!spectating && <button type="button" className={`sprint-toggle${sprint ? " held" : ""}`}
+      aria-pressed={sprint} aria-label={sprint ? "取消冲刺，恢复常速" : "开启冲刺，按住摇杆可加速"}
+      onClick={() => {
+        const next = !farmInput.sprint;
+        farmInput.sprint = next;
+        farmInput.running = next;
+        setSprint(next);
+      }}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="#ffd97a" stroke="#fff0c4"/></svg>
+      <span>{sprint ? "常速" : "冲刺"}</span>
+    </button>}
   </div>;
 }

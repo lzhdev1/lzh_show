@@ -15,7 +15,7 @@ const WORLD_WIDTH = 3.2;
 const TOP = 10;
 const TAIL = 40;
 
-export function createChatBubble() {
+export function createChatBubble(worldWidth = WORLD_WIDTH) {
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
@@ -95,8 +95,8 @@ export function createChatBubble() {
       ctx.fillText(row, cx, TOP + PADDING + LINE * (index + 0.52));
     });
     texture.needsUpdate = true;
-    const height = WORLD_WIDTH * (TOP + boxH + TAIL + 6) / WIDTH;
-    sprite.scale.set(WORLD_WIDTH, height, 1);
+    const height = worldWidth * (TOP + boxH + TAIL + 6) / WIDTH;
+    sprite.scale.set(worldWidth, height, 1);
   }
 
   return {

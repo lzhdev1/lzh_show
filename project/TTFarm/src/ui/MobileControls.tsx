@@ -46,13 +46,13 @@ export function MobileControls() {
   const [baitOpen, setBaitOpen] = useState(false);
   const [itemOpen, setItemOpen] = useState(false);
   const [itemId, setItemId] = useState<string | null>(null);
-  const [sprint, setSprint] = useState(false);
   const longPress = useRef(false);
   const itemTimer = useRef<number | null>(null);
 
   useEffect(() => () => {
     if (itemTimer.current !== null) window.clearTimeout(itemTimer.current);
     farmInput.sprint = false;
+    farmInput.running = false;
     farmInput.brake = false;
   }, []);
 
@@ -87,12 +87,6 @@ export function MobileControls() {
     }
     if (current === preferred) requestStopAction();
     else requestAction(preferred);
-  };
-
-  const pressSprint = (down: boolean) => {
-    farmInput.sprint = down;
-    farmInput.running = down;
-    setSprint(down);
   };
 
   const pressItem = () => {
@@ -148,15 +142,6 @@ export function MobileControls() {
       <span>跳跃</span>
     </button>
 
-    <button type="button" className={`cluster-key sprint${sprint ? " held" : ""}`} aria-label="冲刺"
-      onPointerDown={event => { if (event.button === 0) pressSprint(true); }}
-      onPointerUp={() => pressSprint(false)} onPointerCancel={() => pressSprint(false)}
-      onLostPointerCapture={() => pressSprint(false)}
-      onClick={event => { if (event.detail === 0) { pressSprint(true); window.setTimeout(() => pressSprint(false), 600); } }}>
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="#ffd97a" stroke="#fff0c4"/></svg>
-      <span>冲刺</span>
-    </button>
-
     <button type="button" className={`cluster-key utility${rod ? " bait" : " item"}`}
       aria-label={rod ? "选择鱼饵" : "使用道具，长按选择加速卡"}
       onPointerDown={event => {
@@ -181,13 +166,14 @@ export function MobileControls() {
         : <><ItemIcon size={20}/><span>道具</span></>}
     </button>
 
-    <button type="button" className={`fishing-button cluster-main${current === preferred && !rod ? " action-on" : ""}`}
+    <button type="button" className={`fishing-button cluster-main${rod ? ` phase-${phase}` : ""}${current === preferred && !rod ? " action-on" : ""}`}
       onClick={clickMain} disabled={rod ? phase === "casting" : false}
       aria-label={rod ? fishLabel : preferredMeta.label}>
       <span className="fishing-button-icon">
         {rod ? (phase === "bite" || phase === "reeling" ? <FishMark/> : <RodMark/>) : <span className="cluster-action-emoji" aria-hidden="true">{preferredMeta.icon}</span>}
       </span>
       <span className="fishing-button-label">{rod ? fishLabel : preferredMeta.label}</span>
+      {rod && phase === "bite" && <span className="fishing-bite-badge">咬钩！</span>}
       {rod && (phase === "bite" || phase === "reeling") && <i className="fishing-button-ring" />}
     </button>
   </div>;

@@ -331,6 +331,22 @@ export function LandIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+export function MushroomIcon({ cap = "#c46a55", stem = "#efdfc8", accent = "#f7e2a1", size = 22 }: {
+  cap?: string; stem?: string; accent?: string; size?: number;
+}) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M4.2 11.2c.3-4.2 3.6-7.2 7.8-7.2s7.5 3 7.8 7.2c.1 1.2-.7 2.1-1.9 2.1H6.1c-1.2 0-2-.9-1.9-2.1Z" fill={cap} />
+      <path d="M6.4 10.2c.4-2.6 2.5-4.5 5.6-4.5 1.6 0 3 .6 4 1.7-1-.4-2-.6-3.2-.6-2.5 0-4.6 1.3-6.4 3.4Z" fill="#fff6e8" opacity=".38" />
+      <path d="M8.7 12.7h6.6v4.1c0 2.1-1.5 3.7-3.3 3.7s-3.3-1.6-3.3-3.7v-4.1Z" fill={stem} />
+      <ellipse cx="9.3" cy="8.1" rx="1" ry=".75" fill={accent} />
+      <ellipse cx="13.8" cy="7.2" rx=".8" ry=".6" fill={accent} />
+      <ellipse cx="16.1" cy="9.1" rx=".65" ry=".5" fill={accent} />
+      <path d="M9.8 14.5h4.4" stroke="#a18563" strokeWidth=".8" strokeLinecap="round" opacity=".55" />
+    </svg>
+  );
+}
+
 export function LockIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>

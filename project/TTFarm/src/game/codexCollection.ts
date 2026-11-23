@@ -1,9 +1,9 @@
 /** 图鉴收集记录：只增不减，记录“曾经拿到过”，不跟随库存减少。 */
 export type CodexCollection = Record<string, true>;
 
-const PREFIXES = ["plant:", "mutation:", "animal:", "fish:"] as const;
+const PREFIXES = ["plant:", "mutation:", "animal:", "fish:", "mushroom:"] as const;
 const KEY_BODY = /^[A-Za-z0-9_]+$/;
-const MAX_KEYS = 768;
+const MAX_KEYS = 900;
 
 export function codexPlantKey(crop: string): string {
   return `plant:${crop}`;
@@ -16,6 +16,9 @@ export function codexAnimalKey(species: string): string {
 }
 export function codexFishKey(fish: string): string {
   return `fish:${fish}`;
+}
+export function codexMushroomKey(mushroom: string): string {
+  return `mushroom:${mushroom}`;
 }
 
 function validKey(key: string): boolean {

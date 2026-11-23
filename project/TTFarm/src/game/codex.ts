@@ -2,6 +2,7 @@ import { CROPS, type CropId } from "./crops";
 import { FISH_LIST, FISH_RARITY, type FishSpecies } from "./fish";
 import { ANIMALS, MOUNT_SPECIES, MOUNT_UNLOCK_LEVEL, type AnimalSpecies } from "./ranch";
 import { HERB_MUTATIONS, MUTATIONS, type Mutation } from "./weather";
+import { MUSHROOM_LIST } from "./mushrooms";
 
 /**
  * 图鉴数据：游戏里全部作物、野菜、变异与动物，以及它们之间的引诱关系。
@@ -9,7 +10,7 @@ import { HERB_MUTATIONS, MUTATIONS, type Mutation } from "./weather";
  * 这里只维护“文案”和“关系”，改数值时图鉴自动跟着变。
  */
 
-export type CodexTab = "crop" | "wild" | "herb" | "mutation" | "animal" | "fish";
+export type CodexTab = "crop" | "wild" | "herb" | "mutation" | "animal" | "fish" | "mushroom";
 
 export interface FishEntry {
   fish: FishSpecies;
@@ -21,6 +22,9 @@ export const CODEX_FISH: readonly FishEntry[] = FISH_LIST.map((fish) => ({
   fish,
   rarity: FISH_RARITY[fish.rarity],
 }));
+
+/** 菌类图鉴直接读蘑菇数据，一百种按稀有度与宿主分组展示。 */
+export const CODEX_MUSHROOMS = MUSHROOM_LIST;
 
 export const ANIMAL_PORTRAITS: Record<AnimalSpecies, string> = {
   wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼", fox: "🦊",

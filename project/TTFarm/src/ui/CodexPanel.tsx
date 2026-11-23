@@ -1,12 +1,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { CROPS, type CropId } from "../game/crops";
 import {
-  ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_FISH, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
+  ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_FISH, CODEX_MUSHROOMS, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
 } from "../game/codex";
+import { MUSHROOM_HABITAT_LABEL, MUSHROOM_RARITY_LABEL, MUSHROOM_SHAPE_LABEL } from "../game/mushrooms";
 import { MUTATIONS } from "../game/weather";
-import { codexAnimalKey, codexFishKey, codexMutationKey, codexPlantKey } from "../game/codexCollection";
+import { codexAnimalKey, codexFishKey, codexMushroomKey, codexMutationKey, codexPlantKey } from "../game/codexCollection";
 import { useGame } from "../game/state";
-import { CloseIcon, CropIcon } from "./icons";
+import { CloseIcon, CropIcon, MushroomIcon } from "./icons";
 import { FishPortrait } from "./FishPortrait";
 import "./codex.css";
 
@@ -32,6 +33,7 @@ const TABS: { key: CodexTab; label: string }[] = [
   { key: "mutation", label: "变异" },
   { key: "animal", label: "动物" },
   { key: "fish", label: "鱼类" },
+  { key: "mushroom", label: "菌类" },
 ];
 
 type CodexFilter = "collected" | "uncollected" | "all";
@@ -76,14 +78,21 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
     .filter((entry) => !q || entry.fish.name.includes(q) || entry.fish.blurb.includes(q)
       || entry.fish.effect.includes(q) || entry.rarity.label.includes(q))
     .filter((entry) => matchesFilter(Boolean(codexCollected[codexFishKey(entry.fish.id)]))), [q, filter, codexCollected]);
+  const mushrooms = useMemo(() => CODEX_MUSHROOMS
+    .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)
+      || MUSHROOM_HABITAT_LABEL[entry.habitat].includes(q)
+      || MUSHROOM_RARITY_LABEL[entry.rarity].includes(q)
+      || MUSHROOM_SHAPE_LABEL[entry.shape].includes(q))
+    .filter((entry) => matchesFilter(Boolean(codexCollected[codexMushroomKey(entry.id)]))), [q, filter, codexCollected]);
 
   const progress = useMemo(() => {
     if (searching) {
-      const total = CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length;
+      const total = CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length + CODEX_MUSHROOMS.length;
       const collected = CODEX_PLANTS.filter((entry) => codexCollected[codexPlantKey(entry.crop)]).length
         + CODEX_MUTATIONS.filter((entry) => codexCollected[codexMutationKey(entry.id)]).length
         + CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length
-        + CODEX_FISH.filter((entry) => codexCollected[codexFishKey(entry.fish.id)]).length;
+        + CODEX_FISH.filter((entry) => codexCollected[codexFishKey(entry.fish.id)]).length
+        + CODEX_MUSHROOMS.filter((entry) => codexCollected[codexMushroomKey(entry.id)]).length;
       return { label: "全部图鉴", total, collected };
     }
     if (tab === "mutation") {
@@ -101,6 +110,11 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
       const collected = CODEX_FISH.filter((entry) => codexCollected[codexFishKey(entry.fish.id)]).length;
       return { label: TAB_LABEL[tab], total, collected };
     }
+    if (tab === "mushroom") {
+      const total = CODEX_MUSHROOMS.length;
+      const collected = CODEX_MUSHROOMS.filter((entry) => codexCollected[codexMushroomKey(entry.id)]).length;
+      return { label: TAB_LABEL[tab], total, collected };
+    }
     const entries = CODEX_PLANTS.filter((entry) => entry.kind === tab);
     return {
       label: TAB_LABEL[tab],
@@ -109,7 +123,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
     };
   }, [tab, searching, codexCollected]);
   const percent = progress.total > 0 ? Math.round(progress.collected / progress.total * 100) : 0;
-  const collectedCount = plants.length + mutations.length + animals.length + fishEntries.length;
+  const collectedCount = plants.length + mutations.length + animals.length + fishEntries.length + mushrooms.length;
   const plantCollected = (id: CropId) => Boolean(codexCollected[codexPlantKey(id)]);
 
   return <div className="modal-scrim codex-scrim" onClick={onClose}>
@@ -118,7 +132,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
         <BookIcon size={28}/><h2>图鉴</h2>
         <span className="codex-count">{searching
           ? `匹配 ${collectedCount} 条`
-          : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length} 条`}</span>
+          : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length + CODEX_MUSHROOMS.length} 条`}</span>
         <button className="icon-btn ghost" onClick={onClose} aria-label="关闭图鉴"><CloseIcon/></button>
       </div>
 
@@ -252,6 +266,32 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
           {fishEntries.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
         </ul>
         <p className="codex-note">河湾里共 50 种鱼。越贵的鱼，遛鱼时的金色亮区越窄、小球越快；鱼竿越好，亮区越宽。</p>
+      </>}
+
+      {(tab === "mushroom" || searching) && <>
+        {searching && <h3 className="codex-group">菌类 · {mushrooms.length}</h3>}
+        <ul className="codex-list mushroom-codex-list">
+          {mushrooms.map((species) => {
+            const collected = Boolean(codexCollected[codexMushroomKey(species.id)]);
+            return <li key={species.id} className="codex-card mushroom-codex-card" style={{ "--mushroom-cap": species.cap } as CSSProperties}>
+              <div className={`mushroom-codex-art${collected ? "" : " dim"}`}>
+                <MushroomIcon cap={species.cap} stem={species.stem} accent={species.accent} size={56}/>
+              </div>
+              <div className="codex-title">
+                <div className="codex-head">
+                  <div>
+                    <strong>{species.name}</strong>
+                    <small>{MUSHROOM_RARITY_LABEL[species.rarity]} · {MUSHROOM_SHAPE_LABEL[species.shape]} · 生于{MUSHROOM_HABITAT_LABEL[species.habitat]} · {species.price} 金</small>
+                  </div>
+                  {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
+                </div>
+                <p className="codex-text">{species.blurb}</p>
+              </div>
+            </li>;
+          })}
+          {mushrooms.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
+        </ul>
+        <p className="codex-note">菌类只在雨后那一个天气阶段冒头，雨后转雪则整季不长；魔气、氤氲、通灵三种变异同季内不会重复。</p>
       </>}
       </div>
     </section>

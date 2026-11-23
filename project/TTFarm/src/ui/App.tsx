@@ -18,6 +18,8 @@ import { HudMenu } from "./HudMenu";
 import { FarmPanel } from "./FarmPanel";
 import { RanchPanel, RanchTrigger, RanchHUD } from "./RanchPanel";
 import { ForageHUD } from "./ForageHUD";
+import { MushroomHUD } from "./MushroomHUD";
+import { SpecialVarietyBanner } from "./SpecialVarietyBanner";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
@@ -135,6 +137,7 @@ export function App() {
 
   return (
     <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
+      {!visit && <SpecialVarietyBanner />}
       {visit ? <VisitHUD visit={visit}/> : <>
       <header className="topbar">
         <button className="profile-chip" onClick={() => setProfileOpen(true)} aria-label="查看农场主资料">
@@ -194,6 +197,7 @@ export function App() {
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
         <ForageHUD />
+        <MushroomHUD />
         <TownHUD onOpenMarket={() => setMarketOpen(true)} onOpenCarStore={() => setCarStoreOpen(true)} />
       </>}
 
