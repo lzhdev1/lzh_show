@@ -13,6 +13,7 @@ import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
 import { backpackSlots, backpackUpgradeCost, bagAddCheck, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
 import {
+  codexFishKey,
   codexFromHoldings,
   codexMutationKey,
   codexPlantKey,
@@ -21,6 +22,7 @@ import {
   normalizeCodexCollection,
   type CodexCollection,
 } from "./codexCollection";
+import { fishById, normalizeFishingState, rodById, rodUnlocked } from "./fish";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
@@ -54,6 +56,10 @@ interface GameData {
   backpackLevel: number;
   /** 图鉴收集记录：只增不减，卖出后仍算已收集 */
   codexCollected: CodexCollection;
+  /** 已装备的鱼竿 id；null 表示还没去钓具屋选竿 */
+  fishingRod: string | null;
+  /** 鱼篓：每种鱼的存量，与图鉴收集相互独立 */
+  fishCaught: Record<string, number>;
   nickname: string;
   avatarId: AvatarId;
   outfitId: OutfitId;
@@ -87,6 +93,10 @@ interface GameActions extends RanchActions, ForageActions {
   expandBy: (count: number) => boolean;
   setAppearance: (avatarId: AvatarId, outfitId: OutfitId, bottomId: OutfitId) => void;
   setDecor: (decor: FarmDecor) => void;
+  /** 选一根鱼竿装备；未到等级或不存在时返回 false */
+  equipFishingRod: (id: string) => boolean;
+  /** 把钓到的鱼放进鱼篓，同时点亮鱼类图鉴 */
+  collectFish: (id: string) => boolean;
   resetSave: () => void;
   notify: (text: string, tone?: "ok" | "warn" | "chat", duration?: number) => void;
   dismissToast: (id: number) => void;
@@ -129,6 +139,8 @@ export function initialData(): GameData {
     garage: { cars: [], activeId: null },
     backpackLevel: 1,
     codexCollected: codexFromHoldings(INITIAL_SEEDS, {}, []),
+    fishingRod: null,
+    fishCaught: {},
     nickname: "农场主",
     avatarId: "xiaosui",
     outfitId: "field",
@@ -450,6 +462,35 @@ export const useGame = create<GameStore>()(
         get().notify("农场装饰已保存");
       },
 
+      equipFishingRod: (id) => {
+        const rod = rodById(id);
+        if (!rod) return false;
+        const level = levelFromXp(get().xp);
+        if (!rodUnlocked(rod, level)) {
+          get().notify(`${rod.name}需要 Lv${rod.level} 才能使用`, "warn");
+          return false;
+        }
+        set({ fishingRod: rod.id });
+        get().notify(`已装备：${rod.name}`);
+        return true;
+      },
+
+      collectFish: (id) => {
+        const fish = fishById(id);
+        if (!fish) return false;
+        const s = get();
+        const check = bagAddCheck(s.fishCaught, id, 1, s.backpackLevel);
+        if (!check.ok) {
+          s.notify("鱼篓已满，先卖掉一部分鱼或升级背包", "warn");
+          return false;
+        }
+        set({
+          fishCaught: { ...s.fishCaught, [id]: (s.fishCaught[id] ?? 0) + 1 },
+          codexCollected: markCodexCollected(s.codexCollected, [codexFishKey(id)]),
+        });
+        return true;
+      },
+
       resetSave: () => {
         set({ ...initialData(), nickname: get().nickname, selectedPlot: null, toasts: [] });
         get().notify("存档已重置");
@@ -469,6 +510,8 @@ export const useGame = create<GameStore>()(
         garage: s.garage,
         backpackLevel: s.backpackLevel,
         codexCollected: s.codexCollected,
+        fishingRod: s.fishingRod,
+        fishCaught: s.fishCaught,
         nickname: s.nickname,
         avatarId: s.avatarId,
         outfitId: s.outfitId,
@@ -493,10 +536,11 @@ export const useGame = create<GameStore>()(
         const seeds = { ...base.seeds, ...saved.seeds };
         const harvest = { ...base.harvest, ...saved.harvest };
         const ranch = normalizeRanch(saved.ranch);
+        const fishing = normalizeFishingState({ rod: saved.fishingRod, fish: saved.fishCaught });
         const codexCollected = mergeCodexCollections(
           base.codexCollected,
           normalizeCodexCollection(saved.codexCollected),
-          codexFromHoldings(seeds, harvest, ranch.animals.map((animal) => animal.species)),
+          codexFromHoldings(seeds, harvest, ranch.animals.map((animal) => animal.species), fishing.fish),
         );
         return {
           ...current,
@@ -514,6 +558,8 @@ export const useGame = create<GameStore>()(
           garage: normalizeGarage(saved.garage),
           backpackLevel: normalizeBackpackLevel(saved.backpackLevel),
           codexCollected,
+          fishingRod: fishing.rod,
+          fishCaught: fishing.fish,
         };
       },
     }

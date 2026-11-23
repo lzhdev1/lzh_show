@@ -156,3 +156,65 @@
   .codex-filters { display: flex; }
   .codex-filters button { flex: 1; min-height: 38px; }
 }
+
+/* ---------- 鱼类图鉴 ---------- */
+
+.fish-codex-list .fish-codex-card {
+  display: grid;
+  grid-template-columns: 138px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 9px 11px;
+}
+.fish-codex-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 92px;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--rarity) 22%, #fbf7e6 78%), #f4efde 72%);
+  border: 1px solid color-mix(in srgb, var(--rarity) 34%, #ded6bd 66%);
+  overflow: hidden;
+}
+.fish-codex-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(100deg, #ffffff28 0 8px, transparent 8px 18px);
+  opacity: .55;
+}
+.fish-codex-art.dim { background: #f0ecdf; border-color: #ded6c5; }
+.fish-codex-art .fish-portrait { position: relative; width: 122px !important; height: 73px !important; }
+.fish-codex-copy { display: grid; gap: 3px; min-width: 0; }
+.fish-codex-copy .codex-head { margin: 0; }
+.fish-codex-copy .codex-text { margin: 1px 0; }
+.fish-rarity-dot {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rarity) 16%, #fffdf0 84%);
+  color: color-mix(in srgb, var(--rarity) 75%, #243128 25%);
+  border: 1px solid color-mix(in srgb, var(--rarity) 55%, #ffffff 45%);
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.fish-codex-effect {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  margin-top: 2px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #f3eedb;
+  color: #6b6452;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.fish-codex-effect span { flex: none; color: #51715a; font-weight: 700; }
+@media (max-width: 560px) {
+  .fish-codex-list .fish-codex-card { grid-template-columns: 1fr; gap: 5px; }
+  .fish-codex-art { height: 82px; }
+  .fish-codex-art .fish-portrait { width: 116px !important; height: 70px !important; }
+}

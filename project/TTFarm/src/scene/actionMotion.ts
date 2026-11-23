@@ -2,7 +2,7 @@ import { Euler, Matrix4, Quaternion, Vector3 } from "three";
 import type { ActionId } from "./rig";
 
 /** 动作元数据：duration 为 null 表示持续到玩家移动或主动取消。 */
-export const ACTIONS: Record<ActionId, { label: string; icon: string; key: string; duration: number | null; fade: number }> = {
+export const ACTIONS: Record<ActionId, { label: string; icon: string; key: string; duration: number | null; fade: number; hidden?: boolean }> = {
   punch: { label: "出拳", icon: "👊", key: "J", duration: 0.62, fade: 0.08 },
   kick:  { label: "踢腿", icon: "🦵", key: "K", duration: 0.78, fade: 0.08 },
   cheer: { label: "欢呼", icon: "🙌", key: "C", duration: null, fade: 0.25 },
@@ -10,8 +10,12 @@ export const ACTIONS: Record<ActionId, { label: string; icon: string; key: strin
   sit:   { label: "坐下", icon: "🪑", key: "Z", duration: null, fade: 0.4 },
   lie:   { label: "躺下", icon: "🛌", key: "V", duration: null, fade: 0.5 },
   faint: { label: "晕倒", icon: "💫", key: "B", duration: null, fade: 0.12 },
+  fishWait: { label: "持竿", icon: "🎣", key: "F6", duration: null, fade: 0.22, hidden: true },
+  fishCast: { label: "抛竿", icon: "🎣", key: "F7", duration: 0.92, fade: 0.1, hidden: true },
+  fishReel: { label: "遛鱼", icon: "🎣", key: "F8", duration: null, fade: 0.14, hidden: true },
 };
 export const ACTION_IDS = Object.keys(ACTIONS) as ActionId[];
+export const MENU_ACTION_IDS = ACTION_IDS.filter((id) => !ACTIONS[id].hidden);
 
 export function isActionId(value: unknown): value is ActionId {
   return typeof value === "string" && value in ACTIONS;
@@ -208,13 +212,73 @@ const sit = compile2(["sit"], () => ({
   cycle: null,
 }));
 
+// —— 钓鱼动作：右手持竿前伸，左手扶轮；抛竿时从背后抡到前方，遛鱼时后仰角力 ——
+const fishWait = compile2(["fishWait"], () => ({
+  base: {
+    ...stance,
+    hips: [0.02, 0, 0], spine: [0.06, 0, 0], chest: [0.04, 0, 0], neck: [-0.02, 0, 0], head: [-0.05, 0, 0],
+    leftUpperLeg: [-0.08, 0, 0.07], leftLowerLeg: [0.14, 0, 0],
+    rightUpperLeg: [-0.08, 0, -0.07], rightLowerLeg: [0.14, 0, 0],
+    leftArm: [[0.52, -0.36, 0.58], [0.24, -0.18, 0.9]],
+    rightArm: [[0.28, 0.24, 0.92], [0.12, 0.08, 0.99]],
+  },
+  keys: [
+    { t: 0, p: { spine: [0.05, 0, 0] }, lift: 0 },
+    { t: 0.5, p: { spine: [0.075, 0, 0], head: [-0.06, 0.03, 0], rightArm: [[0.28, 0.3, 0.9], [0.12, 0.12, 0.99]] }, lift: 0.012 },
+    { t: 1, p: { spine: [0.05, 0, 0] }, lift: 0 },
+  ],
+  cycle: 3.2,
+}));
+
+const fishCast = compile2(["fishCast"], () => ({
+  base: {
+    ...stance, hips: [0.02, 0, 0], spine: [0.04, 0, 0], chest: [0.03, 0, 0],
+    leftUpperLeg: [-0.12, 0, 0.08], leftLowerLeg: [0.2, 0, 0],
+    rightUpperLeg: [-0.12, 0, -0.08], rightLowerLeg: [0.2, 0, 0],
+    leftArm: [[0.45, -0.1, 0.55], [0.22, 0.15, 0.86]],
+    rightArm: [[0.25, -0.25, -0.55], [0.18, -0.1, -0.65]],
+  },
+  keys: [
+    { t: 0, p: { spine: [0.02, 0, 0], chest: [0.02, 0, 0], head: [-0.02, 0, 0] }, lift: 0 },
+    { t: 0.28, p: { spine: [-0.12, 0, 0], chest: [-0.04, 0, 0], head: [0.08, 0, 0],
+      rightArm: [[0.28, 0.85, 0.18], [0.14, 0.95, 0.12]], leftArm: [[0.55, 0.1, 0.45], [0.3, 0.3, 0.8]] }, lift: 0.03 },
+    { t: 0.55, p: { spine: [0.16, 0, 0], chest: [0.06, 0, 0], head: [-0.1, 0, 0],
+      rightUpperLeg: [-0.22, 0, -0.08], rightLowerLeg: [0.34, 0, 0],
+      rightArm: [[0.2, 0.08, 0.96], [0.08, 0.02, 1]], leftArm: [[0.4, -0.42, 0.7], [0.16, -0.2, 0.94]] }, lift: 0 },
+    { t: 0.92, p: {
+      rightArm: [[0.28, 0.22, 0.92], [0.12, 0.06, 0.99]],
+      leftArm: [[0.5, -0.36, 0.58], [0.24, -0.18, 0.9]] } },
+  ],
+  cycle: null,
+}));
+
+const fishReel = compile2(["fishReel"], () => ({
+  base: {
+    ...stance, hips: [-0.04, 0, 0], spine: [-0.12, 0, 0], chest: [-0.04, 0, 0], neck: [0.04, 0, 0], head: [0.06, 0, 0],
+    leftUpperLeg: [-0.16, 0, 0.08], leftLowerLeg: [0.26, 0, 0],
+    rightUpperLeg: [-0.24, 0, -0.09], rightLowerLeg: [0.32, 0, 0],
+    leftArm: [[0.4, -0.25, 0.55], [0.15, 0.05, 0.86]],
+    rightArm: [[0.2, 0.16, 0.94], [0.1, 0.05, 1]],
+  },
+  keys: [
+    { t: 0, p: { spine: [-0.1, 0, 0], hips: [-0.03, 0, 0], leftArm: [[0.45, -0.12, 0.58], [0.16, 0.15, 0.83]] } },
+    { t: 0.33, p: { spine: [-0.18, 0.06, 0], hips: [-0.1, 0.02, 0], head: [0.1, 0.04, 0],
+      leftArm: [[0.38, -0.45, 0.52], [0.12, -0.2, 0.86]] } },
+    { t: 0.66, p: { spine: [-0.09, -0.05, 0], hips: [-0.02, -0.02, 0], head: [0.03, -0.03, 0],
+      leftArm: [[0.46, 0.05, 0.62], [0.18, 0.28, 0.82]] } },
+    { t: 1, p: { spine: [-0.1, 0, 0], hips: [-0.03, 0, 0], leftArm: [[0.45, -0.12, 0.58], [0.16, 0.15, 0.83]] } },
+  ],
+  cycle: 1.1,
+}));
+
+
 // compile2 只是把定义延迟到骨骼名已知时再编译。
 function compile2(_names: string[], build: () => { base: PoseSpec; keys: Key[]; cycle: number | null }) {
   return (bones: string[]) => compile(bones, build().base, build().keys, build().cycle);
 }
 
 const builders: Record<ActionId, (bones: string[]) => CompiledAction> = {
-  punch, kick, cheer, dance, lie, faint, sit,
+  punch, kick, cheer, dance, lie, faint, sit, fishWait, fishCast, fishReel,
 };
 
 /** 与 swimStroke 同一套路：关键帧预编译，采样只做四元数混合，无逐帧分配。 */

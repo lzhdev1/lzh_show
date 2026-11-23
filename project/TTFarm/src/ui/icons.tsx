@@ -303,6 +303,16 @@ export function ItemIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+export function FishIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M3.8 12c3-3.6 7.9-4.2 10.9-1.2 1 1 1.6 2.5 3.5 2.8-1 1.4-1.4 2.6-3.5 3-3 3-7.9 2.4-10.9-1.2Z" fill="#cde7df" stroke="#557f73" strokeWidth="1.3" />
+      <path d="M3.8 12 1.8 8.9 2.4 13.3 1.9 15.8Z" fill="#a8d2c5" stroke="#557f73" strokeWidth="1.1" />
+      <circle cx="12.6" cy="10.7" r=".85" fill="#31483f" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>

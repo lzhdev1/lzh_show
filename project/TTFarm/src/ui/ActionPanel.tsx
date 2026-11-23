@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ACTIONS, ACTION_IDS } from "../scene/actionMotion";
+import { ACTIONS, MENU_ACTION_IDS } from "../scene/actionMotion";
 import { requestAction, requestStopAction, useAction } from "../game/actionStore";
 
 /** 左上角「动作」入口：弹层里 7 个动作，键盘快捷键与按钮等价。 */
@@ -27,7 +27,7 @@ export function ActionTrigger() {
       <span>{current ? ACTIONS[current].label : "动作"}</span>
     </button>
     {open && <div className="action-pop" role="menu" aria-label="角色动作列表">
-      {ACTION_IDS.map(id => {
+      {MENU_ACTION_IDS.map(id => {
         const meta = ACTIONS[id];
         const active = current === id;
         return <button key={id} type="button" role="menuitem" className="action-item" aria-pressed={active}

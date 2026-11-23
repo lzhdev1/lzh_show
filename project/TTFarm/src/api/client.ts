@@ -53,6 +53,8 @@ export interface RemoteState {
   garage?: GarageState;
   backpackLevel?: number;
   codexCollected?: CodexCollection;
+  fishingRod?: string | null;
+  fishCaught?: Record<string, number>;
 }
 
 export interface AuthResult {

@@ -2,7 +2,7 @@ import type * as THREE from "three";
 import type { AvatarId, OutfitId } from "../game/appearance";
 
 /** 一次性打击动作与可持续的表情动作；移动、跳跃、骑乘、游泳会取消它们。 */
-export type ActionId = "punch" | "kick" | "cheer" | "dance" | "lie" | "faint" | "sit";
+export type ActionId = "punch" | "kick" | "cheer" | "dance" | "lie" | "faint" | "sit" | "fishWait" | "fishCast" | "fishReel";
 
 export interface AvatarMotion {
   /** Left heel strike is phase zero in both locomotion clips. */

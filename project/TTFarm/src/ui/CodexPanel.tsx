@@ -1,12 +1,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { CROPS, type CropId } from "../game/crops";
 import {
-  ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
+  ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_FISH, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
 } from "../game/codex";
 import { MUTATIONS } from "../game/weather";
-import { codexAnimalKey, codexMutationKey, codexPlantKey } from "../game/codexCollection";
+import { codexAnimalKey, codexFishKey, codexMutationKey, codexPlantKey } from "../game/codexCollection";
 import { useGame } from "../game/state";
 import { CloseIcon, CropIcon } from "./icons";
+import { FishPortrait } from "./FishPortrait";
 import "./codex.css";
 
 function BookIcon({ size = 20 }: { size?: number }) {
@@ -30,6 +31,7 @@ const TABS: { key: CodexTab; label: string }[] = [
   { key: "herb", label: "草药" },
   { key: "mutation", label: "变异" },
   { key: "animal", label: "动物" },
+  { key: "fish", label: "鱼类" },
 ];
 
 type CodexFilter = "collected" | "uncollected" | "all";
@@ -70,13 +72,18 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
     .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)
       || entry.favorite.name.includes(q) || mountLabel(entry).includes(q))
     .filter((entry) => matchesFilter(Boolean(codexCollected[codexAnimalKey(entry.species)]))), [q, filter, codexCollected]);
+  const fishEntries = useMemo(() => CODEX_FISH
+    .filter((entry) => !q || entry.fish.name.includes(q) || entry.fish.blurb.includes(q)
+      || entry.fish.effect.includes(q) || entry.rarity.label.includes(q))
+    .filter((entry) => matchesFilter(Boolean(codexCollected[codexFishKey(entry.fish.id)]))), [q, filter, codexCollected]);
 
   const progress = useMemo(() => {
     if (searching) {
-      const total = CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length;
+      const total = CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length;
       const collected = CODEX_PLANTS.filter((entry) => codexCollected[codexPlantKey(entry.crop)]).length
         + CODEX_MUTATIONS.filter((entry) => codexCollected[codexMutationKey(entry.id)]).length
-        + CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length;
+        + CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length
+        + CODEX_FISH.filter((entry) => codexCollected[codexFishKey(entry.fish.id)]).length;
       return { label: "全部图鉴", total, collected };
     }
     if (tab === "mutation") {
@@ -89,6 +96,11 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
       const collected = CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length;
       return { label: TAB_LABEL[tab], total, collected };
     }
+    if (tab === "fish") {
+      const total = CODEX_FISH.length;
+      const collected = CODEX_FISH.filter((entry) => codexCollected[codexFishKey(entry.fish.id)]).length;
+      return { label: TAB_LABEL[tab], total, collected };
+    }
     const entries = CODEX_PLANTS.filter((entry) => entry.kind === tab);
     return {
       label: TAB_LABEL[tab],
@@ -97,7 +109,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
     };
   }, [tab, searching, codexCollected]);
   const percent = progress.total > 0 ? Math.round(progress.collected / progress.total * 100) : 0;
-  const collectedCount = plants.length + mutations.length + animals.length;
+  const collectedCount = plants.length + mutations.length + animals.length + fishEntries.length;
   const plantCollected = (id: CropId) => Boolean(codexCollected[codexPlantKey(id)]);
 
   return <div className="modal-scrim codex-scrim" onClick={onClose}>
@@ -106,7 +118,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
         <BookIcon size={28}/><h2>图鉴</h2>
         <span className="codex-count">{searching
           ? `匹配 ${collectedCount} 条`
-          : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length} 条`}</span>
+          : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length + CODEX_FISH.length} 条`}</span>
         <button className="icon-btn ghost" onClick={onClose} aria-label="关闭图鉴"><CloseIcon/></button>
       </div>
 
@@ -212,6 +224,33 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
           {animals.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
         </ul>
         <p className="codex-note">{MOUNT_RULE}元素变异动物对非最爱的作物要 2 份诱饵，最爱的作物 1 份就够。</p>
+      </>}
+
+      {(tab === "fish" || searching) && <>
+        {searching && <h3 className="codex-group">鱼类 · {fishEntries.length}</h3>}
+        <ul className="codex-list fish-codex-list">
+          {fishEntries.map(({ fish, rarity }) => {
+            const collected = Boolean(codexCollected[codexFishKey(fish.id)]);
+            return <li key={fish.id} className="codex-card fish-codex-card">
+              <div className={`fish-codex-art${collected ? "" : " dim"}`} style={{ "--rarity": rarity.color } as CSSProperties}>
+                <FishPortrait fish={fish} size={138} dim={!collected} />
+              </div>
+              <div className="fish-codex-copy">
+                <div className="codex-head">
+                  <div className="codex-title">
+                    <strong>{fish.name}</strong>
+                    <small><span className={`fish-rarity-dot rarity-${fish.rarity}`} style={{ "--rarity": rarity.color } as CSSProperties}>{rarity.label}</span> · 售价 {fish.price} 金 · 体长 {fish.visual.length.toFixed(2)} m</small>
+                  </div>
+                  {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
+                </div>
+                <p className="codex-text">{fish.blurb}</p>
+                <div className="fish-codex-effect"><span>功能</span><b>{fish.effect}</b></div>
+              </div>
+            </li>;
+          })}
+          {fishEntries.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
+        </ul>
+        <p className="codex-note">河湾里共 50 种鱼。越贵的鱼，遛鱼时的金色亮区越窄、小球越快；鱼竿越好，亮区越宽。</p>
       </>}
     </section>
   </div>;

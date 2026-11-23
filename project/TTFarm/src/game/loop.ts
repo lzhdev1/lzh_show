@@ -17,11 +17,10 @@ import { useTownInteraction, type TownPlace } from "./townInteraction";
 import { useTownNav } from "./townNav";
 import { useDrive } from "./drive";
 import { PlayerVehicle } from "../scene/vehicle";
-import { bridgeHeightAt, onBridge } from "../scene/layout";
+import { bridgeHeightAt, onBridge, riverInfo, RIVER_BED, RIVER_HALF_WIDTH, WORLD_HALF } from "../scene/layout";
 import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
-import { WORLD_HALF } from "../scene/layout";
 import { ranchBounds } from "../scene/ranchLayout";
 import { createChatBubble } from "../scene/chatBubble";
 import { bubbleText } from "./chat";
@@ -34,6 +33,10 @@ import { setStandingPlot } from "./fieldInteraction";
 import { farmInput, releaseTouchInput } from "./input";
 import { weatherAt } from "./weather";
 import { tickClock } from "./clock";
+import { useFishing, updateCastSite, tickFishing } from "./fishing";
+import { rodById } from "./fish";
+import { createFishingScene } from "../scene/fishingScene";
+import { createRiverFishScene } from "../scene/riverFish";
 
 export interface GameHandle {
   dispose: () => void;
@@ -93,6 +96,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     Math.max(fieldHeightAt(x, z), bridgeHeightAt(x, z) ?? -Infinity);
   const player = new Player(initial.avatarId, world.obstacles, fieldHeightAt, initial.outfitId, initial.bottomId);
   view.scene.add(player.root);
+  const fishingScene = createFishingScene(player);
+  view.scene.add(fishingScene.group);
+  const riverFish = createRiverFishScene();
+  view.scene.add(riverFish.group);
   const localBubble = createChatBubble();
   localBubble.sprite.position.set(0, 1.86, 0);
   player.root.add(localBubble.sprite);
@@ -117,7 +124,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const pointer = new THREE.Vector2();
   const keys = new Set<string>();
   const inputDir = new THREE.Vector3();
-  const actionKeys = new Map(ACTION_IDS.map(id => [ACTIONS[id].key.toLowerCase(), id]));
+  const actionKeys = new Map(ACTION_IDS.filter(id => !ACTIONS[id].hidden).map(id => [ACTIONS[id].key.toLowerCase(), id]));
   const isSpectating = () => useSocial.getState().visit?.mode === "spectate";
 
   // —— 键盘 ——
@@ -243,6 +250,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   let lastDecor = initial.decor;
   let nextPresence = 0;
   let nextNav = 0;
+  let nextFishingSite = 0;
+  let lastFishingPhase = useFishing.getState().phase;
 
   // —— 主循环 ——
   let raf = 0;
@@ -326,6 +335,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const nextRoom = visit ? visit.mode + "/" + visit.ownerId : "home";
     if (roomKey !== nextRoom) {
       if (vehicle) stopDriving();
+      useFishing.getState().cancel(true);
       if (roomKey === "home") homePose = { x: player.positionRef.x, z: player.positionRef.z, yaw: player.root.rotation.y, deck: player.onBridgeDeck };
       roomKey = nextRoom;
       keys.clear(); releaseTouchInput(); destination = null;
@@ -364,6 +374,46 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       }
     }
 
+    // —— 钓鱼状态机：先推进咬钩/超时，再决定是否锁住移动 ——
+    tickFishing(nowMs);
+    const fishingPhase = useFishing.getState().phase;
+    if ((vehicle || spectator || visit || farmInput.blocked) && fishingPhase !== "idle") {
+      useFishing.getState().cancel(true);
+    }
+    if (fishingPhase !== lastFishingPhase) {
+      if (fishingPhase === "casting") player.playAction("fishCast");
+      else if (fishingPhase === "waiting") player.playAction("fishWait");
+      else if (fishingPhase === "reeling") player.playAction("fishReel");
+      else if (fishingPhase === "result") {
+        if (useFishing.getState().result?.ok) player.playAction("cheer");
+        else player.stopAction();
+      } else if (fishingPhase === "idle") player.stopAction();
+      lastFishingPhase = fishingPhase;
+    }
+    const fishingBusy = useFishing.getState().phase !== "idle";
+
+    // 最近可下竿的河岸点：站在岸坡、不在桥上、不在坐骑/水里/载具里才给按钮。
+    // 钓鱼进行中不要重算，否则会把抛竿时的真实落点覆盖成 null。
+    if (!fishingBusy && nowMs >= nextFishingSite) {
+      nextFishingSite = nowMs + 140;
+      let site: { x: number; z: number; y: number; waterY: number } | null = null;
+      const rod = rodById(useGame.getState().fishingRod);
+      const p = player.root.position;
+      const onFoot = player.isOnFoot && player.swimAmount < 0.08 && !vehicle && !spectator && !visit && !useTownInteraction.getState().place;
+      if (rod && onFoot && !onBridge(p.x, p.z, 1.2)) {
+        const info = riverInfo(p.x, p.z);
+        if (info.dist >= RIVER_HALF_WIDTH + 0.12 && info.dist <= rod.castRange + 2.6) {
+          site = {
+            x: info.cx - info.nx * 2.2,
+            z: info.cz - info.nz * 2.2,
+            y: RIVER_BED.waterY,
+            waterY: RIVER_BED.waterY,
+          };
+        }
+      }
+      updateCastSite(site);
+    }
+
     inputDir.set(0, 0, 0);
     view.camera.getWorldDirection(forward);
     forward.y = 0;
@@ -372,7 +422,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     screenRight.crossVectors(forward, WORLD_UP).normalize();
 
     // W/S 走"画面纵深"，A/D 走"画面左右"——都在水平面上，不会把人物往天上推
-    if (farmInput.blocked) {
+    if (farmInput.blocked || fishingBusy) {
       keys.clear();
       player.cancelTarget();
     }
@@ -381,7 +431,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (keys.has("d") || keys.has("arrowright")) inputDir.add(screenRight);
     if (keys.has("a") || keys.has("arrowleft")) inputDir.sub(screenRight);
 
-    if (!farmInput.blocked) {
+    if (!farmInput.blocked && !fishingBusy) {
       if (destination) {
         const goal = destination === "ranch" ? entrance : destination === "wild" ? ranchScene.nearestWildPoint() : forageScene.nearestPatchPoint();
         if (goal) player.moveTo(goal, undefined, false, true);
@@ -521,6 +571,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     view.updateWeather(weather);
     world.update(elapsed, weather, focus, spectator ? 0 : player.swimAmount);
     town.update(dt, elapsed);
+    fishingScene.update(dt, nowMs);
+    riverFish.update(dt, elapsed, player.root.position);
     view.renderer.render(view.scene, view.camera);
   };
 
@@ -547,6 +599,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     horseTrail.dispose();
     ranchScene.dispose();
     forageScene.dispose();
+    fishingScene.dispose();
+    riverFish.dispose();
     view.scene.remove(salesHall);
     salesHall.traverse(node => {
       if (!(node instanceof THREE.Mesh || node instanceof THREE.Line)) return;

@@ -90,8 +90,13 @@ ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS garage JSONB NOT NULL DEFAULT '
 -- 背包等级：Lv1 每类 30 格，每升一级 +10，最高 Lv15
 ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS backpack_level INTEGER NOT NULL DEFAULT 1;
 
--- 图鉴收集记录：只增不减，键为 plant:作物 / mutation:变异 / animal:动物
+-- 图鉴收集记录：只增不减，键为 plant:作物 / mutation:变异 / animal:动物 / fish:鱼
 ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS codex_collected JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- 钓鱼存档：当前装备的鱼竿与鱼篓里的鱼获数量
+ALTER TABLE farm_states
+  ADD COLUMN IF NOT EXISTS fishing_rod VARCHAR(32),
+  ADD COLUMN IF NOT EXISTS fish_caught JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);

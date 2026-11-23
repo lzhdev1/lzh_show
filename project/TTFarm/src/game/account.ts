@@ -11,6 +11,7 @@ import { normalizeRanch } from "./ranch";
 import { normalizeForage } from "./forage";
 import { normalizeGarage } from "./garage";
 import { normalizeBackpackLevel } from "./backpack";
+import { normalizeFishingState } from "./fish";
 import {
   codexFromHoldings,
   mergeCodexCollections,
@@ -43,6 +44,7 @@ function applyRemoteState(state: RemoteState): void {
   }));
 
   const ranch = normalizeRanch(state.ranch);
+  const fishing = normalizeFishingState({ rod: state.fishingRod, fish: state.fishCaught });
 
   useGame.setState({
     coins: state.coins,
@@ -57,6 +59,8 @@ function applyRemoteState(state: RemoteState): void {
     forage: normalizeForage(state.forage),
     garage: normalizeGarage(state.garage),
     backpackLevel: normalizeBackpackLevel(state.backpackLevel),
+    fishingRod: fishing.rod,
+    fishCaught: fishing.fish,
     codexCollected: mergeCodexCollections(
       normalizeCodexCollection(state.codexCollected),
       codexFromHoldings(state.seeds, state.harvest, ranch.animals.map((animal) => animal.species)),
@@ -83,6 +87,8 @@ function pickSave() {
     forage: s.forage,
     garage: s.garage,
     backpackLevel: s.backpackLevel,
+    fishingRod: s.fishingRod,
+    fishCaught: s.fishCaught,
     codexCollected: s.codexCollected,
     selectedSeed: s.selectedSeed,
   };
@@ -163,6 +169,7 @@ function checkpoint(owner: number, json: string, remote: RemoteState) {
   }
   const state = { ...resolved, nickname: remote.nickname, ranch: normalizeRanch(resolved.ranch),
     garage: normalizeGarage(resolved.garage), backpackLevel: normalizeBackpackLevel(resolved.backpackLevel),
+    ...(() => { const fishing = normalizeFishingState({ rod: resolved.fishingRod, fish: resolved.fishCaught }); return { fishingRod: fishing.rod, fishCaught: fishing.fish }; })(),
     codexCollected: normalizeCodexCollection(resolved.codexCollected),
     revision: remote.revision ?? 0 };
   remember(owner, JSON.stringify({ ...state, base: remote, writeId: (local.revision === remote.revision && writeId) || writeKey() }));
@@ -239,6 +246,8 @@ export function startAutoSave(): () => void {
       state.forage === prev.forage &&
       state.garage === prev.garage &&
       state.backpackLevel === prev.backpackLevel &&
+      state.fishingRod === prev.fishingRod &&
+      state.fishCaught === prev.fishCaught &&
       state.codexCollected === prev.codexCollected &&
       state.selectedSeed === prev.selectedSeed
     )) return;

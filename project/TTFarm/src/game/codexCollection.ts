@@ -1,9 +1,9 @@
 /** 图鉴收集记录：只增不减，记录“曾经拿到过”，不跟随库存减少。 */
 export type CodexCollection = Record<string, true>;
 
-const PREFIXES = ["plant:", "mutation:", "animal:"] as const;
+const PREFIXES = ["plant:", "mutation:", "animal:", "fish:"] as const;
 const KEY_BODY = /^[A-Za-z0-9_]+$/;
-const MAX_KEYS = 512;
+const MAX_KEYS = 768;
 
 export function codexPlantKey(crop: string): string {
   return `plant:${crop}`;
@@ -13,6 +13,9 @@ export function codexMutationKey(mutation: string): string {
 }
 export function codexAnimalKey(species: string): string {
   return `animal:${species}`;
+}
+export function codexFishKey(fish: string): string {
+  return `fish:${fish}`;
 }
 
 function validKey(key: string): boolean {
@@ -48,6 +51,7 @@ export function codexFromHoldings(
   seeds: Record<string, number>,
   harvest: Record<string, number>,
   species: readonly string[],
+  fish: Record<string, number> = {},
 ): CodexCollection {
   const keys: string[] = [];
   for (const [crop, count] of Object.entries(seeds)) {
@@ -60,6 +64,9 @@ export function codexFromHoldings(
     if (mutation) keys.push(codexMutationKey(mutation));
   }
   for (const animal of species) keys.push(codexAnimalKey(animal));
+  for (const [id, count] of Object.entries(fish)) {
+    if (count > 0) keys.push(codexFishKey(id));
+  }
   return markCodexCollected({}, keys);
 }
 

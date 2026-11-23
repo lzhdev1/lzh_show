@@ -14,7 +14,7 @@ function equal(left: unknown, right: unknown): boolean {
  * action on the same plot, herd or insufficient stock must be resolved as a whole. */
 export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: RemoteState): RemoteState | null {
   const result = { ...remote, plots: [...remote.plots] };
-  for (const field of ["avatarId","outfitId","bottomId","selectedSeed","decor","ranch","forage","garage","backpackLevel"] as const) {
+  for (const field of ["avatarId","outfitId","bottomId","selectedSeed","decor","ranch","forage","garage","backpackLevel","fishingRod"] as const) {
     // 旧客户端草稿不带新字段（如 forage）：视为未改动，保留远端值
     if (local[field] === undefined || equal(base[field], local[field])) continue;
     if (!equal(base[field], remote[field])) return null;
@@ -30,8 +30,7 @@ export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: Rem
     result[field] += local[field] - base[field];
     if (result[field] < 0) return null;
   }
-  for (const field of ["seeds", "harvest"] as const) {
-    const counts: Record<string, number> = { ...remote[field] };
+  for (const field of ["seeds", "harvest"] as const) {    const counts: Record<string, number> = { ...remote[field] };
     const before: Record<string, number> = base[field], after: Record<string, number> = local[field];
     for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
       counts[key] = (counts[key] ?? 0) + (after[key] ?? 0) - (before[key] ?? 0);
@@ -40,6 +39,15 @@ export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: Rem
     Object.assign(result, { [field]: counts });
   }
   // 图鉴只增不减，两端各自收集的条目直接并集，不参与冲突判定。
+  const fish: Record<string, number> = { ...(remote.fishCaught ?? {}) };
+  {
+    const before = base.fishCaught ?? {}, after = local.fishCaught ?? {};
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      fish[key] = (fish[key] ?? 0) + (after[key] ?? 0) - (before[key] ?? 0);
+      if (fish[key] <= 0) delete fish[key];
+    }
+  }
+  result.fishCaught = fish;
   result.codexCollected = mergeCodexCollections(remote.codexCollected, local.codexCollected);
   return result;
 }
