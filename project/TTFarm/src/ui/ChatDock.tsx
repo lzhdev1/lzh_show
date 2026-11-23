@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { sendChat, useChat, CHAT_LIMIT } from "../game/chat";
+import { sendChat, useChat, CHAT_LIMIT, markChatRead } from "../game/chat";
 import { useAccount } from "../game/account";
 import { DriveDock } from "./DriveDock";
 
@@ -15,6 +15,7 @@ function clockOf(at: number) {
 export function ChatDock() {
   const [open, setOpen] = useState(false);
   const messages = useChat(state => state.messages);
+  const unread = useChat(state => state.unread);
   const room = useChat(state => state.room);
   const selfId = useAccount(state => String(state.user?.id ?? ""));
   const [text, setText] = useState("");
@@ -36,6 +37,11 @@ export function ChatDock() {
   useEffect(() => {
     if (open) list.current?.scrollTo({ top: list.current.scrollHeight });
   }, [open, messages.length]);
+
+  // 面板开着时持续视为已读，新消息只进列表，不积红点
+  useEffect(() => {
+    if (open) markChatRead();
+  }, [open, unread, messages.length]);
 
   const submit = async () => {
     if (sending) return;
@@ -74,9 +80,15 @@ export function ChatDock() {
       </div>
     </section>}
     <DriveDock />
-    <button type="button" className="chat-toggle" aria-expanded={open} aria-label="发言"
-      onClick={() => setOpen(value => !value)}>
+    <button type="button" className="chat-toggle" aria-expanded={open}
+      aria-label={unread ? `发言，${unread} 条未读` : "发言"}
+      onClick={() => {
+        const next = !open;
+        setOpen(next);
+        if (next) markChatRead();
+      }}>
       <span aria-hidden="true">💬</span><b>发言</b>
+      {unread > 0 && <span className="chat-dot" aria-hidden="true" />}
     </button>
   </div>;
 }

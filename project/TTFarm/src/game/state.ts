@@ -30,7 +30,7 @@ export function landPriceOf(id: number): number {
 export interface ToastItem {
   id: number;
   text: string;
-  tone: "ok" | "warn";
+  tone: "ok" | "warn" | "chat";
 }
 
 interface GameData {
@@ -73,7 +73,7 @@ interface GameActions extends RanchActions, ForageActions {
   setAppearance: (avatarId: AvatarId, outfitId: OutfitId, bottomId: OutfitId) => void;
   setDecor: (decor: FarmDecor) => void;
   resetSave: () => void;
-  notify: (text: string, tone?: "ok" | "warn") => void;
+  notify: (text: string, tone?: "ok" | "warn" | "chat", duration?: number) => void;
   dismissToast: (id: number) => void;
 }
 
@@ -132,14 +132,14 @@ export const useGame = create<GameStore>()(
       selectedPlot: null,
       toasts: [],
 
-      notify: (text, tone = "ok") => {
+      notify: (text, tone = "ok", duration = 2400) => {
         toastSeq += 1;
         const id = toastSeq;
         // 顶部只留最近两条：新消息直接把旧消息顶掉，避免提示堆成瀑布。
         set((s) => ({ toasts: [...s.toasts, { id, text, tone }].slice(-2) }));
         window.setTimeout(() => {
           set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-        }, 2400);
+        }, duration);
       },
 
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

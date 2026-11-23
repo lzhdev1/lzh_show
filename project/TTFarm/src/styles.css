@@ -899,6 +899,16 @@ button {
   background: #b5543c;
 }
 
+/* 房间发言提示：白底黑字，格式「昵称：内容」 */
+.toast.chat {
+  background: #ffffff;
+  color: #20251c;
+  border: 1px solid #e3ddcd;
+  text-align: left;
+  font-weight: 600;
+  box-shadow: 0 8px 22px rgba(36, 39, 30, 0.18);
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(-6px);
@@ -1011,6 +1021,7 @@ button {
 
 .chat-toggle {
   pointer-events: auto;
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1027,6 +1038,20 @@ button {
 }
 
 .chat-toggle b { font-size: 13px; }
+
+/* 房间里有未看的他人发言：发言按钮右上角亮一颗红点 */
+.chat-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e4513f;
+  border: 2px solid #fff9ed;
+  box-shadow: 0 2px 7px rgba(176, 45, 31, 0.32);
+}
+
 .chat-dock.open .chat-toggle { background: #eef3dc; border-color: #a9bd8c; }
 
 .chat-card {

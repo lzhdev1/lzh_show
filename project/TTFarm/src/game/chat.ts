@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { FarmApiError, requestFarm } from "../api/client";
 import { useAccount } from "./account";
 import { useSocial } from "./social";
+import { useGame } from "./state";
 
 /** 头顶气泡持续 30 秒；房间历史最多保留 40 条供面板回看 */
 export const BUBBLE_MS = 30_000;
@@ -21,11 +22,15 @@ export interface ChatMessage {
 export const useChat = create<{
   room: string | null;
   messages: ChatMessage[];
+  unread: number;
   notice: string;
-}>(() => ({ room: null, messages: [], notice: "" }));
+}>(() => ({ room: null, messages: [], unread: 0, notice: "" }));
 
 // 记录每条消息第一次在本地出现的时刻，用于校正客户端与服务端的时钟偏差
 const arrivals = new Map<string, number>();
+// 已经处理过的消息；首次拉取到房间历史时只做基线，不补红点和顶部提示
+const seen = new Set<string>();
+let primedRoom: string | null = null;
 
 function roomNow() {
   const { token, user } = useAccount.getState();
@@ -56,8 +61,26 @@ export async function pullChat(signal?: AbortSignal) {
   const result = await requestFarm<{ messages: ChatMessage[] }>(
     `/chat?${new URLSearchParams({ ownerId: active.room })}`,
     { signal, cache: "no-store", headers: { Authorization: "Bearer " + active.token } });
-  if (useChat.getState().room !== active.room) return;
-  useChat.setState(state => ({ messages: merge(state.messages, result.messages) }));
+  const current = useChat.getState();
+  if (current.room !== active.room) return;
+  const primed = primedRoom === active.room;
+  const selfId = String(useAccount.getState().user?.id ?? "");
+  let unread = current.unread;
+  for (const message of result.messages) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    // 首次进入房间拿到的是历史记录，只建基线；自己发的不算未读
+    if (!primed || message.userId === selfId) continue;
+    unread += 1;
+    useGame.getState().notify(`${message.nickname}：${message.body}`, "chat", 9000);
+  }
+  primedRoom = active.room;
+  useChat.setState({ messages: merge(current.messages, result.messages), unread });
+}
+
+/** 打开发言面板即视为读完当前房间消息 */
+export function markChatRead() {
+  if (useChat.getState().unread) useChat.setState({ unread: 0 });
 }
 
 export async function sendChat(text: string) {
@@ -109,7 +132,11 @@ export function startChatSync() {
   const tick = async () => {
     const active = roomNow();
     const room = active?.room ?? null;
-    if (useChat.getState().room !== room) useChat.setState({ room, messages: [], notice: "" });
+    if (useChat.getState().room !== room) {
+      seen.clear();
+      primedRoom = null;
+      useChat.setState({ room, messages: [], unread: 0, notice: "" });
+    }
     if (active && !document.hidden && !busy) {
       busy = true;
       try { await pullChat(); } catch { /* 断线时下一轮再试 */ }
