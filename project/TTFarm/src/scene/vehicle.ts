@@ -4,6 +4,9 @@ import { carModelOf, type OwnedCar } from "../game/garage";
 import { BRIDGE, bridgeHeightAt, onBridge, riverInfo, RIVER_BED } from "./layout";
 import type { WorldObstacles } from "./obstacles";
 
+/** 桥头坡道倾角上限，避免贴边转向时车身做出夸张的俯仰。 */
+const MAX_RAMP_PITCH = 0.24;
+
 export interface VehicleInput {
   throttle: number;
   steer: number;
@@ -21,14 +24,14 @@ export class PlayerVehicle {
   private readonly model;
   private readonly bodyRadius = 1.05;
 
-  constructor(car: OwnedCar, x: number, z: number, heading: number) {
+  constructor(car: OwnedCar, x: number, z: number, heading: number, surfaceY = 0) {
     this.model = carModelOf(car.model);
     const built = buildDetailedCar(car.color, car.model, car.plate);
     this.root = built.root;
     this.wheels = built.wheels;
     this.frontWheels = built.frontWheels;
     this.root.scale.setScalar(this.model.scale);
-    this.root.position.set(x, 0, z);
+    this.root.position.set(x, surfaceY, z);
     this.heading = heading;
     this.root.rotation.y = heading;
     this.root.name = "player-vehicle";
@@ -98,7 +101,20 @@ export class PlayerVehicle {
     }
 
     this.root.position.y = groundAt(this.root.position.x, this.root.position.z);
-    this.root.rotation.y = this.heading;
+    // 桥头坡道让车身顺着坡度抬头/低头；桥面本身保持水平。
+    const bridgeDx = this.root.position.x - BRIDGE.x;
+    const bridgeDz = this.root.position.z - BRIDGE.z;
+    const bridgeAlong = bridgeDx * BRIDGE.nx + bridgeDz * BRIDGE.nz;
+    const bridgeAcross = -bridgeDx * BRIDGE.nz + bridgeDz * BRIDGE.nx;
+    const onRamp = Math.abs(bridgeAlong) > BRIDGE.halfLength &&
+      Math.abs(bridgeAlong) <= BRIDGE.halfLength + BRIDGE.rampLength &&
+      Math.abs(bridgeAcross) <= BRIDGE.halfWidth - 0.12;
+    const pitch = onRamp
+      ? THREE.MathUtils.clamp(
+          Math.atan((bridgeAlong > 0 ? -1 : 1) * (BRIDGE.deckY / BRIDGE.rampLength) * (fx * BRIDGE.nx + fz * BRIDGE.nz)),
+          -MAX_RAMP_PITCH, MAX_RAMP_PITCH)
+      : 0;
+    this.root.rotation.set(0, this.heading, pitch);
     const spin = (this.speed / 0.37) * dt;
     for (const wheel of this.wheels) wheel.rotation.z -= spin;
     // 前轮随方向轻微摆动，侧窗里能看出车在转向

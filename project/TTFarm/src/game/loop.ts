@@ -17,7 +17,7 @@ import { useTownInteraction, type TownPlace } from "./townInteraction";
 import { useTownNav } from "./townNav";
 import { useDrive } from "./drive";
 import { PlayerVehicle } from "../scene/vehicle";
-import { onBridge } from "../scene/layout";
+import { bridgeHeightAt, onBridge } from "../scene/layout";
 import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
@@ -88,6 +88,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (townH > 0) return townH;
     return 0;
   };
+  // 车轮不能只踩地形：桥面和两端坡道是独立于 fieldHeightAt 的抬升面。
+  const vehicleHeightAt = (x: number, z: number) =>
+    Math.max(fieldHeightAt(x, z), bridgeHeightAt(x, z) ?? -Infinity);
   const player = new Player(initial.avatarId, world.obstacles, fieldHeightAt, initial.outfitId, initial.bottomId);
   view.scene.add(player.root);
   const localBubble = createChatBubble();
@@ -283,7 +286,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const p = player.root.position;
     const fx = Math.sin(player.root.rotation.y), fz = Math.cos(player.root.rotation.y);
     const spawn = world.obstacles.project({ x: p.x + fx * 3.0, z: p.z + fz * 3.0 });
-    vehicle = new PlayerVehicle(car, spawn.x, spawn.z, player.root.rotation.y - Math.PI / 2);
+    vehicle = new PlayerVehicle(car, spawn.x, spawn.z, player.root.rotation.y - Math.PI / 2,
+      vehicleHeightAt(spawn.x, spawn.z));
     view.scene.add(vehicle.root);
     player.root.visible = false;
     player.cancelTarget();
@@ -300,10 +304,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const h = vehicle.yaw;
     const rx = Math.sin(h), rz = Math.cos(h);
     const want = { x: vehicle.x + rx * 2.4, z: vehicle.z + rz * 2.4 };
-    const deck = onBridge(want.x, want.z, 0.4);
+    const deck = bridgeHeightAt(want.x, want.z) !== undefined;
     const p = world.obstacles.project(want, deck ? "deck" : "terrain");
     player.root.visible = true;
-    player.relocate(p.x, p.z, h + Math.PI / 2, onBridge(p.x, p.z, 0.4));
+    player.relocate(p.x, p.z, h + Math.PI / 2, deck);
     vehicle.dispose();
     vehicle = null;
     useDrive.getState().setDriving(false);
@@ -406,7 +410,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         steer,
         brake: farmInput.jump || keys.has(" "),
         boost: keys.has("shift") || farmInput.running,
-      }, world.obstacles, fieldHeightAt);
+      }, world.obstacles, vehicleHeightAt);
       useTownInteraction.getState().set(null, "");
       if (elapsed >= nextPresence) {
         nextPresence = elapsed + .08;
