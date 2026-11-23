@@ -12,6 +12,15 @@ import { createForageActions, type ForageActions } from "./forageActions";
 import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
 import { backpackSlots, backpackUpgradeCost, bagAddCheck, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
+import {
+  codexFromHoldings,
+  codexMutationKey,
+  codexPlantKey,
+  markCodexCollected,
+  mergeCodexCollections,
+  normalizeCodexCollection,
+  type CodexCollection,
+} from "./codexCollection";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
@@ -43,6 +52,8 @@ interface GameData {
   meat: Record<string, number>;
   garage: GarageState;
   backpackLevel: number;
+  /** 图鉴收集记录：只增不减，卖出后仍算已收集 */
+  codexCollected: CodexCollection;
   nickname: string;
   avatarId: AvatarId;
   outfitId: OutfitId;
@@ -105,16 +116,19 @@ function makePlots(): PlotState[] {
   }));
 }
 
+const INITIAL_SEEDS: Record<CropId, number> = { ...emptyRecord(0), radish: 3, cabbage: 2 };
+
 export function initialData(): GameData {
   return {
     coins: TEST_COINS,
     xp: 0,
     plots: makePlots(),
-    seeds: { ...emptyRecord(0), radish: 3, cabbage: 2 },
+    seeds: { ...INITIAL_SEEDS },
     harvest: emptyRecord(0),
     meat: {},
     garage: { cars: [], activeId: null },
     backpackLevel: 1,
+    codexCollected: codexFromHoldings(INITIAL_SEEDS, {}, []),
     nickname: "农场主",
     avatarId: "xiaosui",
     outfitId: "field",
@@ -188,6 +202,7 @@ export const useGame = create<GameStore>()(
         set((s) => ({
           coins: s.coins - cost,
           seeds: { ...s.seeds, [crop]: s.seeds[crop] + qty },
+          codexCollected: markCodexCollected(s.codexCollected, [codexPlantKey(crop)]),
         }));
         get().notify(`买入 ${def.name}种子 ×${qty}`);
       },
@@ -264,6 +279,10 @@ export const useGame = create<GameStore>()(
         set((s) => ({
           xp: s.xp + def.xp,
           harvest: { ...s.harvest, [key]: (s.harvest[key] ?? 0) + def.yields },
+          codexCollected: markCodexCollected(s.codexCollected, [
+            codexPlantKey(def.id),
+            ...(plot.mutation ? [codexMutationKey(plot.mutation)] : []),
+          ]),
           plots: s.plots.map((p) =>
             p.id === plotId ? { ...p, crop: null, plantedAt: 0, watered: 0, mutation: null } : p
           ),
@@ -449,6 +468,7 @@ export const useGame = create<GameStore>()(
         meat: s.meat,
         garage: s.garage,
         backpackLevel: s.backpackLevel,
+        codexCollected: s.codexCollected,
         nickname: s.nickname,
         avatarId: s.avatarId,
         outfitId: s.outfitId,
@@ -470,6 +490,14 @@ export const useGame = create<GameStore>()(
             mutation: old.crop && isMutation(old.mutation) && cropMutationValid(old.crop, old.mutation) ? old.mutation : null,
           } : plot;
         });
+        const seeds = { ...base.seeds, ...saved.seeds };
+        const harvest = { ...base.harvest, ...saved.harvest };
+        const ranch = normalizeRanch(saved.ranch);
+        const codexCollected = mergeCodexCollections(
+          base.codexCollected,
+          normalizeCodexCollection(saved.codexCollected),
+          codexFromHoldings(seeds, harvest, ranch.animals.map((animal) => animal.species)),
+        );
         return {
           ...current,
           ...base,
@@ -477,14 +505,15 @@ export const useGame = create<GameStore>()(
           coins: saved.coins ?? base.coins,
           ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
           decor: normalizeDecor(saved.decor),
-          ranch: normalizeRanch(saved.ranch),
+          ranch,
           forage: normalizeForage(saved.forage),
           plots,
-          seeds: { ...base.seeds, ...saved.seeds },
-          harvest: { ...base.harvest, ...saved.harvest },
+          seeds,
+          harvest,
           meat: normalizeMeat(saved.meat),
           garage: normalizeGarage(saved.garage),
           backpackLevel: normalizeBackpackLevel(saved.backpackLevel),
+          codexCollected,
         };
       },
     }

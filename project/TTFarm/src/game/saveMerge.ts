@@ -1,4 +1,5 @@
 import type { RemoteState } from "../api/client";
+import { mergeCodexCollections } from "./codexCollection";
 
 // PostgreSQL JSONB may return object properties in another order.
 function equal(left: unknown, right: unknown): boolean {
@@ -38,5 +39,7 @@ export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: Rem
     }
     Object.assign(result, { [field]: counts });
   }
+  // 图鉴只增不减，两端各自收集的条目直接并集，不参与冲突判定。
+  result.codexCollected = mergeCodexCollections(remote.codexCollected, local.codexCollected);
   return result;
 }

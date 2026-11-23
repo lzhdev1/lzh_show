@@ -1,9 +1,10 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { CROPS, harvestKey, type CropId } from "../game/crops";
+import { CROPS, type CropId } from "../game/crops";
 import {
   ANIMAL_PORTRAITS, CODEX_ANIMALS, CODEX_MUTATIONS, CODEX_PLANTS, MOUNT_RULE, mountLabel, type CodexTab,
 } from "../game/codex";
 import { MUTATIONS } from "../game/weather";
+import { codexAnimalKey, codexMutationKey, codexPlantKey } from "../game/codexCollection";
 import { useGame } from "../game/state";
 import { CloseIcon, CropIcon } from "./icons";
 import "./codex.css";
@@ -31,6 +32,14 @@ const TABS: { key: CodexTab; label: string }[] = [
   { key: "animal", label: "动物" },
 ];
 
+type CodexFilter = "collected" | "uncollected" | "all";
+const FILTERS: { key: CodexFilter; label: string }[] = [
+  { key: "collected", label: "已收集" },
+  { key: "uncollected", label: "未收集" },
+  { key: "all", label: "全部" },
+];
+const TAB_LABEL = TABS.reduce((map, item) => ({ ...map, [item.key]: item.label }), {} as Record<CodexTab, string>);
+
 const FAMILY_LABEL = { element: "元素变异", spirit: "精灵变异", legacy: "旧版变异", wild: "野菜变异", herb: "草药变异" } as const;
 
 function seconds(ms: number) {
@@ -39,48 +48,64 @@ function seconds(ms: number) {
 }
 
 export function CodexPanel({ onClose }: { onClose: () => void }) {
-  const seeds = useGame((s) => s.seeds);
-  const harvest = useGame((s) => s.harvest);
-  const ranch = useGame((s) => s.ranch);
+  const codexCollected = useGame((s) => s.codexCollected) ?? {};
   const [tab, setTab] = useState<CodexTab>("crop");
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<CodexFilter>("all");
 
   const q = query.trim();
   // 有关键词时跨全部四类一起搜，免得用户还得先猜该切哪个页签
   const searching = q.length > 0;
+  const matchesFilter = (collected: boolean) =>
+    filter === "all" || (filter === "collected" ? collected : !collected);
   const plants = useMemo(() => CODEX_PLANTS
     .filter((entry) => searching || (tab === "crop" || tab === "wild" || tab === "herb" ? entry.kind === tab : false))
-    .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)), [tab, q, searching]);
+    .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q))
+    .filter((entry) => matchesFilter(Boolean(codexCollected[codexPlantKey(entry.crop)]))), [tab, q, searching, filter, codexCollected]);
   const mutations = useMemo(() => CODEX_MUTATIONS
     .filter((entry) => !q || entry.label.includes(q) || entry.blurb.includes(q)
-      || FAMILY_LABEL[entry.family].includes(q)), [q]);
+      || FAMILY_LABEL[entry.family].includes(q))
+    .filter((entry) => matchesFilter(Boolean(codexCollected[codexMutationKey(entry.id)]))), [q, filter, codexCollected]);
   const animals = useMemo(() => CODEX_ANIMALS
     .filter((entry) => !q || entry.name.includes(q) || entry.blurb.includes(q)
-      || entry.favorite.name.includes(q) || mountLabel(entry).includes(q)), [q]);
+      || entry.favorite.name.includes(q) || mountLabel(entry).includes(q))
+    .filter((entry) => matchesFilter(Boolean(codexCollected[codexAnimalKey(entry.species)]))), [q, filter, codexCollected]);
 
-  const plantOwned = (id: CropId) => {
-    const parts: string[] = [];
-    if ((seeds[id] ?? 0) > 0) parts.push(`种子 ×${seeds[id]}`);
-    const plain = harvest[harvestKey(id, null)] ?? 0;
-    if (plain > 0) parts.push(`收成 ×${plain}`);
-    if (parts.length === 0) {
-      for (const mutation of Object.keys(MUTATIONS) as (keyof typeof MUTATIONS)[]) {
-        const count = harvest[harvestKey(id, mutation)] ?? 0;
-        if (count > 0) { parts.push(`${MUTATIONS[mutation].label} ×${count}`); break; }
-      }
+  const progress = useMemo(() => {
+    if (searching) {
+      const total = CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length;
+      const collected = CODEX_PLANTS.filter((entry) => codexCollected[codexPlantKey(entry.crop)]).length
+        + CODEX_MUTATIONS.filter((entry) => codexCollected[codexMutationKey(entry.id)]).length
+        + CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length;
+      return { label: "全部图鉴", total, collected };
     }
-    return parts.join(" · ");
-  };
-  const mutationOwned = (id: keyof typeof MUTATIONS) => CODEX_PLANTS
-    .reduce((sum, entry) => sum + (harvest[harvestKey(entry.crop, id)] ?? 0), 0);
-  const animalOwned = (species: string) => ranch.animals.filter((item) => item.species === species).length;
+    if (tab === "mutation") {
+      const total = CODEX_MUTATIONS.length;
+      const collected = CODEX_MUTATIONS.filter((entry) => codexCollected[codexMutationKey(entry.id)]).length;
+      return { label: TAB_LABEL[tab], total, collected };
+    }
+    if (tab === "animal") {
+      const total = CODEX_ANIMALS.length;
+      const collected = CODEX_ANIMALS.filter((entry) => codexCollected[codexAnimalKey(entry.species)]).length;
+      return { label: TAB_LABEL[tab], total, collected };
+    }
+    const entries = CODEX_PLANTS.filter((entry) => entry.kind === tab);
+    return {
+      label: TAB_LABEL[tab],
+      total: entries.length,
+      collected: entries.filter((entry) => codexCollected[codexPlantKey(entry.crop)]).length,
+    };
+  }, [tab, searching, codexCollected]);
+  const percent = progress.total > 0 ? Math.round(progress.collected / progress.total * 100) : 0;
+  const collectedCount = plants.length + mutations.length + animals.length;
+  const plantCollected = (id: CropId) => Boolean(codexCollected[codexPlantKey(id)]);
 
-  return <div className="modal-scrim" onClick={onClose}>
+  return <div className="modal-scrim codex-scrim" onClick={onClose}>
     <section className="modal codex-panel" role="dialog" aria-modal="true" aria-label="图鉴" onClick={(event) => event.stopPropagation()}>
       <div className="modal-head">
         <BookIcon size={28}/><h2>图鉴</h2>
         <span className="codex-count">{searching
-          ? `匹配 ${plants.length + mutations.length + animals.length} 条`
+          ? `匹配 ${collectedCount} 条`
           : `共 ${CODEX_PLANTS.length + CODEX_MUTATIONS.length + CODEX_ANIMALS.length} 条`}</span>
         <button className="icon-btn ghost" onClick={onClose} aria-label="关闭图鉴"><CloseIcon/></button>
       </div>
@@ -90,15 +115,33 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
           onClick={() => setTab(item.key)}>{item.label}</button>)}
       </div>
 
-      <input className="codex-search" value={query} onChange={(event) => setQuery(event.target.value)}
-        placeholder="搜名字或关键词，比如「坐骑」「阴阳」" aria-label="搜索图鉴"/>
+      <div className="codex-progress" aria-label={`${progress.label}收集完成度`}>
+        <div className="codex-progress-copy">
+          <span>{progress.label}收集完成度</span>
+          <b>{progress.collected}/{progress.total}</b>
+          <small>{percent}%</small>
+        </div>
+        <div className="codex-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100}
+          aria-valuenow={percent} aria-valuetext={`${progress.collected}/${progress.total}`}>
+          <i style={{ width: `${percent}%` }}/>
+        </div>
+      </div>
+
+      <div className="codex-tools">
+        <input className="codex-search" value={query} onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜名字或关键词，比如「坐骑」「阴阳」" aria-label="搜索图鉴"/>
+        <div className="codex-filters" role="group" aria-label="收集筛选">
+          {FILTERS.map((item) => <button key={item.key} type="button" aria-pressed={filter === item.key}
+            className={filter === item.key ? "active" : ""} onClick={() => setFilter(item.key)}>{item.label}</button>)}
+        </div>
+      </div>
 
       {(tab === "crop" || tab === "wild" || tab === "herb" || searching) && <>
         {searching && <h3 className="codex-group">作物、野菜与草药 · {plants.length}</h3>}
         <ul className="codex-list">
         {plants.map((entry) => {
           const def = CROPS[entry.crop];
-          const owned = plantOwned(entry.crop);
+          const collected = plantCollected(entry.crop);
           return <li key={entry.crop} className="codex-card">
             <div className="codex-head">
               <span className="codex-icon"><CropIcon crop={entry.crop} size={22}/></span>
@@ -106,7 +149,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                 <strong>{def.name}</strong>
                 <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.yields} 份 · 生长 {seconds(def.growMs)}{def.herb ? " · 种子仅野外草药丛掉落" : def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
               </div>
-              {owned ? <span className="codex-owned">{owned}</span> : <span className="codex-owned muted">未持有</span>}
+              {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
             </div>
             <p className="codex-text">{entry.blurb}</p>
             {entry.lures.length > 0
@@ -118,14 +161,14 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                 <span className="codex-none">{entry.kind === "herb" ? "草药气味不入兽口" : "暂无（野生动物对它没兴趣）"}</span></div>}
           </li>;
         })}
-        {plants.length === 0 && <li className="codex-empty">没有匹配的条目</li>}
+        {plants.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
       </ul></>}
 
       {(tab === "mutation" || searching) && <>
         {searching && <h3 className="codex-group">变异 · {mutations.length}</h3>}
         <ul className="codex-list">
         {mutations.map((entry) => {
-          const count = mutationOwned(entry.id);
+          const collected = Boolean(codexCollected[codexMutationKey(entry.id)]);
           return <li key={entry.id} className="codex-card">
             <div className="codex-head">
               <span className="codex-icon mutation" style={{ "--mutation-tint": `#${MUTATIONS[entry.id].fruit.toString(16).padStart(6, "0")}` } as CSSProperties}>
@@ -135,19 +178,19 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                 <strong>{entry.label}</strong>
                 <small>{FAMILY_LABEL[entry.family]} · 收成售价倍率 ×{entry.multiplier}</small>
               </div>
-              {count > 0 ? <span className="codex-owned">收成 ×{count}</span> : <span className="codex-owned muted">未持有</span>}
+              {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
             </div>
             <p className="codex-text">{entry.blurb}</p>
           </li>;
         })}
-        {mutations.length === 0 && <li className="codex-empty">没有匹配的条目</li>}
+        {mutations.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
       </ul></>}
 
       {(tab === "animal" || searching) && <>
         {searching && <h3 className="codex-group">动物 · {animals.length}</h3>}
         <ul className="codex-list">
           {animals.map((entry) => {
-            const count = animalOwned(entry.species);
+            const collected = Boolean(codexCollected[codexAnimalKey(entry.species)]);
             return <li key={entry.species} className="codex-card">
               <div className="codex-head">
                 <span className="codex-icon animal">{ANIMAL_PORTRAITS[entry.species]}</span>
@@ -155,7 +198,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                   <strong>{entry.name}</strong>
                   <small>{entry.mount === "never" ? "野生伙伴 · 不可骑乘" : "野生伙伴 · 可作坐骑"}</small>
                 </div>
-                {count > 0 ? <span className="codex-owned">牧场 ×{count}</span> : <span className="codex-owned muted">未收服</span>}
+                {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
               </div>
               <p className="codex-text">{entry.blurb}</p>
               <div className="codex-tags">
@@ -166,6 +209,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
               </div>
             </li>;
           })}
+          {animals.length === 0 && <li className="codex-empty">没有符合条件的条目</li>}
         </ul>
         <p className="codex-note">{MOUNT_RULE}元素变异动物对非最爱的作物要 2 份诱饵，最爱的作物 1 份就够。</p>
       </>}

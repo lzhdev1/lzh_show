@@ -11,6 +11,11 @@ import { normalizeRanch } from "./ranch";
 import { normalizeForage } from "./forage";
 import { normalizeGarage } from "./garage";
 import { normalizeBackpackLevel } from "./backpack";
+import {
+  codexFromHoldings,
+  mergeCodexCollections,
+  normalizeCodexCollection,
+} from "./codexCollection";
 
 interface AccountStore {
   token: string | null;
@@ -37,6 +42,8 @@ function applyRemoteState(state: RemoteState): void {
     mutation: plot.crop && isMutation(plot.mutation) && cropMutationValid(plot.crop as CropId, plot.mutation) ? plot.mutation : null,
   }));
 
+  const ranch = normalizeRanch(state.ranch);
+
   useGame.setState({
     coins: state.coins,
     xp: state.xp,
@@ -46,10 +53,14 @@ function applyRemoteState(state: RemoteState): void {
     nickname: useAccount.getState().user?.nickname ?? state.nickname,
     ...normalizeAppearance(state.avatarId, state.outfitId, state.bottomId),
     decor: normalizeDecor(state.decor),
-    ranch: normalizeRanch(state.ranch),
+    ranch,
     forage: normalizeForage(state.forage),
     garage: normalizeGarage(state.garage),
     backpackLevel: normalizeBackpackLevel(state.backpackLevel),
+    codexCollected: mergeCodexCollections(
+      normalizeCodexCollection(state.codexCollected),
+      codexFromHoldings(state.seeds, state.harvest, ranch.animals.map((animal) => animal.species)),
+    ),
     selectedSeed: state.selectedSeed,
   });
 }
@@ -72,6 +83,7 @@ function pickSave() {
     forage: s.forage,
     garage: s.garage,
     backpackLevel: s.backpackLevel,
+    codexCollected: s.codexCollected,
     selectedSeed: s.selectedSeed,
   };
 }
@@ -151,6 +163,7 @@ function checkpoint(owner: number, json: string, remote: RemoteState) {
   }
   const state = { ...resolved, nickname: remote.nickname, ranch: normalizeRanch(resolved.ranch),
     garage: normalizeGarage(resolved.garage), backpackLevel: normalizeBackpackLevel(resolved.backpackLevel),
+    codexCollected: normalizeCodexCollection(resolved.codexCollected),
     revision: remote.revision ?? 0 };
   remember(owner, JSON.stringify({ ...state, base: remote, writeId: (local.revision === remote.revision && writeId) || writeKey() }));
   return state;
@@ -226,6 +239,7 @@ export function startAutoSave(): () => void {
       state.forage === prev.forage &&
       state.garage === prev.garage &&
       state.backpackLevel === prev.backpackLevel &&
+      state.codexCollected === prev.codexCollected &&
       state.selectedSeed === prev.selectedSeed
     )) return;
     const { user, token } = useAccount.getState();

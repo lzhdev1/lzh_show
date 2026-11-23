@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS farm_states (
   harvest       JSONB        NOT NULL DEFAULT '{}'::jsonb,
   selected_seed VARCHAR(32)  NOT NULL DEFAULT 'radish',
   backpack_level INTEGER     NOT NULL DEFAULT 1,
+  codex_collected JSONB      NOT NULL DEFAULT '{}'::jsonb,
   save_version  INTEGER      NOT NULL DEFAULT 1,
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -88,6 +89,9 @@ ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS garage JSONB NOT NULL DEFAULT '
 
 -- 背包等级：Lv1 每类 30 格，每升一级 +10，最高 Lv15
 ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS backpack_level INTEGER NOT NULL DEFAULT 1;
+
+-- 图鉴收集记录：只增不减，键为 plant:作物 / mutation:变异 / animal:动物
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS codex_collected JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);

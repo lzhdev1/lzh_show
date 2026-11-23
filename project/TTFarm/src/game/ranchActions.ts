@@ -2,8 +2,9 @@ import { harvestLots } from "./crops";
 import { animalName, animalValue, baitCount, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, wildAnimalsAt, type RanchState } from "./ranch";
 import { MEAT_YIELD, meatKey, meatName } from "./market";
 import { setNearbyAnimal, useRanchInteraction } from "./ranchInteraction";
+import { codexAnimalKey, markCodexCollected, type CodexCollection } from "./codexCollection";
 
-interface RanchData { ranch: RanchState; harvest: Record<string, number>; coins: number; meat: Record<string, number> }
+interface RanchData { ranch: RanchState; harvest: Record<string, number>; coins: number; meat: Record<string, number>; codexCollected: CodexCollection }
 interface RanchContext extends RanchData { notify: (text: string, tone?: "ok" | "warn") => void }
 export interface RanchActions {
   upgradeRanch: () => void;
@@ -28,7 +29,7 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       notify(level === MOUNT_UNLOCK_LEVEL ? "牧场升至 3 级，坐骑栏已开启" : `牧场升至 ${level} 级，可容纳 ${ranchCapacity(level)} 只动物`);
     },
     tameWild(id, baitKey) {
-      const { ranch, harvest, notify } = get();
+      const { ranch, harvest, codexCollected, notify } = get();
       const animal = wildAnimalsAt(Date.now()).find((wild) => wild.id === id);
       if (!animal || useRanchInteraction.getState().nearbyAnimal?.id !== id) return notify("靠近野生动物才能投喂", "warn");
       if (ranch.animals.some((owned) => owned.id === id)) return;
@@ -39,7 +40,8 @@ export function createRanchActions(set: (value: Partial<RanchData>) => void, get
       if (bait.count < count) return notify(`需要 ${count} 份${bait.name}`, "warn");
       const captured = { id, species: animal.species, element: animal.element };
       set({ harvest: { ...harvest, [bait.key]: harvest[bait.key] - count },
-        ranch: { ...ranch, animals: [...ranch.animals, captured] } });
+        ranch: { ...ranch, animals: [...ranch.animals, captured] },
+        codexCollected: markCodexCollected(codexCollected, [codexAnimalKey(captured.species)]) });
       setNearbyAnimal(null);
       notify(`${animalName(captured)}已入住${ranch.level >= MOUNT_UNLOCK_LEVEL && isMountAnimal(captured) ? "坐骑栏" : "牧场"}`);
     },

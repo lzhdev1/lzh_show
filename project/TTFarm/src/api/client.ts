@@ -6,6 +6,7 @@ import type { FarmDecor } from "../game/decor";
 import type { RanchState } from "../game/ranch";
 import type { ForageState } from "../game/forage";
 import type { GarageState } from "../game/garage";
+import type { CodexCollection } from "../game/codexCollection";
 
 const BASE = "/api/ttfarm";
 
@@ -51,6 +52,7 @@ export interface RemoteState {
   forage?: ForageState;
   garage?: GarageState;
   backpackLevel?: number;
+  codexCollected?: CodexCollection;
 }
 
 export interface AuthResult {

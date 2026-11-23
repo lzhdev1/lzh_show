@@ -2,6 +2,7 @@ import { CROPS, harvestKey, produceName } from "./crops";
 import { FORAGE_SEED_CHANCE, FORAGE_XP, HERB_FORAGE_XP, HERB_SEED_CHANCE, forageRotationAt, wildPatchesAt, type ForageState } from "./forage";
 import { setNearbyPatch, useForageInteraction } from "./forageInteraction";
 import { bagAddCheck } from "./backpack";
+import { codexMutationKey, codexPlantKey, markCodexCollected, type CodexCollection } from "./codexCollection";
 
 interface ForageData {
   forage: ForageState;
@@ -9,6 +10,7 @@ interface ForageData {
   seeds: Record<string, number>;
   xp: number;
   backpackLevel: number;
+  codexCollected: CodexCollection;
 }
 interface ForageContext extends ForageData {
   notify: (text: string, tone?: "ok" | "warn") => void;
@@ -20,7 +22,7 @@ export interface ForageActions {
 export function createForageActions(set: (value: Partial<ForageData>) => void, get: () => ForageContext): ForageActions {
   return {
     foragePatch(id) {
-      const { forage, harvest, seeds, xp, backpackLevel, notify } = get();
+      const { forage, harvest, seeds, xp, backpackLevel, codexCollected, notify } = get();
       const now = Date.now();
       const rotation = forageRotationAt(now);
       const patch = wildPatchesAt(now).find((item) => item.id === id);
@@ -47,6 +49,10 @@ export function createForageActions(set: (value: Partial<ForageData>) => void, g
         xp: xp + (herb ? HERB_FORAGE_XP : FORAGE_XP),
         harvest: { ...harvest, [key]: (harvest[key] ?? 0) + 1 },
         seeds: seedDrop ? { ...seeds, [def.id]: (seeds[def.id] ?? 0) + 1 } : seeds,
+        codexCollected: markCodexCollected(codexCollected, [
+          codexPlantKey(def.id),
+          ...(patch.mutation ? [codexMutationKey(patch.mutation)] : []),
+        ]),
         forage: { rotation, taken: [...taken, patch.slot] },
       });
       setNearbyPatch(null);
