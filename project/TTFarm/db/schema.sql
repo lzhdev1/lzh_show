@@ -98,6 +98,10 @@ ALTER TABLE farm_states
   ADD COLUMN IF NOT EXISTS fishing_rod VARCHAR(32),
   ADD COLUMN IF NOT EXISTS fish_caught JSONB NOT NULL DEFAULT '{}'::jsonb;
 
+-- 商店库存：加速卡、鱼饵、已购鱼竿与当前鱼饵，旧号默认送 3 条蚯蚓
+ALTER TABLE farm_states
+  ADD COLUMN IF NOT EXISTS shop_extras JSONB NOT NULL DEFAULT '{"items":{},"materials":{"worm":3},"ownedRods":["bamboo"],"selectedBait":"worm"}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);
 

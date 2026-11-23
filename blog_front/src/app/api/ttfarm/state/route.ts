@@ -29,7 +29,8 @@ export async function PUT(req: Request) {
       const revision = await saveState(client,user.id,save,"outfitId" in raw,"decor" in raw,"bottomId" in raw,
         "ranch" in raw, "forage" in raw, "garage" in raw, "backpackLevel" in raw,
         typeof raw.revision === "number" ? raw.revision : null, "codexCollected" in raw,
-        "fishingRod" in raw || "fishCaught" in raw);
+        "fishingRod" in raw || "fishCaught" in raw,
+        "items" in raw || "materials" in raw || "ownedRods" in raw || "selectedBait" in raw);
       if (revision === null) throw new FarmError(409,"农场有更新，请载入最新进度", {state:await loadSave(client,user.id,user.nickname)});
       if (writeId) {
         await client.query("INSERT INTO farm_owner_writes(user_id,write_id,revision) VALUES($1,$2,$3)",[user.id,writeId,revision]);

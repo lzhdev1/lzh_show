@@ -11,7 +11,15 @@ import { normalizeForage, type ForageState } from "./forage";
 import { createForageActions, type ForageActions } from "./forageActions";
 import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
-import { backpackSlots, backpackUpgradeCost, bagAddCheck, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
+import { backpackSlots, backpackUpgradeCost, bagAddCheck, bagAddSlotCost, bagUsedSlots, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
+import { remainingMs } from "./growth";
+import {
+  BAIT_BY_ID,
+  baitById,
+  boostCardById,
+  migrateShopExtras,
+  STARTER_ROD,
+} from "./items";
 import {
   codexFishKey,
   codexFromHoldings,
@@ -56,10 +64,18 @@ interface GameData {
   backpackLevel: number;
   /** 图鉴收集记录：只增不减，卖出后仍算已收集 */
   codexCollected: CodexCollection;
-  /** 已装备的鱼竿 id；null 表示还没去钓具屋选竿 */
+  /** 已装备的鱼竿 id；null 表示还没在背包里装备鱼竿 */
   fishingRod: string | null;
   /** 鱼篓：每种鱼的存量，与图鉴收集相互独立 */
   fishCaught: Record<string, number>;
+  /** 成长加速卡库存 */
+  items: Record<string, number>;
+  /** 鱼饵库存，暂与「杂物」共用一页背包 */
+  materials: Record<string, number>;
+  /** 已购买的鱼竿；入门竿默认拥有 */
+  ownedRods: string[];
+  /** 当前选中的鱼饵；没有库存时仍可选中，但不会咬钩 */
+  selectedBait: string | null;
   nickname: string;
   avatarId: AvatarId;
   outfitId: OutfitId;
@@ -97,6 +113,18 @@ interface GameActions extends RanchActions, ForageActions {
   equipFishingRod: (id: string) => boolean;
   /** 把钓到的鱼放进鱼篓，同时点亮鱼类图鉴 */
   collectFish: (id: string) => boolean;
+  /** 商店：买成长加速卡，放入背包「道具」页 */
+  buyBoostCard: (id: string, qty?: number) => boolean;
+  /** 商店：买鱼饵，放入背包「杂物」页；首次购买会自动选中 */
+  buyBait: (id: string, qty?: number) => boolean;
+  /** 商店：买鱼竿，放入背包「装备」页，不会自动装备 */
+  buyFishingRod: (id: string) => boolean;
+  /** 选中鱼饵；传 null 表示不用饵 */
+  selectBait: (id: string | null) => void;
+  /** 咬钩成功时消耗一枚鱼饵 */
+  consumeBait: (id: string) => boolean;
+  /** 对一块正在生长的地使用加速卡 */
+  useBoostCard: (id: string, plotId: number) => boolean;
   resetSave: () => void;
   notify: (text: string, tone?: "ok" | "warn" | "chat", duration?: number) => void;
   dismissToast: (id: number) => void;
@@ -141,6 +169,10 @@ export function initialData(): GameData {
     codexCollected: codexFromHoldings(INITIAL_SEEDS, {}, []),
     fishingRod: null,
     fishCaught: {},
+    items: {},
+    materials: { worm: 3 },
+    ownedRods: [STARTER_ROD],
+    selectedBait: "worm",
     nickname: "农场主",
     avatarId: "xiaosui",
     outfitId: "field",
@@ -281,9 +313,11 @@ export const useGame = create<GameStore>()(
         }
         const def = CROPS[plot.crop];
         const key = harvestKey(def.id, plot.mutation);
-        const room = bagAddCheck(get().harvest, key, def.yields, get().backpackLevel);
-        if (!room.ok) {
-          get().notify(`杂物背包已满（${room.used}/${room.slots} 格），先升级背包或卖掉一批`, "warn");
+        const slots = backpackSlots(get().backpackLevel);
+        const used = bagUsedSlots(get().harvest) + bagUsedSlots(get().materials);
+        const extra = bagAddSlotCost(get().harvest, key, def.yields);
+        if (used + extra > slots) {
+          get().notify(`杂物背包已满（${used}/${slots} 格），先升级背包或卖掉一批`, "warn");
           return;
         }
         const before = levelFromXp(get().xp);
@@ -465,6 +499,10 @@ export const useGame = create<GameStore>()(
       equipFishingRod: (id) => {
         const rod = rodById(id);
         if (!rod) return false;
+        if (!get().ownedRods.includes(rod.id)) {
+          get().notify("这根鱼竿还没买，去商店装备栏看看", "warn");
+          return false;
+        }
         const level = levelFromXp(get().xp);
         if (!rodUnlocked(rod, level)) {
           get().notify(`${rod.name}需要 Lv${rod.level} 才能使用`, "warn");
@@ -472,6 +510,135 @@ export const useGame = create<GameStore>()(
         }
         set({ fishingRod: rod.id });
         get().notify(`已装备：${rod.name}`);
+        return true;
+      },
+
+      buyBoostCard: (id, qty = 1) => {
+        const card = boostCardById(id);
+        if (!card) return false;
+        const count = Math.max(1, Math.min(99, Math.trunc(qty)));
+        const s = get();
+        const cost = card.price * count;
+        if (s.coins < cost) {
+          s.notify("金币不够啦", "warn");
+          return false;
+        }
+        const slots = backpackSlots(s.backpackLevel);
+        const used = bagUsedSlots(s.items);
+        const extra = bagAddSlotCost(s.items, card.id, count);
+        if (used + extra > slots) {
+          s.notify(`道具背包已满（${used}/${slots} 格），先升级背包`, "warn");
+          return false;
+        }
+        set({
+          coins: s.coins - cost,
+          items: { ...s.items, [card.id]: (s.items[card.id] ?? 0) + count },
+        });
+        s.notify(`买入 ${card.name} ×${count}`);
+        return true;
+      },
+
+      buyBait: (id, qty = 1) => {
+        const bait = baitById(id);
+        if (!bait) return false;
+        const count = Math.max(1, Math.min(99, Math.trunc(qty)));
+        const s = get();
+        const cost = bait.price * count;
+        if (s.coins < cost) {
+          s.notify("金币不够啦", "warn");
+          return false;
+        }
+        const slots = backpackSlots(s.backpackLevel);
+        const used = bagUsedSlots(s.materials) + bagUsedSlots(s.harvest);
+        const extra = bagAddSlotCost(s.materials, bait.id, count);
+        if (used + extra > slots) {
+          s.notify(`杂物背包已满（${used}/${slots} 格），先升级背包或卖点菜`, "warn");
+          return false;
+        }
+        set({
+          coins: s.coins - cost,
+          materials: { ...s.materials, [bait.id]: (s.materials[bait.id] ?? 0) + count },
+          selectedBait: s.selectedBait ?? bait.id,
+        });
+        s.notify(`买入 ${bait.name} ×${count}`);
+        return true;
+      },
+
+      buyFishingRod: (id) => {
+        const rod = rodById(id);
+        if (!rod) return false;
+        const s = get();
+        if (s.ownedRods.includes(rod.id)) {
+          s.notify("这根鱼竿已经在背包里了", "warn");
+          return false;
+        }
+        const level = levelFromXp(s.xp);
+        if (level < rod.level) {
+          s.notify(`${rod.name}需要 Lv${rod.level} 才能购买`, "warn");
+          return false;
+        }
+        const slots = backpackSlots(s.backpackLevel);
+        if (s.ownedRods.length + 1 > slots) {
+          s.notify(`装备背包已满（${s.ownedRods.length}/${slots} 格），先升级背包`, "warn");
+          return false;
+        }
+        if (s.coins < rod.price) {
+          s.notify("金币不够啦", "warn");
+          return false;
+        }
+        set({
+          coins: s.coins - rod.price,
+          ownedRods: [...s.ownedRods, rod.id],
+        });
+        s.notify(`买入 ${rod.name}，去背包「装备」页装备`);
+        return true;
+      },
+
+      selectBait: (id) => {
+        if (id !== null && !BAIT_BY_ID[id]) return;
+        set({ selectedBait: id });
+      },
+
+      consumeBait: (id) => {
+        const s = get();
+        const have = s.materials[id] ?? 0;
+        if (have <= 0) return false;
+        const materials = { ...s.materials, [id]: have - 1 };
+        if (materials[id] <= 0) delete materials[id];
+        set({ materials });
+        return true;
+      },
+
+      useBoostCard: (id, plotId) => {
+        const card = boostCardById(id);
+        if (!card) return false;
+        const s = get();
+        const have = s.items[id] ?? 0;
+        if (have <= 0) {
+          s.notify("这张加速卡用完了", "warn");
+          return false;
+        }
+        const plot = s.plots[plotId];
+        if (!plot || !plot.crop) {
+          s.notify("选一块正在生长的地再用卡", "warn");
+          return false;
+        }
+        const now = Date.now();
+        const remain = remainingMs(plot, now);
+        if (remain === null) return false;
+        if (remain <= 0) {
+          s.notify("这块地已经熟了，不用加速", "warn");
+          return false;
+        }
+        const apply = Math.min(remain, card.minutes * 60_000);
+        const items = { ...s.items, [id]: have - 1 };
+        if (items[id] <= 0) delete items[id];
+        set({
+          items,
+          plots: s.plots.map((p) => (p.id === plotId ? { ...p, plantedAt: p.plantedAt - apply } : p)),
+        });
+        const minutes = Math.round(apply / 60_000);
+        s.notify(`${CROPS[plot.crop].name}生长提前了 ${minutes} 分钟`);
         return true;
       },
 
@@ -512,6 +679,10 @@ export const useGame = create<GameStore>()(
         codexCollected: s.codexCollected,
         fishingRod: s.fishingRod,
         fishCaught: s.fishCaught,
+        items: s.items,
+        materials: s.materials,
+        ownedRods: s.ownedRods,
+        selectedBait: s.selectedBait,
         nickname: s.nickname,
         avatarId: s.avatarId,
         outfitId: s.outfitId,
@@ -537,6 +708,15 @@ export const useGame = create<GameStore>()(
         const harvest = { ...base.harvest, ...saved.harvest };
         const ranch = normalizeRanch(saved.ranch);
         const fishing = normalizeFishingState({ rod: saved.fishingRod, fish: saved.fishCaught });
+        const extras = migrateShopExtras(
+          {
+            items: saved.items,
+            materials: saved.materials,
+            ownedRods: saved.ownedRods,
+            selectedBait: saved.selectedBait,
+          },
+          fishing.rod,
+        );
         const codexCollected = mergeCodexCollections(
           base.codexCollected,
           normalizeCodexCollection(saved.codexCollected),
@@ -560,6 +740,10 @@ export const useGame = create<GameStore>()(
           codexCollected,
           fishingRod: fishing.rod,
           fishCaught: fishing.fish,
+          items: extras.items,
+          materials: extras.materials,
+          ownedRods: extras.ownedRods,
+          selectedBait: extras.selectedBait,
         };
       },
     }

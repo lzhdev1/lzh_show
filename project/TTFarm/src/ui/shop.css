@@ -1,0 +1,146 @@
+.modal.bag-modal.shop-modal {
+  width: min(780px, 100%);
+  max-height: min(92vh, 800px);
+}
+
+.shop-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 2px 1px 4px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 122px;
+  padding: 9px 9px 8px;
+  border: 1px solid #e6d7ba;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, .9), transparent 68%),
+    #f8eeda;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+}
+
+.shop-card.locked {
+  opacity: .72;
+  background: #f3ede1;
+}
+.shop-card.equipped {
+  border-color: #acc49a;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, .92), transparent 68%),
+    #edf3e2;
+}
+
+.shop-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.shop-card-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 36px;
+  border: 1px solid #eadcc2;
+  border-radius: 10px;
+  background: #fffdf7;
+  box-shadow: 0 1px 3px rgba(90, 73, 42, .08);
+}
+
+.shop-owned {
+  overflow: hidden;
+  color: #8b7656;
+  font-size: 10.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.shop-card.equipped .shop-owned { color: #547b45; }
+
+.shop-card > strong {
+  overflow: hidden;
+  color: #54472f;
+  font-size: 13.5px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-card > small {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: 28px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #86765e;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.shop-buy-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 7px;
+}
+.shop-price {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-right: auto;
+  color: #8a5b22;
+  font-size: 11px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.shop-price svg { width: 13px; height: 13px; }
+.shop-buy-row .btn.mini {
+  min-height: 27px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.shop-owned-note {
+  margin-top: auto;
+  padding-top: 7px;
+  color: #648153;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.bag-wallet > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #8a7c63;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+@media (max-width: 720px) {
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .shop-card { min-height: 116px; padding: 8px; }
+}
+@media (max-width: 560px) {
+  .shop-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shop-card { min-height: 112px; }
+  .shop-card > strong { font-size: 12.5px; }
+}

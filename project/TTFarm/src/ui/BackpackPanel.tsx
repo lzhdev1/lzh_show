@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { CROPS, CROP_LIST, harvestLots, type CropId } from "../game/crops";
-import { FISH_LIST } from "../game/fish";
+import { CROP_LIST, harvestLots, type CropId } from "../game/crops";
+import { FISHING_RODS, FISH_LIST, type FishingRod } from "../game/fish";
+import { isReady } from "../game/growth";
+import { BAITS, BOOST_CARDS } from "../game/items";
 import type { Mutation } from "../game/weather";
 import { useGame } from "../game/state";
 import {
@@ -11,10 +13,11 @@ import {
   bagUsedSlots,
 } from "../game/backpack";
 import { BagIcon, CloseIcon, CoinIcon, CropIcon, EquipmentIcon, FishIcon, HarvestIcon, ItemIcon, SeedIcon } from "./icons";
+import { RodGlyph } from "./RodGlyph";
+import { BaitGlyph } from "./BaitGlyph";
 import "./backpack.css";
 
 type BagTab = "gear" | "item" | "seed" | "material" | "fish";
-const EMPTY: Record<string, number> = {};
 
 interface Stack {
   key: string;
@@ -26,6 +29,12 @@ interface Stack {
   stackTotal: number;
   sort: number;
   fish?: boolean;
+  kind?: "rod" | "boost" | "bait";
+  rod?: FishingRod;
+  id?: string;
+  equipped?: boolean;
+  selected?: boolean;
+  color?: string;
 }
 
 function splitStacks(base: Omit<Stack, "key" | "count" | "stackIndex" | "stackTotal">, count: number): Stack[] {
@@ -52,8 +61,19 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
   const seeds = useGame((s) => s.seeds);
   const harvest = useGame((s) => s.harvest);
   const fishCaught = useGame((s) => s.fishCaught);
+  const items = useGame((s) => s.items);
+  const materials = useGame((s) => s.materials);
+  const ownedRods = useGame((s) => s.ownedRods);
+  const fishingRod = useGame((s) => s.fishingRod);
+  const selectedBait = useGame((s) => s.selectedBait);
+  const selectedPlot = useGame((s) => s.selectedPlot);
+  const plots = useGame((s) => s.plots);
   const level = useGame((s) => s.backpackLevel);
   const upgradeBackpack = useGame((s) => s.upgradeBackpack);
+  const equipFishingRod = useGame((s) => s.equipFishingRod);
+  const selectBait = useGame((s) => s.selectBait);
+  const useBoostCard = useGame((s) => s.useBoostCard);
+  const notify = useGame((s) => s.notify);
   const [tab, setTab] = useState<BagTab>("seed");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(pageSizeForWidth);
@@ -72,12 +92,44 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
   const slots = backpackSlots(level);
   const upgradeCost = backpackUpgradeCost(level);
   const seedUsed = bagUsedSlots(seeds);
-  const materialUsed = bagUsedSlots(harvest);
+  const gearUsed = ownedRods.length;
+  const itemUsed = bagUsedSlots(items);
+  const materialUsed = bagUsedSlots(harvest) + bagUsedSlots(materials);
   const fishUsed = bagUsedSlots(fishCaught);
 
   const entries = useMemo<Stack[]>(() => {
-    if (tab === "gear") return splitEmpty(EMPTY);
-    if (tab === "item") return splitEmpty(EMPTY);
+    if (tab === "gear") {
+      return FISHING_RODS.filter((rod) => ownedRods.includes(rod.id)).flatMap((rod, index) =>
+        splitStacks(
+          {
+            name: rod.name,
+            crop: "radish",
+            mutation: null,
+            sort: index,
+            kind: "rod",
+            id: rod.id,
+            rod,
+            equipped: fishingRod === rod.id,
+          },
+          1,
+        ),
+      );
+    }
+    if (tab === "item") {
+      return BOOST_CARDS.filter((card) => (items[card.id] ?? 0) > 0).flatMap((card, index) =>
+        splitStacks(
+          {
+            name: card.name,
+            crop: "radish",
+            mutation: null,
+            sort: index,
+            kind: "boost",
+            id: card.id,
+          },
+          items[card.id] ?? 0,
+        ),
+      );
+    }
     if (tab === "seed") {
       return CROP_LIST.flatMap((crop, index) => {
         const count = seeds[crop.id] ?? 0;
@@ -90,13 +142,29 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
         return splitStacks({ name: fish.name, crop: "radish", mutation: null, sort: index, fish: true }, count);
       });
     }
-    return harvestLots(harvest).flatMap((lot, index) =>
+    const baitStacks = BAITS.filter((bait) => (materials[bait.id] ?? 0) > 0).flatMap((bait, index) =>
       splitStacks(
-        { name: lot.name, crop: lot.crop.id, mutation: lot.mutation ?? null, sort: index },
+        {
+          name: bait.name,
+          crop: "radish",
+          mutation: null,
+          sort: index,
+          kind: "bait",
+          id: bait.id,
+          selected: selectedBait === bait.id,
+          color: bait.color,
+        },
+        materials[bait.id] ?? 0,
+      ),
+    );
+    const crops = harvestLots(harvest).flatMap((lot, index) =>
+      splitStacks(
+        { name: lot.name, crop: lot.crop.id, mutation: lot.mutation ?? null, sort: BAITS.length + index },
         lot.count,
       ),
     );
-  }, [tab, seeds, harvest, fishCaught]);
+    return [...baitStacks, ...crops];
+  }, [tab, seeds, harvest, fishCaught, items, materials, ownedRods, fishingRod, selectedBait]);
 
   const pageCount = Math.max(1, Math.ceil(Math.max(slots, entries.length) / pageSize));
   const safePage = Math.min(page, pageCount - 1);
@@ -104,16 +172,16 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
   const pageEntries = entries.slice(start, start + pageSize);
   const slotsOnPage = Math.min(pageSize, Math.max(0, Math.max(slots, entries.length) - start));
   const emptyCount = Math.max(0, slotsOnPage - pageEntries.length);
-  const over = (tab === "seed" ? seedUsed : tab === "material" ? materialUsed : tab === "fish" ? fishUsed : 0) > slots;
+  const used = tab === "seed" ? seedUsed : tab === "gear" ? gearUsed : tab === "item" ? itemUsed : tab === "material" ? materialUsed : tab === "fish" ? fishUsed : 0;
+  const over = used > slots;
 
   useEffect(() => {
     setPage(0);
   }, [tab, pageSize]);
 
-  const used = tab === "seed" ? seedUsed : tab === "material" ? materialUsed : tab === "fish" ? fishUsed : 0;
   const tabs: { key: BagTab; label: string; used: number; Icon: typeof SeedIcon }[] = [
-    { key: "gear", label: "装备", used: 0, Icon: EquipmentIcon },
-    { key: "item", label: "道具", used: 0, Icon: ItemIcon },
+    { key: "gear", label: "装备", used: gearUsed, Icon: EquipmentIcon },
+    { key: "item", label: "道具", used: itemUsed, Icon: ItemIcon },
     { key: "seed", label: "种子", used: seedUsed, Icon: SeedIcon },
     { key: "material", label: "杂物", used: materialUsed, Icon: HarvestIcon },
     { key: "fish", label: "鱼篓", used: fishUsed, Icon: FishIcon },
@@ -155,23 +223,60 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
 
         {over && <p className="bag-over">当前分类已有 {used} 格，超出容量。先升级背包，或卖出/消耗一部分。</p>}
 
-        {tab !== "seed" && tab !== "material" && tab !== "fish" && (
-          <p className="bag-empty-note">{tab === "gear" ? "装备分类还没开放，后续装备会在这里展示" : "道具分类还没开放，后续道具会在这里展示"}</p>
-        )}
+        {tab === "gear" && <p className="bag-hint">点击鱼竿即可装备；装备后才能到河边钓鱼。</p>}
+        {tab === "item" && <p className="bag-hint">点击加速卡：优先用在已选中的地块，没有选中就催熟最早种下的那一块。</p>}
+        {tab === "material" && <p className="bag-hint">点击鱼饵即可选中；蔬菜收成和鱼饵共用「杂物」分类的格数。</p>}
 
         <div className={`bag-grid${pageSize === 10 ? " compact" : ""}`}>
-          {pageEntries.map((item) => (
-            <div
-              key={item.key}
-              className="bag-slot filled"
-              title={`${item.name} ×${item.count}${item.stackTotal > 1 ? `（第 ${item.stackIndex + 1}/${item.stackTotal} 叠）` : ""}`}
-            >
-              <span className="bag-slot-icon">{item.fish ? <FishIcon size={25} /> : <CropIcon crop={item.crop} size={26} />}</span>
-              <span className={`bag-slot-name${item.mutation ? ` variety-mark ${item.mutation}` : ""}`}>{item.name}</span>
-              <b className="bag-slot-count">×{item.count}</b>
-              {item.stackTotal > 1 && <i className="bag-stack-index">{item.stackIndex + 1}/{item.stackTotal}</i>}
-            </div>
-          ))}
+          {pageEntries.map((item) => {
+            const clickable = Boolean(item.kind);
+            const action = () => {
+              if (item.kind === "rod" && item.id) {
+                equipFishingRod(item.id);
+              } else if (item.kind === "bait" && item.id) {
+                selectBait(selectedBait === item.id ? null : item.id);
+              } else if (item.kind === "boost" && item.id) {
+                const picked = selectedPlot !== null && plots[selectedPlot]?.crop && !isReady(plots[selectedPlot], Date.now())
+                  ? selectedPlot
+                  : plots.find((plot) => plot.crop && !isReady(plot, Date.now()))?.id;
+                if (picked === undefined) {
+                  notify("没有正在生长的地块，先种一茬再用加速卡", "warn");
+                  return;
+                }
+                useBoostCard(item.id, picked);
+              }
+            };
+            return (
+              <div
+                key={item.key}
+                className={`bag-slot filled${clickable ? " clickable" : ""}${item.selected ? " selected" : ""}`}
+                role={clickable ? "button" : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={clickable ? action : undefined}
+                onKeyDown={clickable ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    action();
+                  }
+                } : undefined}
+                title={`${item.name} ×${item.count}${item.stackTotal > 1 ? `（第 ${item.stackIndex + 1}/${item.stackTotal} 叠）` : ""}`}
+              >
+                {item.equipped && <i className="bag-slot-chip">装备中</i>}
+                {item.selected && <i className="bag-slot-chip">已选</i>}
+                <span className="bag-slot-icon">
+                  {item.kind === "rod" && item.rod ? <RodGlyph rod={item.rod} size={31} />
+                    : item.kind === "boost" ? <ItemIcon size={23} />
+                      : item.kind === "bait" && item.color ? <BaitGlyph color={item.color} />
+                        : item.fish ? <FishIcon size={25} />
+                          : <CropIcon crop={item.crop} size={26} />}
+                </span>
+                <span className={`bag-slot-name${item.mutation ? ` variety-mark ${item.mutation}` : ""}`}>{item.name}</span>
+                {!item.kind && <b className="bag-slot-count">×{item.count}</b>}
+                {item.kind && item.kind !== "rod" && <b className="bag-slot-count">×{item.count}</b>}
+                {item.stackTotal > 1 && <i className="bag-stack-index">{item.stackIndex + 1}/{item.stackTotal}</i>}
+              </div>
+            );
+          })}
           {Array.from({ length: emptyCount }, (_, index) => (
             <div key={`empty-${start}-${index}`} className="bag-slot empty" aria-hidden="true" />
           ))}
@@ -209,11 +314,5 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function splitEmpty(items: Record<string, number>): Stack[] {
-  return Object.entries(items).flatMap(([key, count], index) =>
-    splitStacks({ name: CROPS[key as CropId]?.name ?? key, crop: key as CropId, mutation: null, sort: index }, count),
   );
 }

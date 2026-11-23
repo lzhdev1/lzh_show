@@ -30,14 +30,19 @@ export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: Rem
     result[field] += local[field] - base[field];
     if (result[field] < 0) return null;
   }
-  for (const field of ["seeds", "harvest"] as const) {    const counts: Record<string, number> = { ...remote[field] };
-    const before: Record<string, number> = base[field], after: Record<string, number> = local[field];
+  for (const field of ["seeds", "harvest", "items", "materials"] as const) {
+    const counts: Record<string, number> = { ...(remote[field] ?? {}) };
+    const before: Record<string, number> = base[field] ?? {}, after: Record<string, number> = local[field] ?? {};
     for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
       counts[key] = (counts[key] ?? 0) + (after[key] ?? 0) - (before[key] ?? 0);
       if (counts[key] < 0) return null;
+      if (counts[key] === 0) delete counts[key];
     }
     Object.assign(result, { [field]: counts });
   }
+  // 鱼竿只增不减，两端买到的直接并集。
+  result.ownedRods = Array.from(new Set([...(remote.ownedRods ?? []), ...(local.ownedRods ?? [])]));
+  if (local.selectedBait !== undefined) result.selectedBait = local.selectedBait;
   // 图鉴只增不减，两端各自收集的条目直接并集，不参与冲突判定。
   const fish: Record<string, number> = { ...(remote.fishCaught ?? {}) };
   {

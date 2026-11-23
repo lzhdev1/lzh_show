@@ -28,7 +28,6 @@ import { CarStorePanel } from "./CarStorePanel";
 import { TownHUD } from "./TownHUD";
 import { BackpackPanel } from "./BackpackPanel";
 import { FishingDock } from "./FishingDock";
-import { FishingGearPanel } from "./FishingGearPanel";
 import "./social.css";
 
 export function App() {
@@ -58,7 +57,6 @@ export function App() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [carStoreOpen, setCarStoreOpen] = useState(false);
   const [backpackOpen, setBackpackOpen] = useState(false);
-  const [fishingGearOpen, setFishingGearOpen] = useState(false);
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   useEffect(() => startChatSync(), []);
@@ -67,7 +65,7 @@ export function App() {
     if (!away && token) return;
     setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
     setProfileOpen(false); setFarmOpen(false); setRanchOpen(false); setCodexOpen(false);
-    setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false); setFishingGearOpen(false);
+    setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false);
   }, [away, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
@@ -84,14 +82,13 @@ export function App() {
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
-  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen || marketOpen || carStoreOpen || backpackOpen || fishingGearOpen);
+  const panelOpen = !away && (shopOpen || profileOpen || farmOpen || ranchOpen || rankingOpen || friendsOpen || codexOpen || marketOpen || carStoreOpen || backpackOpen);
   useEffect(() => {
     if (!panelOpen) return;
     const dismiss = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.isComposing) return;
       setShopOpen(false); setProfileOpen(false); setFarmOpen(false); setRankingOpen(false);
       setRanchOpen(false); setFriendsOpen(false); setCodexOpen(false); setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false);
-      setFishingGearOpen(false);
     };
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
@@ -133,7 +130,6 @@ export function App() {
     { key: "friends", label: "好友", icon: "👥", onClick: () => setFriendsOpen(true),
       hint: friendRoster.users?.filter(item => item.status === "incoming").length ? "有待处理" : undefined },
     { key: "weather", label: "天气 / 农场", icon: "🌤️", onClick: () => setFarmOpen(true) },
-    { key: "fishing", label: "钓具", icon: "🎣", onClick: () => setFishingGearOpen(true) },
   ];
 
   return (
@@ -190,7 +186,7 @@ export function App() {
       {selectedPlot === null && !panelOpen && <>
         <FarmGuests/>
         {driving ? <DriveTouchControls/> : <TouchControls/>}
-        {!driving && <FishingDock onOpenGear={() => setFishingGearOpen(true)} />}
+        {!driving && <FishingDock />}
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
         <ForageHUD />
@@ -242,7 +238,6 @@ export function App() {
       {rankingOpen && <Leaderboard token={token} onClose={() => setRankingOpen(false)} />}
       {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
       {backpackOpen && <BackpackPanel onClose={() => setBackpackOpen(false)} />}
-      {fishingGearOpen && <FishingGearPanel onClose={() => setFishingGearOpen(false)} />}
       </>}
 
       <ChatDock />

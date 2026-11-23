@@ -280,12 +280,15 @@ export function fishById(id: unknown): FishSpecies | null {
   return typeof id === "string" ? FISH_BY_ID[id] ?? null : null;
 }
 
-/** 按稀有度加权抽一条鱼；价格越高的鱼出现越少。 */
-export function rollFish(random = Math.random): FishSpecies {
-  const total = FISH_LIST.reduce((sum, fish) => sum + FISH_RARITY[fish.rarity].weight, 0);
+/** 按稀有度加权抽一条鱼；可以传入鱼饵的稀有度权重，未传则使用基础权重。 */
+export function rollFish(random = Math.random, weights?: Partial<Record<FishRarity, number>>): FishSpecies {
+  const weightOf = (fish: FishSpecies) => weights ? (weights[fish.rarity] ?? 0) : FISH_RARITY[fish.rarity].weight;
+  let total = FISH_LIST.reduce((sum, fish) => sum + weightOf(fish), 0);
+  if (total <= 0) total = FISH_LIST.reduce((sum, fish) => sum + FISH_RARITY[fish.rarity].weight, 0);
+  if (total <= 0) return FISH_LIST[0];
   let pick = random() * total;
   for (const fish of FISH_LIST) {
-    pick -= FISH_RARITY[fish.rarity].weight;
+    pick -= weights && weights[fish.rarity] !== undefined ? weights[fish.rarity]! : FISH_RARITY[fish.rarity].weight;
     if (pick <= 0) return fish;
   }
   return FISH_LIST[0];

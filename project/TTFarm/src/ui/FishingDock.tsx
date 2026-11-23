@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { FISH_RARITY, fishById, rodById } from "../game/fish";
+import { BAITS, baitById } from "../game/items";
 import { ballPosition, describeFishingPhase, useFishing } from "../game/fishing";
 import { useGame } from "../game/state";
 import { unlockFishingAudio } from "../scene/fishingAudio";
@@ -38,8 +39,11 @@ function useNow(active: boolean) {
   return now;
 }
 
-export function FishingDock({ onOpenGear }: { onOpenGear: () => void }) {
+export function FishingDock() {
   const rodId = useGame((s) => s.fishingRod);
+  const selectedBait = useGame((s) => s.selectedBait);
+  const materials = useGame((s) => s.materials);
+  const selectBait = useGame((s) => s.selectBait);
   const phase = useFishing((s) => s.phase);
   const near = useFishing((s) => s.nearRiver);
   const banner = useFishing((s) => s.banner);
@@ -58,18 +62,15 @@ export function FishingDock({ onOpenGear }: { onOpenGear: () => void }) {
   const now = useNow(active || phase === "result");
   const rod = rodById(rodId);
   const fish = fishById(fishId);
+  const bait = baitById(selectedBait);
+  const baitCount = bait ? materials[bait.id] ?? 0 : 0;
+  const [baitOpen, setBaitOpen] = useState(false);
 
-  if (!rod) {
-    return <div className="fishing-dock empty">
-      <button type="button" className="fishing-gear-entry" onClick={onOpenGear}>
-        <RodIcon size={20} /><span>钓具</span>
-      </button>
-      <small>先选一根鱼竿</small>
-    </div>;
-  }
+  if (!rod) return null;
 
   const click = () => {
     unlockFishingAudio();
+    setBaitOpen(false);
     if (phase === "idle" || phase === "result") cast();
     else lift();
   };
@@ -85,12 +86,51 @@ export function FishingDock({ onOpenGear }: { onOpenGear: () => void }) {
           phase === "bite" ? `咬钩！${biteLeft.toFixed(1)} 秒内提竿` :
           phase === "reeling" ? `${reelLeft.toFixed(1)} 秒内把小球对准亮区` : ""}
       </div>}
-      {phase === "idle" && near && <div className="fishing-hint soft">{banner || `${rod.name}在手，站定抛竿`}</div>}
+      {phase === "idle" && near && <div className="fishing-hint soft">{banner || `${rod.name}在手${bait ? ` · ${bait.name}${baitCount > 0 ? ` ×${baitCount}` : "（已用完）"}` : " · 空钩"}`}</div>}
       {phase === "casting" && <div className="fishing-hint soft">抛竿线正在出水……</div>}
 
+      {baitOpen && (phase === "idle" || phase === "result") && (
+        <div className="fishing-bait-pop" role="dialog" aria-label="选择鱼饵">
+          <div className="fishing-bait-head">
+            <strong>选择鱼饵</strong>
+            <button type="button" onClick={() => setBaitOpen(false)} aria-label="收起鱼饵选择"><CloseIcon size={14} /></button>
+          </div>
+          <button
+            type="button"
+            className={`fishing-bait-option${selectedBait === null ? " active" : ""}`}
+            onClick={() => { selectBait(null); setBaitOpen(false); }}
+          >
+            <span className="fishing-bait-dot no-bait" />
+            <span><b>不用鱼饵</b><small>空钩可以抛竿，但不会有鱼咬钩</small></span>
+          </button>
+          {BAITS.map((item) => {
+            const count = materials[item.id] ?? 0;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`fishing-bait-option${selectedBait === item.id ? " active" : ""}${count <= 0 ? " empty" : ""}`}
+                onClick={() => { selectBait(item.id); setBaitOpen(false); }}
+              >
+                <span className="fishing-bait-dot" style={{ background: item.color }} />
+                <span><b>{item.name}<i>×{count}</i></b><small>{item.target}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="fishing-controls">
-        <button type="button" className="fishing-gear-small" onClick={onOpenGear} aria-label="更换鱼竿" title="更换鱼竿">
-          <RodIcon size={16} />
+        <button
+          type="button"
+          className={`fishing-bait-small${bait && baitCount > 0 ? "" : " empty"}`}
+          onClick={() => setBaitOpen((open) => !open)}
+          disabled={active}
+          aria-label="选择鱼饵"
+          title={bait ? `${bait.name} ×${baitCount}` : "选择鱼饵"}
+        >
+          {bait ? <span className="fishing-bait-dot" style={{ background: bait.color }} /> : <span className="fishing-bait-dot no-bait" />}
+          <small>{bait ? bait.short : "空钩"}</small>
         </button>
         <button type="button" className={`fishing-button phase-${phase}${near || phase !== "idle" ? "" : " dim"}`}
           onClick={click} disabled={phase === "casting"} aria-label={describeFishingPhase(phase)}>

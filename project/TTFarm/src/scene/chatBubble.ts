@@ -2,15 +2,18 @@ import * as THREE from "three";
 
 /**
  * 头顶对话气泡：一次 Canvas 绘制（圆角、描边、小尾巴），
- * 之后只换贴图内容，不参与几何拼装。文字最多 4 行，超出用省略号。
+ * 之后只换贴图内容，不参与几何拼装。文字最多 5 行，超出用省略号。
+ * 画布按 2 倍分辨率绘制，贴在 3D 场景里字体边缘更干净。
  */
-const WIDTH = 512;
-const HEIGHT = 256;
-const FONT = "600 30px system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif";
-const LINE = 38;
-const PADDING = 26;
-const MAX_LINES = 4;
-const WORLD_WIDTH = 2.15;
+const WIDTH = 1024;
+const HEIGHT = 520;
+const FONT = "600 58px system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const LINE = 74;
+const PADDING = 44;
+const MAX_LINES = 5;
+const WORLD_WIDTH = 3.2;
+const TOP = 10;
+const TAIL = 40;
 
 export function createChatBubble() {
   const canvas = document.createElement("canvas");
@@ -19,7 +22,7 @@ export function createChatBubble() {
   const ctx = canvas.getContext("2d")!;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 2;
+  texture.anisotropy = 8;
   const material = new THREE.SpriteMaterial({
     map: texture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
   });
@@ -32,7 +35,7 @@ export function createChatBubble() {
   function draw(text: string) {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.font = FONT;
-    const maxWidth = WIDTH - PADDING * 2 - 20;
+    const maxWidth = WIDTH - PADDING * 2 - 40;
     const lines: string[] = [];
     let line = "";
     for (const char of text) {
@@ -47,31 +50,52 @@ export function createChatBubble() {
     }
     let widest = 0;
     for (const row of lines) widest = Math.max(widest, ctx.measureText(row).width);
-    const boxW = Math.min(WIDTH - 12, widest + PADDING * 2 + 20);
+    const boxW = Math.min(WIDTH - 24, Math.max(widest + PADDING * 2 + 40, 360));
     const boxH = PADDING * 2 + lines.length * LINE;
     const left = (WIDTH - boxW) / 2;
-    const top = 8;
-    ctx.fillStyle = "rgba(255, 251, 240, 0.97)";
-    ctx.strokeStyle = "rgba(196, 183, 146, 0.95)";
-    ctx.lineWidth = 3;
+    const cx = WIDTH / 2;
+
+    ctx.save();
+    ctx.shadowColor = "rgba(38, 48, 33, 0.22)";
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 7;
+    ctx.fillStyle = "rgba(255, 252, 244, 0.985)";
     ctx.beginPath();
-    // 尾巴 + 圆角矩形一体绘制：先画尾巴，再盖住接缝
-    ctx.moveTo(WIDTH / 2 - 16, top + boxH - 2);
-    ctx.lineTo(WIDTH / 2, top + boxH + 18);
-    ctx.lineTo(WIDTH / 2 + 16, top + boxH - 2);
+    ctx.moveTo(cx - 30, TOP + boxH - 6);
+    ctx.lineTo(cx, TOP + boxH + TAIL);
+    ctx.lineTo(cx + 30, TOP + boxH - 6);
+    ctx.closePath();
     ctx.fill();
     ctx.beginPath();
-    ctx.roundRect(left, top, boxW, boxH, 26);
+    ctx.roundRect(left, TOP, boxW, boxH, 48);
     ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(188, 174, 139, 0.92)";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.roundRect(left, TOP, boxW, boxH, 48);
     ctx.stroke();
-    ctx.fillStyle = "#38492f";
+    ctx.beginPath();
+    ctx.moveTo(cx - 30, TOP + boxH - 5);
+    ctx.lineTo(cx, TOP + boxH + TAIL);
+    ctx.lineTo(cx + 30, TOP + boxH - 5);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(left + 5, TOP + 5, boxW - 10, boxH - 10, 43);
+    ctx.stroke();
+
+    ctx.fillStyle = "#2f4029";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     lines.forEach((row, index) => {
-      ctx.fillText(row, WIDTH / 2, top + PADDING + LINE * (index + 0.5));
+      ctx.fillText(row, cx, TOP + PADDING + LINE * (index + 0.52));
     });
     texture.needsUpdate = true;
-    const height = WORLD_WIDTH * (top + boxH + 20) / WIDTH;
+    const height = WORLD_WIDTH * (TOP + boxH + TAIL + 6) / WIDTH;
     sprite.scale.set(WORLD_WIDTH, height, 1);
   }
 

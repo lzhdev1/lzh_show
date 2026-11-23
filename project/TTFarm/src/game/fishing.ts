@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { fishBallSpeed, fishById, fishSize, fishZoneWidth, rodById, rollFish } from "./fish";
+import { baitById } from "./items";
 import { useGame } from "./state";
 
 export type FishingPhase = "idle" | "casting" | "waiting" | "bite" | "reeling" | "result";
@@ -37,6 +38,8 @@ interface FishingStore {
   ballSpeed: number;
   result: FishingResult | null;
   castSeed: number;
+  /** 本次抛竿挂上的鱼饵；null 表示空钩，不会有鱼咬钩 */
+  baitId: string | null;
   /** 当前上鱼/脱钩的展示标签 */
   banner: string;
   cast: () => boolean;
@@ -95,13 +98,14 @@ export const useFishing = create<FishingStore>()((set, get) => ({
   ballSpeed: 0.5,
   result: null,
   castSeed: 0,
+  baitId: null,
   banner: "",
 
   cast: () => {
     if (get().phase !== "idle" && get().phase !== "result") return false;
     const rod = rodOf();
     if (!rod) {
-      notifyOnce("先去钓具屋选一根鱼竿", "warn");
+      notifyOnce("先去商店买鱼竿，再到背包「装备」页装上", "warn");
       return false;
     }
     if (!site) {
@@ -109,10 +113,15 @@ export const useFishing = create<FishingStore>()((set, get) => ({
       return false;
     }
     const now = performance.now();
+    const game = useGame.getState();
+    const chosen = baitById(game.selectedBait);
+    const baitId = chosen && (game.materials[chosen.id] ?? 0) > 0 ? chosen.id : null;
     set({
       phase: "casting", phaseAt: now, biteAt: 0, biteStart: 0, fishId: null, result: null,
-      castSeed: Math.floor(Math.random() * 97), banner: "抛竿",
+      castSeed: Math.floor(Math.random() * 97), baitId,
+      banner: baitId ? `抛竿 · ${chosen?.name ?? ""}` : "抛竿 · 空钩",
     });
+    if (!baitId && chosen) notifyOnce(`${chosen.name}用完了，空钩不会有鱼咬`, "warn");
     return true;
   },
 
@@ -173,13 +182,13 @@ export const useFishing = create<FishingStore>()((set, get) => ({
 
   closeResult: () => {
     if (get().phase !== "result") return;
-    set({ phase: "idle", fishId: null, result: null, banner: "" });
+    set({ phase: "idle", fishId: null, result: null, banner: "", baitId: null });
   },
 
   cancel: (quiet = false) => {
     const s = get();
     if (s.phase === "idle") return;
-    set({ phase: "idle", fishId: null, result: null, banner: "", biteAt: 0, biteStart: 0, reelAt: 0 });
+    set({ phase: "idle", fishId: null, result: null, banner: "", biteAt: 0, biteStart: 0, reelAt: 0, baitId: null });
     if (!quiet) notifyOnce("已收竿", "ok");
   },
 }));
@@ -194,7 +203,21 @@ export function tickFishing(now: number) {
     return;
   }
   if (s.phase === "waiting" && now >= s.biteAt) {
-    const fish = rollFish();
+    const bait = baitById(s.baitId);
+    const game = useGame.getState();
+    if (!bait || (game.materials[bait.id] ?? 0) <= 0) {
+      useFishing.setState({
+        phase: "result",
+        result: {
+          ok: false, fishId: null, length: 0, weight: 0,
+          reason: "钩上一直没有鱼饵，鱼连看都没看一眼", at: now,
+        },
+        banner: "空钩",
+      });
+      return;
+    }
+    game.consumeBait(bait.id);
+    const fish = rollFish(Math.random, bait.weights);
     useFishing.setState({
       phase: "bite", phaseAt: now, biteStart: now, fishId: fish.id,
       biteKind: Math.random() < 0.52 ? "sink" : "rise",

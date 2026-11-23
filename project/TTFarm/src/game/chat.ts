@@ -94,7 +94,9 @@ export async function sendChat(text: string) {
     body: JSON.stringify({ ownerId: active.room, text: body }),
   });
   remember(result.message);
+  seen.add(result.message.id);
   useChat.setState(state => ({ messages: merge(state.messages, [result.message]), notice: "" }));
+  useGame.getState().notify(`${result.message.nickname}：${result.message.body}`, "chat", 9000);
   return result.message;
 }
 

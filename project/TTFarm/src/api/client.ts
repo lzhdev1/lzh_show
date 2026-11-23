@@ -55,6 +55,10 @@ export interface RemoteState {
   codexCollected?: CodexCollection;
   fishingRod?: string | null;
   fishCaught?: Record<string, number>;
+  items?: Record<string, number>;
+  materials?: Record<string, number>;
+  ownedRods?: string[];
+  selectedBait?: string | null;
 }
 
 export interface AuthResult {

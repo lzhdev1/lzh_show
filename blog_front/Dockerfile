@@ -56,7 +56,7 @@ RUN pnpm build
 # 游戏产物直接落进主站的静态目录，由 Next 的 public 提供 /ttfarm
 RUN rm -rf /app/public/ttfarm && cp -r /ttfarm/dist /app/public/ttfarm
 WORKDIR /app
-COPY project/TTFarm/src/game/crops.ts project/TTFarm/src/game/growth.ts project/TTFarm/src/game/weather.ts project/TTFarm/src/game/ranch.ts project/TTFarm/src/game/forage.ts project/TTFarm/src/game/garage.ts project/TTFarm/src/game/backpack.ts project/TTFarm/src/game/codexCollection.ts project/TTFarm/src/game/fish.ts ./farm-rules/
+COPY project/TTFarm/src/game/crops.ts project/TTFarm/src/game/growth.ts project/TTFarm/src/game/weather.ts project/TTFarm/src/game/ranch.ts project/TTFarm/src/game/forage.ts project/TTFarm/src/game/garage.ts project/TTFarm/src/game/backpack.ts project/TTFarm/src/game/codexCollection.ts project/TTFarm/src/game/fish.ts project/TTFarm/src/game/items.ts ./farm-rules/
 RUN pnpm build
 
 # ---- 生产运行阶段：standalone 最小运行时 ----
