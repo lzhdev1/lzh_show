@@ -613,3 +613,13 @@
   .fishing-dock { bottom: calc(88px + env(safe-area-inset-bottom)); }
   .fishing-qte { bottom: calc(188px + env(safe-area-inset-bottom)); }
 }
+
+/* 手机端：钓鱼大按钮并入右下角动作簇，只保留提示、遛鱼条和结果弹窗。 */
+.hud[data-input="touch"] .fishing-controls,
+.hud[data-input="touch"] .fishing-rod-name { display: none; }
+.hud[data-input="touch"] .fishing-dock {
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(272px + env(safe-area-inset-bottom));
+  align-items: flex-end;
+}
+.hud[data-input="touch"] .fishing-qte { bottom: calc(306px + env(safe-area-inset-bottom)); }

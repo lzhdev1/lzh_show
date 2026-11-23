@@ -28,6 +28,7 @@ import { CarStorePanel } from "./CarStorePanel";
 import { TownHUD } from "./TownHUD";
 import { BackpackPanel } from "./BackpackPanel";
 import { FishingDock } from "./FishingDock";
+import { MobileControls } from "./MobileControls";
 import "./social.css";
 
 export function App() {
@@ -149,6 +150,23 @@ export function App() {
           </span>
         </button>
 
+        <div className="field-status">
+          {selectedPlot === null && <>
+            <WeatherBadge onOpen={() => setFarmOpen(true)} />
+            <ControlGuide />
+            <ActionTrigger />
+            <button type="button" className="ranch-trigger farm-trigger" aria-label="打开农场" onClick={() => setFarmOpen(true)}>
+              <LandIcon /><b>农场</b>
+            </button>
+            <RanchTrigger onClick={() => setRanchOpen(true)} />
+            <button type="button" className="ranch-trigger shop-trigger" aria-label="打开商店" onClick={() => setShopOpen(true)}>
+              <ShopIcon /><b>商店</b>
+            </button>
+            <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
+          </>}
+          <ReturnToLoginButton />
+        </div>
+
         <div className="top-right">
           <div className="hud-compact-hide top-tools">
             <CodexTrigger onClick={() => setCodexOpen(true)} />
@@ -159,6 +177,7 @@ export function App() {
           <button className="bag-trigger" onClick={() => setBackpackOpen(true)} aria-label="打开背包">
             <BagIcon /><span>背包</span>
           </button>
+          <ChatDock />
           {!away && <HudMenu items={menuItems}>
             <div className="hud-menu-actions"><ActionTrigger /></div>
             <ControlGuide />
@@ -167,26 +186,11 @@ export function App() {
         </div>
       </header>
 
-      <div className="field-status">
-        {selectedPlot === null && <>
-          <WeatherBadge onOpen={() => setFarmOpen(true)} />
-          <ControlGuide />
-          <ActionTrigger />
-          <button type="button" className="ranch-trigger farm-trigger" aria-label="打开农场" onClick={() => setFarmOpen(true)}>
-            <LandIcon /><b>农场</b>
-          </button>
-          <RanchTrigger onClick={() => setRanchOpen(true)} />
-          <button type="button" className="ranch-trigger shop-trigger" aria-label="打开商店" onClick={() => setShopOpen(true)}>
-            <ShopIcon /><b>商店</b>
-          </button>
-          <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
-        </>}
-        <ReturnToLoginButton />
-      </div>
       {selectedPlot === null && !panelOpen && <>
         <FarmGuests/>
         {driving ? <DriveTouchControls/> : <TouchControls/>}
         {!driving && <FishingDock />}
+        {!driving && <MobileControls />}
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
         <ForageHUD />
@@ -239,8 +243,6 @@ export function App() {
       {friendsOpen && <FriendsPanel token={token} roster={friendRoster} onClose={() => setFriendsOpen(false)}/>}
       {backpackOpen && <BackpackPanel onClose={() => setBackpackOpen(false)} />}
       </>}
-
-      <ChatDock />
 
       <div className="toasts" aria-live="polite">
         {toasts.map((toast) => (

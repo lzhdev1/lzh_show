@@ -1,7 +1,29 @@
 /* 图鉴面板：与牧场同族的奶油纸质卡片，信息密度比别的面板高一些 */
-.codex-panel { width: min(620px, 100%); }
+.codex-panel {
+  width: min(620px, 100%);
+  height: min(720px, calc(100dvh - 44px));
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.codex-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px 0;
+  scrollbar-width: thin;
+}
+.codex-body::-webkit-scrollbar { width: 7px; }
+.codex-body::-webkit-scrollbar-thumb { background: #ddcfb3; border-radius: 999px; }
 .modal-scrim.codex-scrim { z-index: 70; }
 .codex-count { font-size: 12px; color: #6b6355; font-variant-numeric: tabular-nums; }
+
+.codex-panel > .modal-head,
+.codex-panel > .farm-tabs,
+.codex-panel > .codex-progress,
+.codex-panel > .codex-tools { flex: 0 0 auto; }
 
 .codex-progress {
   margin: 10px 0 9px;
@@ -150,6 +172,7 @@
   line-height: 1.75;
 }
 @media (max-width: 560px) {
+  .codex-panel { height: calc(100dvh - 24px); }
   .codex-title small { font-size: 10.5px; }
   .codex-owned { font-size: 10.5px; }
   .codex-tools { flex-direction: column; align-items: stretch; }

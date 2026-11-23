@@ -148,6 +148,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      <div className="codex-body">
       {(tab === "crop" || tab === "wild" || tab === "herb" || searching) && <>
         {searching && <h3 className="codex-group">作物、野菜与草药 · {plants.length}</h3>}
         <ul className="codex-list">
@@ -252,6 +253,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
         </ul>
         <p className="codex-note">河湾里共 50 种鱼。越贵的鱼，遛鱼时的金色亮区越窄、小球越快；鱼竿越好，亮区越宽。</p>
       </>}
+      </div>
     </section>
   </div>;
 }

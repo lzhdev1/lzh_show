@@ -111,6 +111,8 @@ interface GameActions extends RanchActions, ForageActions {
   setDecor: (decor: FarmDecor) => void;
   /** 选一根鱼竿装备；未到等级或不存在时返回 false */
   equipFishingRod: (id: string) => boolean;
+  /** 卸下当前鱼竿；右下角大按钮会退回默认动作 */
+  unequipFishingRod: () => void;
   /** 把钓到的鱼放进鱼篓，同时点亮鱼类图鉴 */
   collectFish: (id: string) => boolean;
   /** 商店：买成长加速卡，放入背包「道具」页 */
@@ -511,6 +513,12 @@ export const useGame = create<GameStore>()(
         set({ fishingRod: rod.id });
         get().notify(`已装备：${rod.name}`);
         return true;
+      },
+
+      unequipFishingRod: () => {
+        if (!get().fishingRod) return;
+        set({ fishingRod: null });
+        get().notify("已卸下鱼竿，右下角大按钮切回默认动作");
       },
 
       buyBoostCard: (id, qty = 1) => {

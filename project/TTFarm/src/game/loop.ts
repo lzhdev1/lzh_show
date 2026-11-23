@@ -460,7 +460,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       vehicle.update(dt, {
         throttle,
         steer,
-        brake: farmInput.jump || keys.has(" "),
+        brake: farmInput.jump || farmInput.brake || keys.has(" "),
         boost: keys.has("shift") || farmInput.running,
       }, world.obstacles, vehicleHeightAt);
       useTownInteraction.getState().set(null, "");

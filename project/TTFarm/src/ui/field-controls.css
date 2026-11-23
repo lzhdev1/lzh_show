@@ -1,11 +1,10 @@
-/* The canvas keeps the middle of the screen free for gestures. */
+/* 顶栏一行：人物、功能按钮、图鉴/排行/背包/驾驶/发言全部并排；手机上农场/牧场/商店落到第二行。 */
 .field-status {
-  position: fixed;
-  top: calc(env(safe-area-inset-top) + 75px);
-  left: max(17px, env(safe-area-inset-left));
+  position: static;
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .weather-badge, .guide-trigger, .guide-copy {
   color: #304b3d;
@@ -71,11 +70,14 @@
 
 .topbar {
   pointer-events: none;
-  padding-top: calc(14px + env(safe-area-inset-top));
+  top: 0;
+  padding-top: calc(2px + env(safe-area-inset-top));
+  padding-bottom: 0;
   padding-left: max(16px, env(safe-area-inset-left));
   padding-right: max(16px, env(safe-area-inset-right));
 }
 .topbar button, .seed-scroll, .dock { pointer-events: auto; }
+.dock { bottom: calc(2px + env(safe-area-inset-bottom)); }
 .profile-chip { min-width: 0; }
 .profile-meta { min-width: 0; }
 .profile-name { max-width: 16ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -134,7 +136,7 @@
   .touch-guide { display: block; }
   .touch-stick, .jump-control {
     position: fixed;
-    bottom: calc(85px + env(safe-area-inset-bottom));
+    bottom: calc(72px + env(safe-area-inset-bottom));
     border: 2px solid #fff5dcca;
     background: #344e47aa;
     box-shadow: 0 3px 12px #23362e48, inset 0 0 0 2px #3b554d52;
@@ -166,33 +168,86 @@
   }
   .touch-stick[data-running] { border-color: #ffd571; }
   .touch-stick[data-running] .stick-thumb { background: #ffdc87; }
-  .jump-control {
-    right: max(20px, env(safe-area-inset-right));
-    width: 66px;
-    height: 66px;
-    border-radius: 50%;
-    display: grid;
-    align-content: center;
-    justify-items: center;
-    gap: 1px;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .jump-control:active { background: #4e7054; }
   .plot-action {
     left: auto;
-    right: max(20px, env(safe-area-inset-right));
-    bottom: calc(163px + env(safe-area-inset-bottom));
+    right: max(18px, env(safe-area-inset-right));
+    bottom: calc(272px + env(safe-area-inset-bottom));
     transform: none;
   }
-  .dock { bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .dock { bottom: calc(2px + env(safe-area-inset-bottom)); }
   .sheet { bottom: calc(80px + env(safe-area-inset-bottom)); max-height: 60dvh; overflow-y: auto; }
   .seed-scroll { overscroll-behavior-x: contain; }
   .stepper-btn, .plot-chip, .btn.mini, .icon-btn.ghost { min-height: 44px; min-width: 44px; }
   .icon-btn { min-width: 44px; min-height: 44px; }
 }
+@media (max-width: 820px) {
+  .topbar {
+    padding: calc(2px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    gap: 4px;
+  }
+  .field-status {
+    position: fixed;
+    top: calc(50px + env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    gap: 4px;
+    z-index: 2;
+  }
+}
+@media (min-width: 821px) {
+  /* 桌面钓鱼大按钮固定在右下角，种子栏让出右侧空间，避免贴底后压住按钮。 */
+  .dock { width: min(760px, calc(100vw - 350px)); }
+}
+@media (min-width: 821px) and (max-width: 1359px) {
+  .topbar {
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+  .profile-chip { padding: 3px 10px 3px 3px; min-height: 42px; gap: 7px; }
+  .profile-chip img { width: 34px; height: 34px; }
+  .profile-name { max-width: 8ch; font-size: 14px; }
+  .xp-track { width: 38px; }
+  .field-status { gap: 3px; }
+  .field-status .ranch-trigger {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
+  }
+  .field-status .ranch-trigger b,
+  .field-status .ranch-trigger span:not(.request-count) { display: none; }
+  .weather-badge {
+    width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  .weather-badge span { display: none; }
+  .guide-trigger { width: 40px; height: 40px; }
+  .action-trigger > span:not(.action-trigger-icon) { display: none; }
+  .login-return > span { display: none; }
+  .top-right { gap: 4px; }
+  .top-right .icon-btn,
+  .top-right .icon-btn.labeled { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; }
+  .top-right .icon-btn.labeled span,
+  .top-right .rank-trigger span { display: none; }
+  .bag-trigger { width: 40px; min-height: 40px; padding: 0; gap: 0; }
+  .bag-trigger span { display: none; }
+  .chat-toggle, .drive-toggle {
+    width: 40px;
+    min-height: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+  }
+  .chat-toggle b, .drive-toggle b { display: none; }
+}
 @media (max-width: 560px) {
-  .topbar { padding: calc(8px + env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) 0 max(9px, env(safe-area-inset-left)); gap: 4px; }
+  .topbar { padding: calc(2px + env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); gap: 4px; }
   .top-right { gap: 4px; flex-shrink: 0; }
   .icon-btn.labeled { padding: 0; justify-content: center; width: 44px; }
   .icon-btn.labeled span { display: none; }
@@ -200,13 +255,13 @@
   .profile-name { max-width: 7ch; }
   .coin-pill { padding: 0 7px; gap: 3px; }
   .coin-pill b { font-size: 13px; }
-  .field-status { top: calc(60px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); gap: 4px; }
+  .field-status { top: calc(50px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); gap: 4px; }
   .field-status .ranch-trigger { flex-direction: column; justify-content: center; gap: 1px; min-width: 44px; padding: 3px 5px; font-size: 10px; line-height: 1.1; }
   .field-status .ranch-trigger svg { width: 17px; height: 17px; }
   .ranch-trigger.login-return { flex-direction: column; justify-content: center; gap: 1px; min-width: 44px; padding: 3px 4px; font-size: 10px; line-height: 1.1; }
   .login-return .return-verb { display: none; }
   .dock-shop { display: none; }
-  .toasts { top: calc(114px + env(safe-area-inset-top)); }
+  .toasts { top: calc(102px + env(safe-area-inset-top)); }
   .modal .row { flex-wrap: wrap; }
 }
 @media (max-width: 360px) {
@@ -216,13 +271,12 @@
 }
 /* 长名字的作物在窄屏上会跨过摇杆上缘，操作行整行放到摇杆之上。 */
 @media (max-width: 390px) and (orientation: portrait) {
-  .hud[data-input="touch"] .plot-action { bottom: calc(195px + env(safe-area-inset-bottom)); }
+  .hud[data-input="touch"] .plot-action { bottom: calc(272px + env(safe-area-inset-bottom)); }
 }
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
   .dock { width: min(55vw, 580px); }
-  .hud[data-input='touch'] :is(.touch-stick, .jump-control) { bottom: max(14px, env(safe-area-inset-bottom)); }
-  .hud[data-input='touch'] .touch-stick { width: 88px; height: 88px; }
-  .hud[data-input='touch'] .plot-action { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 78px); }
+  .hud[data-input='touch'] .touch-stick { bottom: calc(78px + env(safe-area-inset-bottom)); width: 88px; height: 88px; }
+  .hud[data-input='touch'] .plot-action { bottom: calc(252px + env(safe-area-inset-bottom)); }
   .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 146px); }
   .modal { max-height: 100%; }
 }

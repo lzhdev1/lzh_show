@@ -79,7 +79,7 @@ export function ControlGuide() {
 }
 
 export function DriveTouchControls() {
-  type DriveKey = "forward" | "back" | "left" | "right";
+  type DriveKey = "forward" | "back" | "left" | "right" | "brake";
   const held = useRef(new Map<number, DriveKey>());
   const [active, setActive] = useState<DriveKey[]>([]);
 
@@ -96,6 +96,7 @@ export function DriveTouchControls() {
     farmInput.forward = Math.max(-1, Math.min(1, forward));
     farmInput.x = Math.max(-1, Math.min(1, steer));
     farmInput.running = false;
+    farmInput.brake = keys.includes("brake");
     setActive(keys);
   };
 
@@ -105,6 +106,7 @@ export function DriveTouchControls() {
       farmInput.forward = 0;
       farmInput.x = 0;
       farmInput.running = false;
+      farmInput.brake = false;
     };
     window.addEventListener("blur", reset);
     document.addEventListener("visibilitychange", reset);
@@ -145,8 +147,11 @@ export function DriveTouchControls() {
       {key("back", "▼", "后退")}
     </div>
     <div className="drive-pad drive-pad-steer">
-      {key("left", "◀", "左转")}
-      {key("right", "▶", "右转")}
+      <div className="drive-steer-row">
+        {key("left", "◀", "左转")}
+        {key("right", "▶", "右转")}
+      </div>
+      {key("brake", "■", "刹车")}
     </div>
   </div>;
 }
@@ -181,7 +186,7 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
     const magnitude = Math.min(1, Math.max(0, (distance - 0.10) / 0.90));
     farmInput.x = distance ? dx / distance * magnitude : 0;
     farmInput.forward = distance ? -dy / distance * magnitude : 0;
-    farmInput.running = magnitude >= (farmInput.running ? 0.77 : 0.9);
+    farmInput.running = farmInput.sprint || magnitude >= (farmInput.running ? 0.77 : 0.9);
     e.currentTarget.toggleAttribute("data-running", farmInput.running);
     const clamp = Math.max(1, distance);
     e.currentTarget.style.setProperty("--stick-x", `${dx / clamp * radius}px`);
@@ -204,11 +209,5 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
       onPointerCancel={(e) => { if (e.pointerId === active.current) release(); }}>
       <span className="stick-thumb" />
     </div>
-    {!spectating && <button type="button" className="jump-control" aria-label="跳跃"
-      onPointerDown={(e) => { if (e.button === 0) farmInput.jump = true; }}
-      onClick={(e) => { if (e.detail === 0) farmInput.jump = true; }}>
-      <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 12 6-6 6 6m-6-6v12M5 21h14"/></svg>
-      <span>跳跃</span>
-    </button>}
   </div>;
 }

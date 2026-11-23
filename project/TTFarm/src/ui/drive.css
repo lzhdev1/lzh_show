@@ -2,6 +2,7 @@
 
 .drive-dock {
   pointer-events: none;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -31,7 +32,11 @@
 
 .drive-card {
   pointer-events: auto;
-  width: min(330px, calc(100vw - 32px));
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  width: min(330px, calc(100vw - 24px));
   max-height: min(46vh, 380px);
   overflow: auto;
   padding: 12px;
@@ -112,7 +117,7 @@
 
 .drive-pad {
   position: absolute;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(72px + env(safe-area-inset-bottom));
   display: flex;
   gap: 10px;
   pointer-events: auto;
@@ -123,8 +128,12 @@
 }
 .drive-pad-steer {
   right: max(18px, env(safe-area-inset-right));
+  flex-direction: column;
   align-items: flex-end;
+  gap: 8px;
 }
+.drive-steer-row { display: flex; gap: 8px; }
+.drive-pad-steer .drive-key:last-child { width: 144px; height: 52px; border-radius: 18px; }
 .drive-key {
   width: 68px;
   height: 68px;
@@ -164,7 +173,8 @@
 .drive-key:focus-visible { outline: 3px solid #ffe8ad; outline-offset: 2px; }
 
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
-  .drive-pad { bottom: max(12px, env(safe-area-inset-bottom)); }
+  .drive-pad { bottom: calc(80px + env(safe-area-inset-bottom)); }
   .drive-key { width: 58px; height: 58px; border-radius: 20px; }
   .drive-key-arrow { font-size: 17px; }
+  .drive-pad-steer .drive-key:last-child { width: 124px; height: 46px; border-radius: 16px; }
 }

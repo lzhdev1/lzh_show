@@ -71,6 +71,7 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
   const level = useGame((s) => s.backpackLevel);
   const upgradeBackpack = useGame((s) => s.upgradeBackpack);
   const equipFishingRod = useGame((s) => s.equipFishingRod);
+  const unequipFishingRod = useGame((s) => s.unequipFishingRod);
   const selectBait = useGame((s) => s.selectBait);
   const useBoostCard = useGame((s) => s.useBoostCard);
   const notify = useGame((s) => s.notify);
@@ -223,7 +224,7 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
 
         {over && <p className="bag-over">当前分类已有 {used} 格，超出容量。先升级背包，或卖出/消耗一部分。</p>}
 
-        {tab === "gear" && <p className="bag-hint">点击鱼竿即可装备；装备后才能到河边钓鱼。</p>}
+        {tab === "gear" && <p className="bag-hint">点击鱼竿装备，再点「装备中」的鱼竿即可卸下；装备后右下角大按钮才会变成钓鱼。</p>}
         {tab === "item" && <p className="bag-hint">点击加速卡：优先用在已选中的地块，没有选中就催熟最早种下的那一块。</p>}
         {tab === "material" && <p className="bag-hint">点击鱼饵即可选中；蔬菜收成和鱼饵共用「杂物」分类的格数。</p>}
 
@@ -232,7 +233,8 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
             const clickable = Boolean(item.kind);
             const action = () => {
               if (item.kind === "rod" && item.id) {
-                equipFishingRod(item.id);
+                if (fishingRod === item.id) unequipFishingRod();
+                else equipFishingRod(item.id);
               } else if (item.kind === "bait" && item.id) {
                 selectBait(selectedBait === item.id ? null : item.id);
               } else if (item.kind === "boost" && item.id) {
