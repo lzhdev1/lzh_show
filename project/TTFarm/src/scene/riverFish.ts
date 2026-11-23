@@ -15,6 +15,10 @@ interface FishInstance {
   lateral: number;
   phase: number;
   size: number;
+  /** 鱼体中心在水面以下的深度，按体型计算，保证背鳍也不会露出水面 */
+  depth: number;
+  /** 水面上的淡淡鱼影，让水下鱼群在不露背的情况下仍然可读 */
+  shadow?: THREE.Mesh;
 }
 
 const WATER_Y = RIVER_BED.waterY;
@@ -304,6 +308,12 @@ function mergeOrSelf(parts: THREE.BufferGeometry[]) {
   return merged;
 }
 
+/** 让鱼体连同背鳍最高点都沉在水面下；大鱼按体高自动加深，避免鳍尖穿出水面。 */
+function swimDepth(species: FishSpecies, size: number) {
+  // 背鳍最高点约 0.95×体高，取整个体高再加一点余量。
+  return species.visual.girth * size + 0.055 + Math.random() * 0.06;
+}
+
 function createFish(species: FishSpecies): FishInstance {
   const { body, tail, material } = fishAssets(species);
   const root = new THREE.Group();
@@ -318,7 +328,7 @@ function createFish(species: FishSpecies): FishInstance {
   return {
     species, root, tail: tailGroup,
     s: 0, dir: 1, speed: 0.2, lateral: 0,
-    phase: 0, size: 1,
+    phase: 0, size: 1, depth: 0.18,
   };
 }
 
@@ -348,33 +358,47 @@ export function createRiverFishScene(): RiverFishScene {
   const t = new THREE.Vector3();
   const tmp = new THREE.Vector3();
   const playerNear = new THREE.Vector3();
+  const shadowGeometry = new THREE.PlaneGeometry(1, 1);
+  shadowGeometry.rotateX(-Math.PI / 2);
+  const shadowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x123b3b, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide,
+  });
+
+  const addFish = (species: FishSpecies) => {
+    const instance = createFish(species);
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadow.renderOrder = 2;
+    shadow.rotation.y = Math.random() * Math.PI;
+    instance.shadow = shadow;
+    group.add(instance.root, shadow);
+    fish.push(instance);
+    return instance;
+  };
 
   // 50 种鱼各放一条，沿整条河均匀铺开；再补几条常见鱼，让近岸不至于太空
   FISH_LIST.forEach((species, i) => {
-    const instance = createFish(species);
+    const instance = addFish(species);
     instance.s = (i / FISH_LIST.length) * MAX_INDEX + (Math.random() - 0.5) * 2.2;
     instance.dir = Math.random() < 0.5 ? 1 : -1;
     instance.speed = 0.11 + Math.random() * 0.22;
     instance.lateral = (Math.random() - 0.5) * 8.4;
     instance.phase = Math.random() * Math.PI * 2;
     instance.size = species.visual.length * (0.86 + Math.random() * 0.28);
+    instance.depth = swimDepth(species, instance.size);
     instance.root.scale.setScalar(instance.size);
-    fish.push(instance);
-    group.add(instance.root);
   });
   // 近距离补充：常见鱼和小鱼群，放在农场附近的河段
   for (let i = 0; i < 18; i += 1) {
     const species = FISH_LIST[Math.floor(Math.random() * 20)];
-    const instance = createFish(species);
+    const instance = addFish(species);
     instance.s = 68 + Math.random() * 28;
     instance.dir = Math.random() < 0.5 ? 1 : -1;
     instance.speed = 0.14 + Math.random() * 0.25;
     instance.lateral = (Math.random() - 0.5) * 10;
     instance.phase = Math.random() * Math.PI * 2;
     instance.size = species.visual.length * (0.82 + Math.random() * 0.24);
+    instance.depth = swimDepth(species, instance.size);
     instance.root.scale.setScalar(instance.size);
-    fish.push(instance);
-    group.add(instance.root);
   }
 
   const update = (dt: number, elapsed: number, player: THREE.Vector3) => {
@@ -390,24 +414,35 @@ export function createRiverFishScene(): RiverFishScene {
       const nx = -t.z, nz = t.x;
       v.x += nx * lateral * 0.46;
       v.z += nz * lateral * 0.46;
-      // 水面留一道背脊：河面材质偏不透，鱼完全沉在水下会看不见，
-      // 让鱼背略出水、腹部仍在水线附近，既有游动感也能一眼认出鱼种。
-      const bob = Math.sin(elapsed * 1.5 + item.phase) * 0.014;
-      item.root.position.set(v.x, WATER_Y + 0.022 + bob, v.z);
+      // 鱼真正在水下游：按体高算中心深度，背鳍也留在水面以下；
+      // 只在深浅之间做很小的起伏，不再把鱼背抬出水面当可见性补丁。
+      const bob = Math.sin(elapsed * 0.62 + item.phase) * 0.018;
+      item.root.position.set(v.x, WATER_Y - item.depth + bob, v.z);
       item.root.rotation.y = Math.atan2(-t.z, t.x) + (item.dir < 0 ? Math.PI : 0);
+      item.root.rotation.x = Math.sin(elapsed * 0.9 + item.phase) * 0.035;
       item.root.rotation.z = Math.sin(elapsed * 1.7 + item.phase) * 0.07;
-      item.tail.rotation.y = Math.sin(elapsed * (4.4 + item.speed * 13) + item.phase) * 0.42;
       // 靠镜头太远的鱼缩到极小，减少填满水面的碎点
       tmp.copy(item.root.position).sub(playerNear);
-      item.root.visible = tmp.lengthSq() < 110 * 110;
+      const dist = tmp.length();
+      const visible = dist < 110;
+      item.root.visible = visible;
+      if (item.shadow) {
+        item.shadow.visible = visible && dist < 72;
+        item.shadow.position.set(v.x, WATER_Y + 0.006, v.z);
+        item.shadow.rotation.y = item.root.rotation.y;
+        item.shadow.scale.set(item.size * 0.92, 1, item.size * 0.30);
+      }
+      item.tail.rotation.y = Math.sin(elapsed * (4.4 + item.speed * 13) + item.phase) * 0.42;
     }
   };
 
   const dispose = () => {
     fish.forEach((item) => {
+      item.shadow?.removeFromParent();
       item.root.removeFromParent();
-      item.root.traverse((node) => { if (node instanceof THREE.Mesh) node.geometry = node.geometry; });
     });
+    shadowGeometry.dispose();
+    shadowMaterial.dispose();
     geometryCache.forEach(({ body, tail, material }) => {
       body.dispose(); tail.dispose(); material.dispose();
     });

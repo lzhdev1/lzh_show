@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { TownBuilder } from "./townBuild";
 import { buildCar, CAR_COLORS } from "./townCar";
 import { townSurfaceHeight, walkNodes, type RouteNode } from "./townLayout";
-import { bridgeHeightAt } from "../layout";
+import { bridgeHeightAt, BRIDGE, inRiver, onBridge } from "../layout";
 import { HALL_PARKING, SHOPPER_ROUTE, inSalesHall, SALES_HALL } from "../salesHallLayout";
 
 /** NPC 与循环车的固定参数都放这里，方便手感调优 */
@@ -14,6 +14,20 @@ const CITY_PARK = 5;
 const SHOPPER_SPEED = 1.0;
 const SHOPPER_PAUSE = 7;
 const SHOPPER_COUNT = 4;
+
+/** 行人只允许踩在岸上或桥面；河面本身不是可走地面。 */
+function inWater(x: number, z: number, pad = 0.35) {
+  return inRiver(x, z, pad) && !onBridge(x, z, pad);
+}
+
+function dryPoint(x: number, z: number) {
+  if (!inWater(x, z)) return { x, z };
+  // 万一路线点算进河里，拉到桥面中轴，宁可绕桥也不踩水。
+  return {
+    x: Math.max(BRIDGE.x - BRIDGE.halfLength + 0.7, Math.min(BRIDGE.x + BRIDGE.halfLength - 0.7, x)),
+    z: BRIDGE.z,
+  };
+}
 
 const SKIN = [0xf3c9a5, 0xe4ad82, 0xc88e64, 0xa9704d, 0xf7d8bb];
 const HAIR = [0x3f2e26, 0x5b4234, 0x2e2a28, 0x7b5b3e, 0x9b7650, 0x4a3a52];
@@ -121,7 +135,12 @@ class Walker {
   ) {
     this.node = nodeIndex;
     this.phase = mulberry(seed + 31)() * Math.PI * 2;
-    this.person.node.position.set(nodes[nodeIndex].x, 0.14, nodes[nodeIndex].z);
+    if (inWater(nodes[this.node].x, nodes[this.node].z)) {
+      this.node = nodes.findIndex(n => !inWater(n.x, n.z));
+      if (this.node < 0) this.node = 0;
+    }
+    const start = dryPoint(nodes[this.node].x, nodes[this.node].z);
+    this.person.node.position.set(start.x, 0.14, start.z);
   }
   node: number;
   target: number | null = null;
@@ -135,12 +154,16 @@ class Walker {
     return out;
   }
   update(dt: number, t: number) {
+    const from = this.nodes[this.node];
     if (this.target === null) {
-      const neighbors = this.neighborsOf(this.node);
+      const neighbors = this.neighborsOf(this.node).filter((index) => {
+        const node = this.nodes[index];
+        return node && !inWater(node.x, node.z) &&
+          !inWater((from.x + node.x) * 0.5, (from.z + node.z) * 0.5);
+      });
       if (neighbors.length) this.target = neighbors[Math.floor(Math.random() * neighbors.length)];
     }
     const to = this.target === null ? null : this.nodes[this.target];
-    const from = this.nodes[this.node];
     if (to) {
       const dx = to.x - from.x, dz = to.z - from.z;
       const dist = Math.hypot(dx, dz);
@@ -149,12 +172,21 @@ class Walker {
         this.target = null;
       } else {
         const step = Math.min(dist, WALK_SPEED * dt);
-        this.person.node.position.x += (dx / dist) * step;
-        this.person.node.position.z += (dz / dist) * step;
-        this.person.node.rotation.y = Math.atan2(dx, dz);
+        const nx = this.person.node.position.x + (dx / dist) * step;
+        const nz = this.person.node.position.z + (dz / dist) * step;
+        if (inWater(nx, nz)) {
+          this.target = null;
+          this.person.node.position.x = from.x;
+          this.person.node.position.z = from.z;
+        } else {
+          this.person.node.position.x = nx;
+          this.person.node.position.z = nz;
+          this.person.node.rotation.y = Math.atan2(dx, dz);
+        }
       }
     }
-    const y = townSurfaceHeight(this.person.node.position.x, this.person.node.position.z) || 0.14;
+    const bridge = bridgeHeightAt(this.person.node.position.x, this.person.node.position.z);
+    const y = bridge ?? Math.max(townSurfaceHeight(this.person.node.position.x, this.person.node.position.z), 0.14);
     this.person.node.position.y = y;
     const swing = Math.sin(t * 5.4 + this.phase);
     this.person.legL.rotation.x = swing * 0.42;
@@ -167,7 +199,7 @@ class Walker {
 /** 过桥顾客：固定路线走到大厅柜台，停一会儿再原路返回 */
 class Shopper {
   readonly person: Person;
-  private route = SHOPPER_ROUTE;
+  private route = SHOPPER_ROUTE.map((point) => dryPoint(point.x, point.z));
   private cumulative: number[] = [];
   private total = 0;
   private cursor = 1;
@@ -207,7 +239,8 @@ class Shopper {
     const seg = this.cumulative[this.cursor] - this.cumulative[this.cursor - 1] || 1;
     const k = Math.max(0, Math.min(1, (this.progress - this.cumulative[this.cursor - 1]) / seg));
     const x = a.x + (b.x - a.x) * k, z = a.z + (b.z - a.z) * k;
-    this.person.node.position.set(x, this.groundAt(x, z), z);
+    const safe = dryPoint(x, z);
+    this.person.node.position.set(safe.x, this.groundAt(safe.x, safe.z), safe.z);
     this.person.node.rotation.y = Math.atan2((b.x - a.x) * this.dir, (b.z - a.z) * this.dir);
     const swing = Math.sin(t * 5.2 + this.cursor);
     this.person.legL.rotation.x = swing * 0.38;
@@ -364,15 +397,18 @@ export class TownLife {
   private delivery: DeliveryVan | null = null;
   readonly group = new THREE.Group();
   constructor(_signalStates: (t: number) => { ew: "green" | "yellow" | "red"; ns: "green" | "yellow" | "red" }, seed = 1009) {
+    this.group.name = "town-life";
     const graph = walkNodes();
     const r = mulberry(seed);
     for (let i = 0; i < 24; i++) {
       const person = makePerson(seed + i * 7 + 3);
+      person.node.name = `town-walker-${i}`;
       this.walkers.push(new Walker(person, graph.nodes, graph.links, seed + i, Math.floor(r() * graph.nodes.length)));
       this.group.add(person.node);
     }
     for (let i = 0; i < SHOPPER_COUNT; i++) {
       const shopper = new Shopper(i);
+      shopper.person.node.name = `town-shopper-${i}`;
       this.shoppers.push(shopper);
       this.group.add(shopper.person.node);
     }

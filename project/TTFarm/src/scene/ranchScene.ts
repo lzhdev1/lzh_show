@@ -161,7 +161,14 @@ export function createRanchScene(obstacles:WorldObstacles) {
         const progress=THREE.MathUtils.smoothstep(cycle-leg,0,.60);
         const a=(leg+progress)*2.7+actor.seed*tau;
         const dx=actor.range*Math.cos(a),dz=actor.range*.69*Math.sin(2*a);
-        target.set(actor.anchor.x+dx,actor.anchor.y,actor.anchor.z+dz);
+        let tx=actor.anchor.x+dx,tz=actor.anchor.z+dz;
+        // 野生动物只在岸上走：椭圆路径快要压到水面时，沿河道法线推回岸边。
+        const shore=riverInfo(tx,tz);
+        if(shore.dist<RIVER_BED.waterLine+1.1) {
+          const push=RIVER_BED.waterLine+1.1-shore.dist;
+          tx+=shore.nx*push;tz+=shore.nz*push;
+        }
+        target.set(tx,actor.anchor.y,tz);
         const travel=Math.hypot(target.x-p.x,target.z-p.z);
         p.copy(target);
         stride=dt>0?Math.min(.68,travel/dt*2.7):0;

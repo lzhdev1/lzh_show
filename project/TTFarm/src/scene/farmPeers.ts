@@ -11,6 +11,7 @@ import { createChatBubble } from "./chatBubble";
 import { bubbleText } from "../game/chat";
 import type { createRanchAuras } from "./ranchAuras";
 import type { RanchAnimal } from "../game/ranch";
+import { inRiver, onBridge } from "./layout";
 
 function nameplate(name: string) {
   const canvas = document.createElement("canvas");
@@ -109,7 +110,9 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
         motion.running = THREE.MathUtils.damp(motion.running, next.running ? 1 : 0, 10, dt);
         const stride = next.mount ? (next.running ? 3.6 : 2.7) : (next.running ? 1.97 : 1.32);
         motion.phase = (motion.phase + travel / stride) % 1;
-        motion.swimming = THREE.MathUtils.damp(motion.swimming, next.swimming ? 1 : 0, 9, dt);
+        // 访客如果落点已经在河面且不在桥面，强制进入游泳姿态，不能在水上继续踏步。
+        const onWater = inRiver(root.position.x, root.position.z, 0.25) && !onBridge(root.position.x, root.position.z, 0.25);
+        motion.swimming = THREE.MathUtils.damp(motion.swimming, next.swimming || onWater ? 1 : 0, 9, dt);
         motion.swimPhase = (motion.swimPhase + dt * .48 + travel * .33) % 1;
         jumpTime += dt;
         motion.jumpPhase = Math.min(1, jumpTime / 1.22);

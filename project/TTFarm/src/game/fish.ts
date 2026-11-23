@@ -301,15 +301,15 @@ export function fishSize(fish: FishSpecies, random = Math.random): { length: num
 }
 
 export function fishZoneWidth(fish: FishSpecies, rodBonus = 0): number {
-  const base: Record<FishRarity, number> = { common: 0.245, uncommon: 0.175, rare: 0.125, epic: 0.092, legendary: 0.062 };
+  const base: Record<FishRarity, number> = { common: 0.33, uncommon: 0.26, rare: 0.20, epic: 0.155, legendary: 0.115 };
   const tiers: Record<FishRarity, number> = { common: 35, uncommon: 180, rare: 550, epic: 3000, legendary: 8800 };
-  const scale = 1 - Math.min(0.22, Math.max(0, Math.log10(fish.price / tiers[fish.rarity]) * 0.16));
-  return Math.min(0.36, Math.max(0.042, base[fish.rarity] * scale + rodBonus));
+  const scale = 1 - Math.min(0.16, Math.max(0, Math.log10(fish.price / tiers[fish.rarity]) * 0.12));
+  return Math.min(0.40, Math.max(0.078, base[fish.rarity] * scale + rodBonus));
 }
 
 export function fishBallSpeed(fish: FishSpecies): number {
-  const base: Record<FishRarity, number> = { common: 0.42, uncommon: 0.56, rare: 0.72, epic: 0.9, legendary: 1.1 };
-  return base[fish.rarity] * (1 + Math.min(0.3, Math.max(0, Math.log10(fish.price / 35) - 1) * 0.12));
+  const base: Record<FishRarity, number> = { common: 0.24, uncommon: 0.27, rare: 0.30, epic: 0.34, legendary: 0.38 };
+  return base[fish.rarity] * (1 + Math.min(0.18, Math.max(0, Math.log10(fish.price / 35) - 1) * 0.10));
 }
 
 export interface FishingRod {
