@@ -9,6 +9,7 @@ import { normalizeAppearance } from "./appearance";
 import { normalizeDecor } from "./decor";
 import { normalizeRanch } from "./ranch";
 import { normalizeForage } from "./forage";
+import { normalizeGarage } from "./garage";
 
 interface AccountStore {
   token: string | null;
@@ -46,6 +47,7 @@ function applyRemoteState(state: RemoteState): void {
     decor: normalizeDecor(state.decor),
     ranch: normalizeRanch(state.ranch),
     forage: normalizeForage(state.forage),
+    garage: normalizeGarage(state.garage),
     selectedSeed: state.selectedSeed,
   });
 }
@@ -66,6 +68,7 @@ function pickSave() {
     decor: s.decor,
     ranch: s.ranch,
     forage: s.forage,
+    garage: s.garage,
     selectedSeed: s.selectedSeed,
   };
 }
@@ -143,7 +146,8 @@ function checkpoint(owner: number, json: string, remote: RemoteState) {
       useGame.getState().notify("另一位玩家已更改同一份进度，已载入最新农场，本机操作已备份", "warn");
     return remote;
   }
-  const state = { ...resolved, nickname: remote.nickname, ranch: normalizeRanch(resolved.ranch), revision: remote.revision ?? 0 };
+  const state = { ...resolved, nickname: remote.nickname, ranch: normalizeRanch(resolved.ranch),
+    garage: normalizeGarage(resolved.garage), revision: remote.revision ?? 0 };
   remember(owner, JSON.stringify({ ...state, base: remote, writeId: (local.revision === remote.revision && writeId) || writeKey() }));
   return state;
 }
@@ -216,6 +220,7 @@ export function startAutoSave(): () => void {
       state.decor === prev.decor &&
       state.ranch === prev.ranch &&
       state.forage === prev.forage &&
+      state.garage === prev.garage &&
       state.selectedSeed === prev.selectedSeed
     )) return;
     const { user, token } = useAccount.getState();

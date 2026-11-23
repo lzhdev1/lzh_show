@@ -5,6 +5,7 @@ import type { CropId } from "../game/crops";
 import type { FarmDecor } from "../game/decor";
 import type { RanchState } from "../game/ranch";
 import type { ForageState } from "../game/forage";
+import type { GarageState } from "../game/garage";
 
 const BASE = "/api/ttfarm";
 
@@ -48,6 +49,7 @@ export interface RemoteState {
   decor?: FarmDecor;
   ranch?: RanchState;
   forage?: ForageState;
+  garage?: GarageState;
 }
 
 export interface AuthResult {

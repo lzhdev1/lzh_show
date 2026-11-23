@@ -3,6 +3,7 @@ import { CROPS, cropMutationValid } from "@farm-rules/crops";
 import { MAX_WATER, PLOT_COUNT, START_UNLOCKED } from "@farm-rules/growth";
 import { normalizeRanch as readRanch } from "@farm-rules/ranch";
 import { normalizeForage as readForage } from "@farm-rules/forage";
+import { normalizeGarage as readGarage } from "@farm-rules/garage";
 import { MUTATIONS as CROP_MUTATIONS, isMutation } from "@farm-rules/weather";
 
 /** 测试期金币：新号直接给一大笔，方便试扩建 */
@@ -55,6 +56,7 @@ export interface FarmSave {
   decor: ReturnType<typeof readDecor>;
   ranch: ReturnType<typeof readRanch>;
   forage: ReturnType<typeof readForage>;
+  garage: ReturnType<typeof readGarage>;
   selectedSeed: string;
 }
 
@@ -84,6 +86,7 @@ export function initialSave(nickname = "农场主"): FarmSave {
     decor: readDecor(null),
     ranch: readRanch(null),
     forage: readForage(null),
+    garage: readGarage(null),
     selectedSeed: "radish",
   };
 }
@@ -150,6 +153,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
     decor: readDecor(src.decor),
     ranch: readRanch(src.ranch),
     forage: readForage(src.forage),
+    garage: readGarage(src.garage),
     selectedSeed: typeof src.selectedSeed === "string" && CROP_IDS.includes(src.selectedSeed)
       ? src.selectedSeed
       : "radish",
@@ -171,10 +175,11 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
     decor: FarmSave["decor"];
     ranch: FarmSave["ranch"];
     forage: FarmSave["forage"];
+    garage: FarmSave["garage"];
     save_version: number;
     revision: number;
   }>(
-    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.forage, s.save_version, s.revision,
+    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.forage, s.garage, s.save_version, s.revision,
             CASE WHEN u.nickname_key IS NULL THEN '' ELSE u.nickname END AS nickname, u.avatar_id
        FROM farm_states s JOIN users u ON u.id = s.user_id WHERE s.user_id = $1`,
     [userId]
@@ -205,6 +210,7 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
       decor: row.decor,
       ranch: row.ranch,
       forage: row.forage,
+      garage: row.garage,
     },
     row.nickname
   ) ?? initialSave(nickname);
@@ -212,12 +218,12 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
 }
 
 export async function saveState(pool: Queryable, userId: number, save: FarmSave,
-                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, includeForage = true, expectedRevision: number | null = null): Promise<number | null> {
+                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, includeForage = true, includeGarage = true, expectedRevision: number | null = null): Promise<number | null> {
   const result = await pool.query(
     `WITH written AS (
-     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, forage, save_version, revision, updated_at)
-     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb, $18::jsonb,
-            CASE WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
+     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, forage, garage, save_version, revision, updated_at)
+     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb, $18::jsonb, $20::jsonb,
+            CASE WHEN $21 THEN 4 WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
      ON CONFLICT (user_id) DO UPDATE SET
        coins = EXCLUDED.coins,
        xp = EXCLUDED.xp,
@@ -235,9 +241,10 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
        decor = CASE WHEN $12 THEN EXCLUDED.decor ELSE farm_states.decor END,
        ranch = CASE WHEN $16 THEN EXCLUDED.ranch ELSE farm_states.ranch END,
        forage = CASE WHEN $19 THEN EXCLUDED.forage ELSE farm_states.forage END,
+       garage = CASE WHEN $21 THEN EXCLUDED.garage ELSE farm_states.garage END,
        save_version = GREATEST(farm_states.save_version, EXCLUDED.save_version),
        revision = farm_states.revision + 1, updated_at = now()
-     WHERE ($16 OR farm_states.save_version < 2)
+     WHERE ($16 OR $21 OR farm_states.save_version < 2)
        AND (farm_states.revision = $17 OR ($17 IS NULL AND farm_states.save_version < 3))
      RETURNING user_id,revision)
      UPDATE users SET avatar_id = CASE WHEN $11 THEN $8 ELSE avatar_id END
@@ -262,6 +269,8 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
       expectedRevision,
       JSON.stringify(save.forage),
       includeForage,
+      JSON.stringify(save.garage),
+      includeGarage,
     ]
   );
   return result.rows[0]?.revision ?? null;

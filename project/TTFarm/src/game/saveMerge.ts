@@ -13,7 +13,7 @@ function equal(left: unknown, right: unknown): boolean {
  * action on the same plot, herd or insufficient stock must be resolved as a whole. */
 export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: RemoteState): RemoteState | null {
   const result = { ...remote, plots: [...remote.plots] };
-  for (const field of ["avatarId","outfitId","bottomId","selectedSeed","decor","ranch","forage"] as const) {
+  for (const field of ["avatarId","outfitId","bottomId","selectedSeed","decor","ranch","forage","garage"] as const) {
     // 旧客户端草稿不带新字段（如 forage）：视为未改动，保留远端值
     if (local[field] === undefined || equal(base[field], local[field])) continue;
     if (!equal(base[field], remote[field])) return null;

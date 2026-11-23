@@ -82,6 +82,9 @@ ALTER TABLE farm_states
 -- 野菜采摘记录：rotation 是刷新轮次，taken 是本轮已采的菜丛编号
 ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS forage JSONB NOT NULL DEFAULT '{"rotation":0,"taken":[]}'::jsonb;
 
+-- 车库随账号存档，cars 数组与 activeId 均由服务端归一化后落库
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS garage JSONB NOT NULL DEFAULT '{"cars":[],"activeId":null}'::jsonb;
+
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);
 
