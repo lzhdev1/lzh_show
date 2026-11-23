@@ -9,8 +9,8 @@ export interface HudMenuItem {
 }
 
 /**
- * 移动端功能抽屉：主层只留农场 / 牧场 / 人物信息，
- * 图鉴、排行、商店、好友、动作、天气、操作说明与返回登录都收进这里。
+ * 移动端功能抽屉：主层留农场 / 牧场 / 人物信息，商店放进顶栏，
+ * 图鉴、排行、好友、动作、天气、操作说明与返回登录都收进这里。
  */
 export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: ReactNode }) {
   const [open, setOpen] = useState(false);

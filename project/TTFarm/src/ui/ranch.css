@@ -15,6 +15,12 @@
   font-size: 13px;
   cursor: pointer;
 }
+.farm-trigger {
+  background: #eff5df;
+  border-color: #bbc99e;
+  color: #355c39;
+  font-weight: 700;
+}
 .riding-action {
   position: fixed;
   top: calc(128px + env(safe-area-inset-top));

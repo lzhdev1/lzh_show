@@ -125,7 +125,6 @@ export function App() {
   const menuItems = [
     { key: "codex", label: "图鉴", icon: "📖", onClick: () => setCodexOpen(true) },
     { key: "rank", label: "排行榜", icon: "🏆", onClick: () => setRankingOpen(true) },
-    { key: "shop", label: "商店", icon: "🏪", onClick: () => setShopOpen(true) },
     { key: "friends", label: "好友", icon: "👥", onClick: () => setFriendsOpen(true),
       hint: friendRoster.users?.filter(item => item.status === "incoming").length ? "有待处理" : undefined },
     { key: "weather", label: "天气 / 农场", icon: "🌤️", onClick: () => setFarmOpen(true) },
@@ -159,12 +158,9 @@ export function App() {
             <CoinIcon />
             <b>{coins.toLocaleString("zh-CN")}</b>
           </div>
-          <button className="icon-btn labeled" onClick={() => setFarmOpen(true)} aria-label="打开农场">
-            <LandIcon />
-            <span>农场</span>
-          </button>
-          <button className="icon-btn solid hud-compact-hide" onClick={() => setShopOpen(true)} aria-label="打开商店">
+          <button className="icon-btn labeled" onClick={() => setShopOpen(true)} aria-label="打开商店">
             <ShopIcon />
+            <span>商店</span>
           </button>
           {!away && <HudMenu items={menuItems}>
             <div className="hud-menu-actions"><ActionTrigger /></div>
@@ -179,6 +175,9 @@ export function App() {
           <WeatherBadge onOpen={() => setFarmOpen(true)} />
           <ControlGuide />
           <ActionTrigger />
+          <button type="button" className="ranch-trigger farm-trigger" aria-label="打开农场" onClick={() => setFarmOpen(true)}>
+            <LandIcon /><b>农场</b>
+          </button>
           <RanchTrigger onClick={() => setRanchOpen(true)} />
           <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
         </>}
