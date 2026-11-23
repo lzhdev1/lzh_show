@@ -319,7 +319,7 @@ export class Player {
       motion.jumpPhase = (frame - 32) / 216;
       motion.jumpWeight = THREE.MathUtils.smoothstep(t, 0, 0.11)
         * (1 - THREE.MathUtils.smoothstep(t, landing + 0.14, end));
-      this.jumpHeight = 4 * 0.42 * air * (1 - air);
+      this.jumpHeight = 4 * 0.72 * air * (1 - air);
       if (t >= end) this.jumpTime = -1;
     }
     const support = THREE.MathUtils.lerp(surface.floorY, surface.waterY, motion.swimming);

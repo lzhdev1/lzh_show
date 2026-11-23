@@ -5,7 +5,7 @@ import { BOOST_CARDS, BAITS, baitById } from "../game/items";
 import { isReady } from "../game/growth";
 import { useFishing } from "../game/fishing";
 import { useGame } from "../game/state";
-import { farmInput } from "../game/input";
+import { farmInput, setSprintEnabled } from "../game/input";
 import { unlockFishingAudio } from "../scene/fishingAudio";
 import { ItemIcon, CloseIcon } from "./icons";
 import "./mobile-controls.css";
@@ -51,8 +51,7 @@ export function MobileControls() {
 
   useEffect(() => () => {
     if (itemTimer.current !== null) window.clearTimeout(itemTimer.current);
-    farmInput.sprint = false;
-    farmInput.running = false;
+    setSprintEnabled(false);
     farmInput.brake = false;
   }, []);
 

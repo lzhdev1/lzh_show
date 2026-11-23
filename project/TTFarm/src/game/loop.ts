@@ -101,7 +101,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   view.scene.add(player.root);
   // 本地验收专用：允许控制台把角色瞬移到菌圃，线上域名不会挂这个入口。
   if (typeof location !== "undefined" && /^(127\.0\.0\.\d+|localhost)$/.test(location.hostname)) {
-    (window as Window & { __ttfarmTeleport?: (x: number, z: number) => void }).__ttfarmTeleport = (x, z) => player.relocate(x, z, 0);
+    (window as Window & {
+      __ttfarmTeleport?: (x: number, z: number) => void;
+    }).__ttfarmTeleport = (x, z) => player.relocate(x, z, 0);
   }
   const fishingScene = createFishingScene(player);
   view.scene.add(fishingScene.group);
@@ -491,7 +493,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
           jumping: false, swimming: false, action: null, actionTime: 0, mount: null });
       }
     } else {
-      player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running);
+      player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running || farmInput.sprint);
       // 城市场景交互：售货大厅柜台、汽车店室内、便利店室内
       {
         const px = player.root.position.x, pz = player.root.position.z;

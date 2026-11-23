@@ -215,9 +215,89 @@ function hostSurface(kind: HostKind, seed: number) {
   return 0.08;
 }
 
+function moundProfile(t: number) {
+  // smoothstep 两端切线归零：坡脚平缓接地面，坡顶是圆丘而不是被削平的平台。
+  const s = 1 - t * t * (3 - 2 * t);
+  return Math.pow(s, 0.8);
+}
+
+/** 石头也用一体起伏的岩块，不用方盒/圆柱拼出“平板”。 */
+function createRockGeometry(seed: number) {
+  const geometry = new THREE.IcosahedronGeometry(1, 1);
+  const position = geometry.attributes.position;
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+    const n = 1
+      + Math.sin(x * 2.6 + seed * 3.7) * 0.13
+      + Math.sin(y * 3.2 - seed * 2.1) * 0.10
+      + Math.sin(z * 2.9 + seed * 5.3) * 0.09;
+    position.setXYZ(i, x * n, y * (y < 0 ? 0.42 : 0.72) * n, z * n);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createMoundGeometry(radius: number, height: number, seed: number) {
+  const rings = 9;
+  const segments = 22;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+  const color = new THREE.Color();
+  const grassDeep = new THREE.Color("#88a05f");
+  const grassMid = new THREE.Color("#a3b671");
+  const grassDry = new THREE.Color("#c4c783");
+  const soil = new THREE.Color("#9b815c");
+  const stretch = 0.84 + (Math.sin(seed * 4.1) + 1) * 0.08;
+  for (let ring = 0; ring <= rings; ring++) {
+    const t = ring / rings;
+    const profile = moundProfile(t);
+    for (let segment = 0; segment < segments; segment++) {
+      const theta = segment / segments * Math.PI * 2;
+      const rim = 1 + t * (
+        Math.sin(theta * 3 + seed * 2.7) * 0.085
+        + Math.sin(theta * 5 - seed * 1.9) * 0.052
+        + Math.sin(theta * 8 + seed * 4.3) * 0.028
+      );
+      const r = radius * t * rim * (t === rings ? 1.08 : 1);
+      // 低频肩部起伏 + 细碎坡面起伏：轮廓不是旋转体，坡面也有凹有脊。
+      const shoulder = Math.sin(theta * 4 + seed * 3.1) * Math.sin(t * Math.PI) * 0.09;
+      const ripple = Math.sin(theta * 7 - seed * 1.3) * Math.sin(t * Math.PI) * 0.028;
+      const y = Math.max(0, height * (profile + shoulder * profile + ripple))
+        + (t === rings ? -0.015 : 0);
+      const bx = Math.cos(theta) * r * (1 + Math.sin(theta * 2 + seed) * 0.055);
+      const bz = Math.sin(theta) * r * stretch;
+      positions.push(bx, y, bz);
+      const patch = Math.sin(theta * 5 + seed * 5.2) * 0.5 + 0.5;
+      const bare = profile > 0.4 && patch > 0.78 ? (profile - 0.4) * 0.42 : 0;
+      const soilAmount = Math.min(0.42, bare);
+      color.copy(grassDeep).lerp(grassMid, 0.34 + patch * 0.55);
+      color.lerp(grassDry, profile * 0.42);
+      color.lerp(soil, soilAmount);
+      colors.push(color.r, color.g, color.b);
+    }
+  }
+  for (let ring = 0; ring < rings; ring++) {
+    for (let segment = 0; segment < segments; segment++) {
+      const next = (segment + 1) % segments;
+      const a = ring * segments + segment;
+      const b = ring * segments + next;
+      const c = (ring + 1) * segments + segment;
+      const d = (ring + 1) * segments + next;
+      indices.push(a, c, d, a, d, b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
-  const matGreen = new THREE.MeshStandardMaterial({ color: "#6d9254", roughness: 0.98 });
-  const matGreenLight = new THREE.MeshStandardMaterial({ color: "#7ca461", roughness: 0.98 });
+  const matGrassBlade = new THREE.MeshStandardMaterial({ color: "#5f8142", roughness: 0.96 });
+  const moundMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98, flatShading: true });
   const stone = new THREE.MeshStandardMaterial({ color: "#a9a798", roughness: 0.95, flatShading: true });
   const stoneWarm = new THREE.MeshStandardMaterial({ color: "#b9ab91", roughness: 0.95, flatShading: true });
   const rnd = randomSource(0x6f756e67);
@@ -234,48 +314,42 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
       const p = new THREE.Vector3(x, 0, z);
 
       if (kind === "mound") {
-        const h = 0.7 + rnd() * 1.25;
-        const mound = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), rnd() > 0.5 ? matGreen : matGreenLight);
-        mound.scale.y = h / radius;
+        const h = Math.min(1.7, 0.45 + radius * 0.24 + rnd() * 0.16);
+        const seed = rnd() * 100;
+        const mound = new THREE.Mesh(createMoundGeometry(radius, h, seed), moundMaterial);
         mound.position.copy(p);
         mound.rotation.y = rnd() * 6.28;
         mound.castShadow = true;
         mound.receiveShadow = true;
         group.add(mound);
         // 土丘没有单独的地面高度采样，碰撞圈按视觉半径收口，
-        // 只留最外圈薄边可踩，避免玩家走进穹顶后腰部以下埋进土里。
-        obstacles.addCircle(x, z, radius * 0.96);
-        for (let i = 0; i < 6; i++) {
-          const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.18 + rnd() * 0.12, 4), matGreenLight);
+        // 只留最外圈薄边可踩，避免玩家走进坡面后腰部以下埋进土里。
+        obstacles.addCircle(x, z, radius * 0.99);
+        for (let i = 0; i < 11; i++) {
+          const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.3 + rnd() * 0.22, 5), matGrassBlade);
           const a = rnd() * 6.28;
-          const d = radius * (0.45 + rnd() * 0.5);
-          tuft.position.set(x + Math.cos(a) * d, (h * (1 - 0.7 * (d / radius) ** 2)) * 0.4, z + Math.sin(a) * d);
+          const t = 0.3 + rnd() * 0.58;
+          const d = radius * t;
+          tuft.position.set(x + Math.cos(a) * d, h * moundProfile(t) + 0.02, z + Math.sin(a) * d);
+          tuft.rotation.set(Math.sin(a) * 0.18, rnd() * 6.28, Math.cos(a) * 0.4);
           group.add(tuft);
         }
       } else {
-        const scale = 0.28 + rnd() * 0.62;
-        const variant = Math.floor(rnd() * 6);
-        let geo: THREE.BufferGeometry;
-        if (variant === 0) geo = new THREE.DodecahedronGeometry(scale, 0);
-        else if (variant === 1) geo = new THREE.OctahedronGeometry(scale, 0);
-        else if (variant === 2) geo = new THREE.IcosahedronGeometry(scale, 1);
-        else if (variant === 3) geo = new THREE.CylinderGeometry(scale * 0.9, scale, scale * 0.55, 7);
-        else if (variant === 4) geo = new THREE.BoxGeometry(scale * 1.7, scale * 0.45, scale);
-        else geo = new THREE.SphereGeometry(scale, 7, 4);
-        const rock = new THREE.Mesh(geo, rnd() > 0.45 ? stone : stoneWarm);
-        rock.position.set(x, scale * (0.35 + rnd() * 0.15), z);
-        rock.scale.set(1.1 + rnd() * 0.4, 0.68 + rnd() * 0.35, 0.9 + rnd() * 0.4);
-        rock.rotation.set(rnd() * 0.2, rnd() * 6.28, rnd() * 0.2);
+        const scale = 0.3 + rnd() * 0.66;
+        const rock = new THREE.Mesh(createRockGeometry(rnd() * 100), rnd() > 0.45 ? stone : stoneWarm);
+        rock.position.set(x, scale * (0.24 + rnd() * 0.1), z);
+        rock.scale.set(scale * (1.15 + rnd() * 0.4), scale * (0.72 + rnd() * 0.3), scale * (0.9 + rnd() * 0.4));
+        rock.rotation.set(rnd() * 0.1, rnd() * 6.28, rnd() * 0.1);
         rock.castShadow = true;
         rock.receiveShadow = true;
         group.add(rock);
-        obstacles.addCircle(x, z, scale * 0.55);
+        obstacles.addCircle(x, z, scale * 0.58);
       }
       return;
     }
   };
 
-  for (let i = 0; i < 34; i++) place(2.2 + rnd() * 5.4, "mound");
+  for (let i = 0; i < 34; i++) place(1.5 + rnd() * 2.3, "mound");
   for (let i = 0; i < 46; i++) place(0.3 + rnd() * 0.55, "rock");
 }
 
