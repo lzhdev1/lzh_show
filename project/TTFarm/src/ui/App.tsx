@@ -11,7 +11,8 @@ import { PlotAction } from "./PlotAction";
 import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
 import { farmInput, releaseTouchInput } from "../game/input";
-import { ControlGuide, ReturnToLoginButton, TouchControls, WeatherBadge } from "./FieldControls";
+import { useDrive } from "../game/drive";
+import { ControlGuide, DriveTouchControls, ReturnToLoginButton, TouchControls, WeatherBadge } from "./FieldControls";
 import { ActionTrigger } from "./ActionPanel";
 import { HudMenu } from "./HudMenu";
 import { FarmPanel } from "./FarmPanel";
@@ -71,6 +72,7 @@ export function App() {
 
   const avatarId = useGame((s) => s.avatarId);
   const coins = useGame((s) => s.coins);
+  const driving = useDrive((s) => s.driving);
   const xp = useGame((s) => s.xp);
   const seeds = useGame((s) => s.seeds);
   const selectedSeed = useGame((s) => s.selectedSeed);
@@ -184,7 +186,7 @@ export function App() {
       </div>
       {selectedPlot === null && !panelOpen && <>
         <FarmGuests/>
-        <TouchControls />
+        {driving ? <DriveTouchControls/> : <TouchControls/>}
         <PlotAction onOpenShop={() => setShopOpen(true)} />
         <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
         <ForageHUD />

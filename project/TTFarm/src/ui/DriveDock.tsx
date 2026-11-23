@@ -59,7 +59,8 @@ export function DriveDock() {
               })}
             </ul>
           )}
-          <p className="drive-tip">W/S 油门刹车 · A/D 转向 · 空格手刹 · Shift 加速</p>
+          <p className="drive-tip desktop-guide">W/S 油门刹车 · A/D 转向 · 空格手刹 · Shift 加速</p>
+          <p className="drive-tip touch-guide">左侧前进 / 后退 · 右侧左转 / 右转</p>
         </section>
       )}
       <button type="button" className="drive-toggle" aria-expanded={open} onClick={() => setOpen(v => !v)}>

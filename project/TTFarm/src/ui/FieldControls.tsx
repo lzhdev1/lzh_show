@@ -54,7 +54,7 @@ export function ControlGuide() {
     <button type="button" className="guide-trigger" aria-label="操作说明" aria-expanded={open} onClick={() => setOpen(!open)}>?</button>
     {open && <div className="guide-copy">
       <p className="desktop-guide"><b>移动</b> WASD / 方向键<br/><b>奔跑</b> 按住 Shift　<b>跳跃</b> 空格<br/><b>镜头</b> 左键或右键拖动，Q / E 左右转，滚轮缩放</p>
-      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆，推到外圈奔跑<br/><b>跳跃</b> 点右侧跳跃键<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
+      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆，推到外圈奔跑<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
       <p><b>种菜</b> 点选下方种子，走到菜地上点「撒种」。生长时可浇水，作物上方出成熟标志后，走到那块地上点「收获」。</p>
       <p><b>采野菜</b> 野外每 10 分钟长出一批野菜丛，走近点「采摘」获得野菜，还有机会捡到种子种回农场。「农场 → 野外野菜」可以带路。</p>
       <p><b>动作</b> J 出拳　K 踢腿　C 欢呼　X 跳舞　Z 坐下　V 躺下　B 晕倒，也可以点左上角「动作」按钮；移动或跳跃会取消动作。</p>
@@ -75,6 +75,79 @@ export function ControlGuide() {
       </div>
       <p><a href={`${import.meta.env.BASE_URL}credits/animals.html`} target="_blank" rel="noopener noreferrer">动物模型署名与许可</a></p>
     </div>}
+  </div>;
+}
+
+export function DriveTouchControls() {
+  type DriveKey = "forward" | "back" | "left" | "right";
+  const held = useRef(new Map<number, DriveKey>());
+  const [active, setActive] = useState<DriveKey[]>([]);
+
+  const sync = () => {
+    const keys = [...held.current.values()];
+    let forward = 0;
+    let steer = 0;
+    for (const key of keys) {
+      if (key === "forward") forward += 1;
+      else if (key === "back") forward -= 1;
+      else if (key === "right") steer += 1;
+      else if (key === "left") steer -= 1;
+    }
+    farmInput.forward = Math.max(-1, Math.min(1, forward));
+    farmInput.x = Math.max(-1, Math.min(1, steer));
+    farmInput.running = false;
+    setActive(keys);
+  };
+
+  useEffect(() => {
+    const reset = () => {
+      held.current.clear();
+      farmInput.forward = 0;
+      farmInput.x = 0;
+      farmInput.running = false;
+    };
+    window.addEventListener("blur", reset);
+    document.addEventListener("visibilitychange", reset);
+    return () => {
+      window.removeEventListener("blur", reset);
+      document.removeEventListener("visibilitychange", reset);
+      reset();
+    };
+  }, []);
+
+  const press = (key: DriveKey) => (e: PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 || held.current.has(e.pointerId)) return;
+    e.preventDefault();
+    held.current.set(e.pointerId, key);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    sync();
+  };
+
+  const release = (e: PointerEvent<HTMLButtonElement>) => {
+    if (!held.current.delete(e.pointerId)) return;
+    sync();
+  };
+
+  const key = (id: DriveKey, arrow: string, label: string) => (
+    <button type="button" className={`drive-key${active.includes(id) ? " held" : ""}`}
+      aria-label={label} aria-pressed={active.includes(id)}
+      onPointerDown={press(id)} onPointerUp={release}
+      onPointerCancel={release} onLostPointerCapture={release}
+      onContextMenu={(e) => e.preventDefault()}>
+      <span className="drive-key-arrow" aria-hidden="true">{arrow}</span>
+      <span>{label}</span>
+    </button>
+  );
+
+  return <div className="drive-touch-controls" role="group" aria-label="车辆触屏按键">
+    <div className="drive-pad drive-pad-throttle">
+      {key("forward", "▲", "前进")}
+      {key("back", "▼", "后退")}
+    </div>
+    <div className="drive-pad drive-pad-steer">
+      {key("left", "◀", "左转")}
+      {key("right", "▶", "右转")}
+    </div>
   </div>;
 }
 
