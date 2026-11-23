@@ -2,6 +2,7 @@ import { FORAGE_PATCH_COUNT } from "../game/forage";
 import { WILD_CLEARINGS } from "../game/ranch";
 import { FENCE_X, FENCE_Z, RIVER_BED, ROAD_HALF_WIDTH, WORLD_HALF, onBridge, riverInfo, roadInfo } from "./layout";
 import { onRanchReserve } from "./ranchLayout";
+import { inHallParkingGround } from "./salesHallLayout";
 
 /**
  * 野菜菜丛的锚点表：只有一处事实源，forageScene 与调试脚本共用。
@@ -42,6 +43,7 @@ function anchorSpotOk(x: number, z: number) {
   if (riverInfo(x, z).dist < RIVER_BED.shoulder + 3.2) return false;
   if (onBridge(x, z, 3)) return false;
   if (roadInfo(x, z) < ROAD_HALF_WIDTH + 1.6) return false;
+  if (inHallParkingGround(x, z)) return false;
   if (WILD_CLEARINGS.some(([wx, wz]) => Math.hypot(x - wx, z - wz) < 8)) return false;
   return true;
 }

@@ -12,7 +12,7 @@ import type { FarmDecor } from "../game/decor";
 import { WorldObstacles } from "./obstacles";
 import { onRanchReserve } from "./ranchLayout";
 import { inTown } from "./town/townLayout";
-import { inSalesHallGround } from "./salesHallLayout";
+import { inHallParkingGround, inSalesHallGround } from "./salesHallLayout";
 import { PALETTE, clay } from "./materials";
 import {
   BRIDGE,
@@ -530,6 +530,8 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
     if (inTown(x, z)) return true;
     // 河岸售货大厅与门口硬化区也不许长树
     if (inSalesHallGround(x, z)) return true;
+    // 大厅旁停车场、入口与短步道同样留空
+    if (inHallParkingGround(x, z)) return true;
     return false;
   };
 

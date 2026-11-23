@@ -47,5 +47,47 @@ export const SHOPPER_ROUTE = [
   { x: 21.6, z: 13.0 },
 ] as const;
 
-/** 送货车在售货大厅北门外的停车位 */
-export const HALL_PARKING = { x: 24.2, z: 19.6 } as const;
+/** 送货车在售货大厅北侧停车场里的固定车位（第 3 个车位中心） */
+export const HALL_PARKING = { x: 14.1, z: 24.1, yaw: -Math.PI / 2 } as const;
+
+/**
+ * 售货大厅停车场：农场北围栏外、大厅西北侧。
+ * 入口在东侧，车道沿南边一条，五个车位一律车头朝北停放。
+ */
+export const HALL_PARKING_LOT = {
+  x0: 6.8, x1: 21.3,
+  z0: 18.2, z1: 26.4,
+  /** 东侧入口硬化带 */
+  apronX1: 23.1,
+  apronZ0: 18.3,
+  apronZ1: 22.2,
+  /** 大厅北门到停车场的短接步道 */
+  pathX0: 18.0,
+  pathX1: 23.2,
+  pathZ0: 17.0,
+  pathZ1: 19.0,
+} as const;
+
+export const HALL_PARKING_BAYS = {
+  x0: 7.6,
+  width: 2.6,
+  count: 5,
+  z0: 22.0,
+  depth: 4.2,
+} as const;
+
+/** 停车场及其入口，树木/石头/野草都不许落进来 */
+export function inHallParkingGround(x: number, z: number): boolean {
+  return x >= HALL_PARKING_LOT.x0 - 2.4 && x <= HALL_PARKING_LOT.apronX1 + 1.6 &&
+    z >= HALL_PARKING_LOT.pathZ0 - 1.2 && z <= HALL_PARKING_LOT.z1 + 1.8;
+}
+
+/** 停车场地面比草地略高，走上去要抬脚 */
+export function hallParkingHeight(x: number, z: number): number {
+  if (x >= HALL_PARKING_LOT.x0 && x <= HALL_PARKING_LOT.apronX1 &&
+      z >= HALL_PARKING_LOT.z0 && z <= HALL_PARKING_LOT.z1) return 0.065;
+  if (x >= HALL_PARKING_LOT.pathX0 && x <= HALL_PARKING_LOT.pathX1 &&
+      z >= HALL_PARKING_LOT.pathZ0 && z <= HALL_PARKING_LOT.pathZ1) return 0.04;
+  return 0;
+}
+

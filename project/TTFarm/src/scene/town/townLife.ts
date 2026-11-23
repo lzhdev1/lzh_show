@@ -242,8 +242,8 @@ const CITY_LOOP: RouteNode[] = [
 ];
 
 /**
- * 唯一会过桥的车：城市主大道 → 水泥桥 → 河岸步道 → 售货大厅北门停车。
- * 到点后停 11 秒再原路返回，不会在农场里乱转。
+ * 唯一会过桥的车：城市主大道 → 水泥桥 → 河岸步道 → 售货大厅北侧停车场。
+ * 从东侧入口拐进车道，倒进第 3 个车位，停 11 秒再原路返回。
  */
 const DELIVERY_ROUTE: RouteNode[] = [
   { x: 52, z: 52 },
@@ -256,8 +256,14 @@ const DELIVERY_ROUTE: RouteNode[] = [
   { x: 16.6, z: 44.0 },
   { x: 16.4, z: 36.0 },
   { x: 17.4, z: 29.0 },
-  { x: 19.4, z: 23.0 },
-  { x: 21.8, z: 20.4 },
+  { x: 19.8, z: 27.4 },
+  { x: 21.2, z: 25.0 },
+  { x: 21.8, z: 22.0 },
+  { x: 21.9, z: 20.6 },
+  { x: 21.0, z: 20.0 },
+  { x: 18.0, z: 19.8 },
+  { x: 15.4, z: 19.9 },
+  { x: HALL_PARKING.x, z: 21.0 },
   { x: HALL_PARKING.x, z: HALL_PARKING.z },
 ];
 
@@ -291,7 +297,8 @@ class RouteCar {
     const point = this.curve.getPointAt(this.t);
     const tangent = this.curve.getTangentAt(this.t);
     this.mesh.position.set(point.x, roadHeightAt(point.x, point.z), point.z);
-    this.mesh.rotation.y = Math.atan2(tangent.x, tangent.z);
+    // 车辆模型局部 +x 是车头，+z 是左侧车门；朝向按车头对准切线换算。
+    this.mesh.rotation.y = Math.atan2(-tangent.z, tangent.x);
   }
   update(dt: number) {
     this.t = (this.t + (this.speed * dt) / this.total) % 1;
@@ -316,7 +323,7 @@ class DeliveryVan {
     const tangent = this.curve.getTangentAt(this.t);
     this.mesh.position.set(point.x, roadHeightAt(point.x, point.z), point.z);
     const forward = this.dir > 0 ? 1 : -1;
-    this.mesh.rotation.y = Math.atan2(tangent.x * forward, tangent.z * forward);
+    this.mesh.rotation.y = Math.atan2(-tangent.z * forward, tangent.x * forward);
   }
   update(dt: number) {
     if (this.pause > 0) {

@@ -11,7 +11,8 @@ import { createForageScene } from "../scene/forageScene";
 import { createTown } from "../scene/town/townScene";
 import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect, inTown } from "../scene/town/townLayout";
 import { createSalesHall } from "../scene/salesHall";
-import { salesHallHeight, inSalesHall, HALL_COUNTER } from "../scene/salesHallLayout";
+import { createHallParking } from "../scene/hallParking";
+import { salesHallHeight, inSalesHall, HALL_COUNTER, hallParkingHeight } from "../scene/salesHallLayout";
 import { useTownInteraction, type TownPlace } from "./townInteraction";
 import { useTownNav } from "./townNav";
 import { useDrive } from "./drive";
@@ -47,6 +48,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   view.scene.add(town.group);
   const salesHall = createSalesHall(world.obstacles);
   view.scene.add(salesHall);
+  const hallParking = createHallParking(world.obstacles);
+  view.scene.add(hallParking);
   const ranchScene = createRanchScene(world.obstacles);
   view.scene.add(ranchScene.group);
 
@@ -77,6 +80,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     // 河岸售货大厅的混凝土台比草地高，进店先抬脚
     const hallH = salesHallHeight(x, z);
     if (hallH > 0) return hallH;
+    // 大厅旁停车场：沥青面略高于草地
+    const parkingH = hallParkingHeight(x, z);
+    if (parkingH > 0) return parkingH;
     // 河东小城的铺装比草地略高，走上去要抬脚
     const townH = townSurfaceHeight(x, z);
     if (townH > 0) return townH;

@@ -39,14 +39,17 @@ export interface CrossDef {
 export const AVENUES: AvenueDef[] = [
   { id: "main", z: 52, x0: 42.6, x1: 140, half: 3.6 },
   { id: "north", z: 110, x0: 46, x1: 140, half: 3.4 },
+  // 城南滨水街：把河对岸原先的空白草坡接进城区
+  { id: "south", z: 19.5, x0: 50, x1: 100, half: 3.2 },
 ];
 export const CROSSES: CrossDef[] = [
-  { id: "central", x: 82, z0: 22, z1: 140, half: 3.6 },
+  // 中央街南延到滨水街，和新街区连成一片
+  { id: "central", x: 82, z0: 10, z1: 140, half: 3.6 },
   { id: "east", x: 126, z0: 22, z1: 140, half: 3.4 },
 ];
 
 export const TOWN = {
-  bounds: { x0: 44, x1: 140, z0: 22, z1: 140 },
+  bounds: { x0: 44, x1: 140, z0: 9, z1: 140 },
   avenue: AVENUES[0],
   cross: CROSSES[0],
   avenues: AVENUES,
@@ -65,6 +68,8 @@ export const WALK = {
   northNorthZ: 114.6,
   eastWestX: 121.4,
   eastEastX: 130.6,
+  southSouthZ: 15.3,
+  southNorthZ: 23.7,
 } as const;
 
 export const ROAD_Y = 0.06;
@@ -121,6 +126,10 @@ export const MIDRISES: TowerDef[] = [
   { id: "mid-east-d", x: 133.5, z: 134, w: 6, d: 6, h: 16, color: 0xcdd3c9, accent: 0x5e756c, face: "-x" },
   { id: "mid-north-w", x: 48, z: 128, w: 6, d: 7, h: 15, color: 0xd6bfa7, accent: 0x8c604b, face: "+x" },
   { id: "mid-north-e", x: 122, z: 131, w: 6, d: 6, h: 15, color: 0xd1c5b3, accent: 0x74695a, face: "-z" },
+  // —— 城南滨水街区：填掉河对岸原先空着的草坡 ——
+  { id: "mid-south-a", x: 62, z: 26.6, w: 6, d: 3.6, h: 13, color: 0xd5c3aa, accent: 0x8b6a52, face: "+z" },
+  { id: "mid-south-b", x: 94, z: 26.6, w: 6, d: 3.6, h: 12, color: 0xcbd1c4, accent: 0x63786d, face: "+z" },
+  { id: "mid-south-c", x: 104, z: 12.3, w: 7, d: 3.8, h: 12, color: 0xd9c2a6, accent: 0x88634c, face: "+z" },
 ];
 
 export const SHOPS: ShopDef[] = [
@@ -162,6 +171,17 @@ export const SHOPS: ShopDef[] = [
   { id: "shop-east-e", name: "东街小铺", x: 134, z: 127, w: 5.5, d: 4, h: 7.0, color: 0xdcc7a2, accent: 0x9a6a3c, face: "-x", kind: "grocery" },
   { id: "shop-north-w", name: "北门花店", x: 48, z: 136, w: 6, d: 4, h: 7.0, color: 0xdccab8, accent: 0xb06a62, face: "+x", kind: "flower" },
   { id: "shop-south-e", name: "南街茶点", x: 118, z: 27, w: 5, d: 4, h: 6.8, color: 0xcdd9b6, accent: 0x5d8a74, face: "-x", kind: "tea" },
+
+  // —— 城南滨水街南侧（面朝 +z，一排临河店面） ——
+  { id: "shop-river-a", name: "河风鱼铺", x: 57, z: 12.3, w: 7, d: 4, h: 7.2, color: 0xc7d7d2, accent: 0x537877, face: "+z", kind: "food" },
+  { id: "shop-river-b", name: "渡口杂货", x: 67, z: 12.3, w: 7, d: 4, h: 7.0, color: 0xdcc7a2, accent: 0x9a6a3c, face: "+z", kind: "grocery" },
+  { id: "shop-river-c", name: "南岸茶摊", x: 75, z: 12.3, w: 5.5, d: 4, h: 6.9, color: 0xcdd9b6, accent: 0x5d8a74, face: "+z", kind: "tea" },
+  { id: "shop-river-d", name: "滨水花房", x: 90, z: 12.3, w: 7, d: 4, h: 7.3, color: 0xdccab8, accent: 0xb06a62, face: "+z", kind: "flower" },
+
+  // —— 西岸临河一排小铺：从售货大厅望向对岸时把河岸线填满 ——
+  { id: "shop-riverfront-a", name: "河岸茶棚", x: 46, z: 24.5, w: 5, d: 2.6, h: 5.8, color: 0xcdd9b6, accent: 0x5d8a74, face: "-x", kind: "tea" },
+  { id: "shop-riverfront-b", name: "渡口小卖", x: 46, z: 30, w: 5, d: 2.6, h: 6.0, color: 0xdcc7a2, accent: 0x9a6a3c, face: "-x", kind: "grocery" },
+  { id: "shop-riverfront-c", name: "柳岸花摊", x: 46, z: 36, w: 5, d: 2.6, h: 5.7, color: 0xdccab8, accent: 0xb06a62, face: "-x", kind: "flower" },
 ];
 
 export const POCKET_PARK = { x: 115.5, z: 70, radius: 4.2 } as const;
@@ -191,11 +211,17 @@ export const PLAZAS: Array<{ x0: number; x1: number; z0: number; z1: number }> =
   { x0: 130.6, x1: 140, z0: 22, z1: 46.4 },
   { x0: 130.6, x1: 140, z0: 57.6, z1: 104.4 },
   { x0: 130.6, x1: 140, z0: 115, z1: 140 },
+  // 城南滨水街两侧：南侧临河店面铺地，北侧接旧城南缘
+  { x0: 54, x1: 78, z0: 10.4, z1: 14.3 },
+  { x0: 86, x1: 100, z0: 10.4, z1: 14.3 },
+  { x0: 100.4, x1: 110, z0: 10.4, z1: 14.3 },
+  { x0: 50, x1: 76, z0: 23.7, z1: 28.5 },
+  { x0: 86, x1: 100, z0: 23.7, z1: 28.5 },
 ];
 
 /** 街区外沿与城镇边界：树木/石头/草丛的排除区 */
 export function inTown(x: number, z: number): boolean {
-  if (x >= 44 && x <= 141 && z >= 21 && z <= 141) return true;
+  if (x >= 44 && x <= 141 && z >= 9 && z <= 141) return true;
   // 主大道向西接桥的一小段
   if (x >= 42 && x <= 142 && z >= 47.4 && z <= 56.6) return true;
   return false;

@@ -37,7 +37,7 @@ export interface WildAnimal extends RanchAnimal { slot: number }
 export interface RanchState { level: number; animals: RanchAnimal[]; ridingId: string | null }
 
 export const RANCH_MAX_LEVEL = 10;
-export const WILD_CLEARINGS = [[2,20],[-1,25],[12,22],[-24,9],[-11,-21],[15,-23],[-33,34],
+export const WILD_CLEARINGS = [[2,20],[-1,25],[13,33],[-24,9],[-11,-21],[15,-23],[-33,34],
   [-62,72],[-38,-31],[4,47],[1,-54],[-59,16]] as const;
 export const MOUNT_UNLOCK_LEVEL = 3;
 export const HORSE_SPEED_FACTOR = 3;
