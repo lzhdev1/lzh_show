@@ -1149,7 +1149,7 @@ button {
   .chat-compose input { font-size: 16px; }
 }
 
-/* 手机端：驾驶与发言移到顶部第二行，农场 / 牧场留在左端；商店从菜单提回顶栏 */
+/* 手机端：驾驶与发言移到顶部第二行，农场 / 牧场 / 商店留在左端 */
 @media (max-width: 820px) {
   .chat-dock {
     top: calc(75px + env(safe-area-inset-top));
@@ -1233,7 +1233,7 @@ button {
     flex-direction: column;
     position: fixed;
     z-index: 56;
-    top: calc(66px + env(safe-area-inset-top));
+    top: calc(128px + env(safe-area-inset-top));
     right: max(10px, env(safe-area-inset-right));
     width: min(330px, calc(100vw - 20px));
     max-height: min(72vh, 560px);
@@ -1305,6 +1305,19 @@ button {
   .hud-menu-extra .action-menu,
   .hud-menu-extra .control-guide { justify-self: stretch; }
   .hud-menu-extra .ranch-trigger { width: 100%; justify-content: center; }
+}
+
+/* 菜单从顶部第二行下方展开，避免压住农场 / 牧场 / 商店 / 驾驶 / 发言 */
+@media (max-width: 560px) {
+  .hud-menu {
+    top: calc(112px + env(safe-area-inset-top));
+    width: calc(100vw - 18px);
+    max-height: min(66vh, 500px);
+  }
+}
+
+@media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
+  .hud-menu { top: calc(116px + env(safe-area-inset-top)); max-height: min(58vh, 320px); }
 }
 
 @keyframes menu-pop {

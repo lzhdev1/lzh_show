@@ -158,10 +158,6 @@ export function App() {
             <CoinIcon />
             <b>{coins.toLocaleString("zh-CN")}</b>
           </div>
-          <button className="icon-btn labeled" onClick={() => setShopOpen(true)} aria-label="打开商店">
-            <ShopIcon />
-            <span>商店</span>
-          </button>
           {!away && <HudMenu items={menuItems}>
             <div className="hud-menu-actions"><ActionTrigger /></div>
             <ControlGuide />
@@ -179,6 +175,9 @@ export function App() {
             <LandIcon /><b>农场</b>
           </button>
           <RanchTrigger onClick={() => setRanchOpen(true)} />
+          <button type="button" className="ranch-trigger shop-trigger" aria-label="打开商店" onClick={() => setShopOpen(true)}>
+            <ShopIcon /><b>商店</b>
+          </button>
           <FriendsTrigger count={friendRoster.users?.filter(item => item.status === "incoming").length ?? 0} onClick={() => setFriendsOpen(true)}/>
         </>}
         <ReturnToLoginButton />

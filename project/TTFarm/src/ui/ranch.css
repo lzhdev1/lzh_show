@@ -21,6 +21,12 @@
   color: #355c39;
   font-weight: 700;
 }
+.shop-trigger {
+  background: #fff4df;
+  border-color: #d9c6a0;
+  color: #6b5430;
+  font-weight: 700;
+}
 .riding-action {
   position: fixed;
   top: calc(128px + env(safe-area-inset-top));

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export interface HudMenuItem {
   key: string;
@@ -9,8 +10,9 @@ export interface HudMenuItem {
 }
 
 /**
- * 移动端功能抽屉：主层留农场 / 牧场 / 人物信息，商店放进顶栏，
+ * 移动端功能抽屉：主层留农场 / 牧场 / 商店 / 人物信息，
  * 图鉴、排行、好友、动作、天气、操作说明与返回登录都收进这里。
+ * 抽屉用 portal 挂到 body，避免被顶栏的 fixed 层叠上下文压住。
  */
 export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -29,7 +31,7 @@ export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: 
       </svg>
       <span>菜单</span>
     </button>
-    {open && <>
+    {open && createPortal(<>
       <div className="hud-menu-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
       <nav className="hud-menu" aria-label="功能菜单">
         <div className="hud-menu-head">
@@ -46,6 +48,6 @@ export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: 
         </div>
         {children && <div className="hud-menu-extra">{children}</div>}
       </nav>
-    </>}
+    </>, document.body)}
   </>;
 }
