@@ -1,24 +1,84 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useClock } from "../game/clock";
 import { CROP_LIST, harvestLots, produceName, CROPS, type CropId } from "../game/crops";
 import { useFieldInteraction } from "../game/fieldInteraction";
 import { formatRemain, isReady, MAX_WATER, remainingMs } from "../game/growth";
-import { animalName, baitCount, isMountAnimal, ranchCapacity } from "../game/ranch";
+import { animalName, baitCount, isMountAnimal, ranchCapacity, type AnimalSpecies } from "../game/ranch";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { helpAtFarm, leaveVisit, useSocial, type Visit } from "../game/social";
 import { kickGuest } from "../game/chat";
+import { useAccount } from "../game/account";
 import { useGame } from "../game/state";
 import { ReturnToLoginButton, TouchControls } from "./FieldControls";
 import { ActionTrigger } from "./ActionPanel";
 import { FriendsIcon } from "./FriendsPanel";
 import { HarvestIcon, SowIcon, WateringCanIcon } from "./icons";
 
-export function FarmGuests() {
+interface RoomMember {
+  id: string;
+  nickname: string;
+  isHost: boolean;
+  isSelf: boolean;
+  online: boolean;
+}
+
+/**
+ * 房间成员：房主和来串门的玩家共用同一个入口。
+ * 两人以内直接露名字；超过两人折叠成在线人数，点开才展开名单。
+ */
+export function RoomMembers({ includeSelf = true }: { includeSelf?: boolean }) {
   const players = useSocial(state => state.players);
+  const visit = useSocial(state => state.visit);
+  const user = useAccount(state => state.user);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  useEffect(() => { if (!players.length) setOpen(false); }, [players.length]);
-  if (!players.length) return null;
+  const wrap = useRef<HTMLDivElement>(null);
+  const selfId = includeSelf && user ? String(user.id) : "";
+  const hostId = visit?.ownerId ?? selfId;
+  const hostName = visit?.ownerName ?? (includeSelf ? user?.nickname ?? "" : "");
+
+  const members = useMemo(() => {
+    const map = new Map<string, RoomMember>();
+    if (hostId) {
+      map.set(hostId, {
+        id: hostId, nickname: hostName || "房主",
+        isHost: true, isSelf: hostId === selfId,
+        online: hostId === selfId || players.some(player => String(player.id) === hostId),
+      });
+    }
+    if (selfId && user && !map.has(selfId)) {
+      map.set(selfId, {
+        id: selfId, nickname: user.nickname,
+        isHost: selfId === hostId, isSelf: true, online: true,
+      });
+    }
+    for (const player of players) {
+      const id = String(player.id);
+      if (map.has(id)) continue;
+      map.set(id, { id, nickname: player.nickname, isHost: id === hostId, isSelf: id === selfId, online: true });
+    }
+    const order = (member: RoomMember) => member.isHost ? 0 : member.isSelf ? 1 : 2;
+    return [...map.values()].sort((a, b) => order(a) - order(b) || a.nickname.localeCompare(b.nickname, "zh-CN"));
+  }, [players, hostId, hostName, selfId, user]);
+
+  useEffect(() => { setOpen(false); }, [visit?.ownerId]);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [open]);
+
+  if (!members.length) return null;
+  const online = members.filter(member => member.online).length;
+  const compact = members.length > 2;
+  const label = (member: RoomMember) => member.isHost && member.isSelf ? "房主（我）"
+    : member.isHost ? `房主·${member.nickname}` : member.isSelf ? "我" : member.nickname;
+  const summary = compact && !open ? `在线 ${online} 人` : members.map(label).join("、");
+  const canKick = !visit;
+
   const kick = async (id: string, nickname: string) => {
     if (busy) return;
     setBusy(id);
@@ -29,17 +89,24 @@ export function FarmGuests() {
       useGame.getState().notify(error instanceof Error ? error.message : "请离失败，稍后再试", "warn");
     } finally { setBusy(null); }
   };
-  return <div className="farm-guests-wrap">
-    <button type="button" className="farm-guests" aria-expanded={open}
-      aria-label="查看在场访客" onClick={() => setOpen(value => !value)}>
-      <FriendsIcon/><span>正在串门 · {players.map(player => player.nickname).join("、")}</span>
+
+  return <div className="room-members" ref={wrap} data-count={members.length}>
+    <button type="button" className="room-member-trigger" aria-expanded={open} aria-haspopup="menu"
+      aria-label={`房间成员，在线 ${online} 人`} onClick={() => setOpen(value => !value)}>
+      <FriendsIcon/><span className="room-member-summary">{summary}</span>
     </button>
-    {open && <div className="farm-guest-list" role="menu" aria-label="在场访客">
-      {players.map(player => <div key={player.id} className="farm-guest-row">
-        <span>{player.nickname}</span>
-        <button type="button" disabled={busy === player.id} onClick={() => void kick(player.id, player.nickname)}>
-          {busy === player.id ? "处理中…" : "请离"}
-        </button>
+    {open && <div className="room-member-list" role="menu" aria-label="房间成员">
+      <div className="room-member-head">
+        <b>房间成员</b><small>在线 {online} / {members.length} 人</small>
+      </div>
+      {members.map(member => <div key={member.id} className="room-member-row">
+        <span className={`room-member-dot${member.online ? "" : " off"}`} aria-hidden="true"/>
+        <span className="room-member-name">{member.nickname}</span>
+        {(member.isHost || member.isSelf) && <em>{member.isHost && member.isSelf ? "房主 · 我"
+          : member.isHost ? "房主" : "我"}</em>}
+        {!member.online && <em className="off">离线</em>}
+        {canKick && !member.isHost && !member.isSelf && <button type="button" disabled={busy === member.id}
+          onClick={() => void kick(member.id, member.nickname)}>{busy === member.id ? "处理中…" : "请离"}</button>}
       </div>)}
     </div>}
   </div>;
@@ -108,40 +175,87 @@ export function GuestAction({ visit }: { visit: Visit }) {
   </div>;
 }
 
-/** 好友房间身份：贴在头像下方，只显示房主农场与协作状态，不再占一整条顶栏。 */
 export function FriendVisitInfo({ visit }: { visit: Visit }) {
-  const guestNames = useSocial(state => state.players.map(player => player.nickname).join("、"));
   return <div className="friend-visit-info">
     <span className="friend-visit-icon" aria-hidden="true"><FriendsIcon/></span>
     <div className="friend-visit-text">
       <strong>{visit.ownerName}的农场</strong>
-      <small>{visit.canManage ? "协作串门 · 消耗与收获都记在房主账上" : "自由游玩 · 未获协作授权"}
-        {guestNames ? ` · 同场 ${guestNames}` : ""}
-      </small>
+      <small>{visit.canManage ? "协作串门 · 消耗与收获都记在房主账上" : "自由游玩 · 未获协作授权"}</small>
     </div>
+  </div>;
+}
+
+const MOUNT_EMOJI: Partial<Record<AnimalSpecies, string>> = {
+  horse: "🐴", wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼",
+};
+
+/**
+ * 串门坐骑：先列出自己牧场里已拥有的可骑动物，玩家选一只才骑上去。
+ * 正在骑乘时同样先打开列表，由玩家选择换乘或下坐骑。
+ */
+function MountPicker({ variant }: { variant: "friend" | "visit" }) {
+  const onFoot = useSocial(state => state.visitOnFoot);
+  const ranch = useGame(state => state.ranch);
+  const mounts = useMemo(() => ranch.animals.filter(isMountAnimal), [ranch.animals]);
+  const mount = mounts.find(animal => animal.id === ranch.ridingId);
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [open]);
+
+  useEffect(() => { if (mounts.length === 0) setOpen(false); }, [mounts.length]);
+
+  const ride = (id: string) => {
+    if (!useGame.getState().setRiding(id)) return;
+    useSocial.setState({ visitOnFoot: false });
+    setOpen(false);
+  };
+  const dismount = () => {
+    useSocial.setState({ visitOnFoot: true });
+    setOpen(false);
+  };
+  const toggle = () => {
+    if (!mounts.length) {
+      useGame.getState().notify("牧场还没有可骑的动物：收服野马，或让狼、熊、虎、狮子、大象、熊猫带上五行变异", "warn");
+      return;
+    }
+    setOpen(value => !value);
+  };
+  const label = !onFoot && mount ? `下坐骑 · ${animalName(mount)}` : mounts.length ? `选择坐骑 · ${mounts.length}只` : "召唤坐骑";
+
+  return <div className={`mount-picker mount-picker-${variant}`} ref={wrap}>
+    <button type="button" className={`${variant === "friend" ? "friend-visit-ride" : "visit-ride"}${mounts.length ? "" : " empty"}`}
+      onClick={toggle} aria-haspopup="menu" aria-expanded={open}
+      title={mounts.length ? "点击选择要骑的坐骑" : "还没有可骑的动物"}>
+      {label}
+    </button>
+    {open && <div className="mount-picker-menu" role="menu" aria-label="我的坐骑">
+      <div className="mount-picker-head"><b>我的坐骑</b><small>{mounts.length} 只</small></div>
+      {mounts.map(animal => <button key={animal.id} type="button" role="menuitem"
+        className={`mount-picker-item${animal.id === ranch.ridingId && !onFoot ? " active" : ""}`}
+        onClick={() => ride(animal.id)}>
+        <span className="mount-picker-icon" aria-hidden="true">{MOUNT_EMOJI[animal.species] ?? "🐾"}</span>
+        <span className="mount-picker-copy">
+          <strong>{animalName(animal)}</strong>
+          <small>{animal.element ? "五行变异坐骑" : "牧场坐骑"}</small>
+        </span>
+        {animal.id === ranch.ridingId && !onFoot && <em>骑乘中</em>}
+      </button>)}
+      {!onFoot && <button type="button" className="mount-picker-dismount" onClick={dismount}>下坐骑</button>}
+    </div>}
   </div>;
 }
 
 /** 坐骑按钮：挂在发言按钮正下方，和好友条拆开。 */
 export function FriendMountButton() {
-  const onFoot = useSocial(state => state.visitOnFoot);
-  const ranch = useGame(state => state.ranch);
-  const mount = ranch.animals.find(animal => animal.id === ranch.ridingId);
-  const rideReady = mount ?? ranch.animals.find(isMountAnimal);
-  const toggleRide = () => {
-    if (!onFoot) { useSocial.setState({ visitOnFoot: true }); return; }
-    if (!rideReady) {
-      useGame.getState().notify("牧场还没有可骑的动物：收服野马，或让狼、熊、虎、狮子、大象、熊猫带上五行变异", "warn");
-      return;
-    }
-    if (!mount && !useGame.getState().setRiding(rideReady.id)) return;
-    useSocial.setState({ visitOnFoot: false });
-  };
-  return <button type="button" className={`friend-mount-top friend-visit-ride${rideReady ? "" : " empty"}`} onClick={toggleRide}
-    title={rideReady ? animalName(rideReady) : "还没有可骑的动物"}
-    aria-label={onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : "下坐骑"}>
-    {onFoot ? (rideReady ? `骑 ${animalName(rideReady)}` : "召唤坐骑") : `下坐骑 · ${animalName(mount!)}`}
-  </button>;
+  return <MountPicker variant="friend"/>;
 }
 
 /** 回家按钮：紧挨功能菜单左侧。 */
@@ -160,21 +274,6 @@ export function FriendVisitOverlay({ visit }: { visit: Visit }) {
 
 export function VisitHUD({ visit }: { visit: Visit }) {
   const reconnecting = useSocial(state => state.reconnecting);
-  const onFoot = useSocial(state => state.visitOnFoot);
-  const ranch = useGame(state => state.ranch);
-  const mount = ranch.animals.find(animal => animal.id === ranch.ridingId);
-  // 没有正在骑的动物时，也允许从坐骑栏里挑一只——串门时不必回自己牧场先上马。
-  const rideReady = mount ?? ranch.animals.find(isMountAnimal);
-  const toggleRide = () => {
-    if (!onFoot) { useSocial.setState({ visitOnFoot: true }); return; }
-    if (!rideReady) {
-      useGame.getState().notify("牧场还没有可骑的动物：收服野马，或让狼、熊、虎、狮子、大象、熊猫带上五行变异", "warn");
-      return;
-    }
-    if (!mount && !useGame.getState().setRiding(rideReady.id)) return;
-    useSocial.setState({ visitOnFoot: false });
-  };
-  const guestNames = useSocial(state => state.players.map(player => player.nickname).join("、"));
   const spectator = visit.mode === "spectate";
   const focus = (area: "farm" | "ranch") => window.dispatchEvent(new CustomEvent("ttfarm:visit-focus", { detail: area }));
   return <div className="visit-hud">
@@ -184,6 +283,7 @@ export function VisitHUD({ visit }: { visit: Visit }) {
         <small>{spectator ? "排行榜参观 · 自由镜头" : visit.canManage ? "好友串门 · 已获协作授权" : "好友串门 · 自由游玩"}</small>
       </div></div>
       <div className="visit-exits">
+        <RoomMembers includeSelf={false}/>
         <button className="visit-return" onClick={leaveVisit}>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8.6 10 2l8 6.6M4.5 7.7v9.6h11V7.7M8 17v-5h4v5"/></svg>回家
         </button>
@@ -196,14 +296,9 @@ export function VisitHUD({ visit }: { visit: Visit }) {
       <small className="desktop-guide">拖动环绕 · WASD 平移 · 滚轮缩放</small>
       <small className="touch-guide">滑动环绕 · 摇杆平移 · 双指缩放</small>
     </nav> : <>
-      {guestNames && <div className="visit-company">同场 · {guestNames}</div>}
       <div className="visit-tools">
         <ActionTrigger/>
-        <button className={`visit-ride${rideReady ? "" : " empty"}`} onClick={toggleRide}
-          title={rideReady ? animalName(rideReady) : "还没有可骑的动物"}
-          aria-label={onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : "下坐骑"}>
-          {onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : `下坐骑 · ${animalName(mount!)}`}
-        </button>
+        <MountPicker variant="visit"/>
       </div>
       {visit.canManage && !reconnecting && <GuestAction visit={visit}/>}
     </>}

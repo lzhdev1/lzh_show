@@ -8,12 +8,11 @@ import { HarvestIcon, SowIcon, WateringCanIcon } from "./icons";
 
 const actions = {
   sow: { label: "撒种", Icon: SowIcon },
-  shop: { label: "买种子", Icon: SowIcon },
   water: { label: "浇水", Icon: WateringCanIcon },
   harvest: { label: "收获", Icon: HarvestIcon },
 };
 
-export function PlotAction({ onOpenShop }: { onOpenShop: () => void }) {
+export function PlotAction() {
   const standingPlot = useFieldInteraction((s) => s.standingPlot);
   const plot = useGame((s) => standingPlot === null ? undefined : s.plots[standingPlot]);
   const selectedSeed = useGame((s) => s.selectedSeed);
@@ -30,9 +29,9 @@ export function PlotAction({ onOpenShop }: { onOpenShop: () => void }) {
   let detail: string;
   let description: string;
   if (!plot.crop) {
-    action = seedCount > 0 ? "sow" : "shop";
+    action = "sow";
     detail = seedCount > 0 ? `${CROPS[selectedSeed].name} ×${seedCount}` : `${CROPS[selectedSeed].name}已用完`;
-    description = detail;
+    description = seedCount > 0 ? detail : `${detail}，请先到商店购买种子`;
   } else {
     action = ready ? "harvest" : "water";
     const crop = CROPS[plot.crop];
@@ -68,10 +67,15 @@ export function PlotAction({ onOpenShop }: { onOpenShop: () => void }) {
         if (game.plots[plot.id] !== plot || ready !== isReady(plot, Date.now())) return;
         if (!plot.crop && game.selectedSeed !== selectedSeed) return;
         switch (action) {
-          case "sow": game.plant(plot.id); break;
+          case "sow":
+            if (seedCount <= 0) {
+              game.notify("请先到商店购买种子", "warn");
+              break;
+            }
+            game.plant(plot.id);
+            break;
           case "water": game.water(plot.id); break;
           case "harvest": game.harvestPlot(plot.id); break;
-          case "shop": onOpenShop(); break;
         }
       }}>
       <span className="plot-action-icon"><Icon size={29} /></span>

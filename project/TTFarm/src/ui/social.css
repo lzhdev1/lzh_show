@@ -204,19 +204,102 @@
   white-space: nowrap;
 }
 /* 坐骑按钮挂在发言正下方，跟随聊天坞定位，不另占顶栏一行。 */
-.friend-mount-top {
+.mount-picker {
+  position: relative;
+  z-index: 15;
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  pointer-events: auto;
+}
+.mount-picker-friend {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  max-width: min(170px, 46vw);
-  min-height: 36px;
-  padding: 0 10px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  pointer-events: auto;
+  width: max-content;
+  max-width: min(180px, 46vw);
 }
-.chat-dock.open .friend-mount-top { display: none; }
+.chat-dock.open .mount-picker-friend { display: none; }
+.mount-picker-friend .friend-visit-ride { max-width: 100%; }
+.mount-picker-visit { width: 100%; }
+.mount-picker-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 30;
+  width: min(232px, calc(100vw - 20px));
+  max-height: min(46vh, 340px);
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #d7ccb0;
+  border-radius: 14px;
+  background: #fff9edf7;
+  box-shadow: 0 8px 22px #34432b30;
+}
+.mount-picker-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid #e7dfcc;
+  color: #3d513b;
+}
+.mount-picker-head b { font-size: 13px; }
+.mount-picker-head small { color: #6a715d; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.mount-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f8f2e3;
+  color: #3d513b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mount-picker-item:hover { background: #f2ead7; }
+.mount-picker-item.active { border-color: #9bb07e; background: #edf3df; }
+.mount-picker-icon {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  background: #e9efd9;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.mount-picker-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.mount-picker-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.mount-picker-copy small { color: #6a715d; font-size: 10px; }
+.mount-picker-item em {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #dfead0;
+  color: #4d6b3d;
+  font-style: normal;
+  font-size: 10px;
+}
+.mount-picker-dismount {
+  min-height: 38px;
+  margin-top: 2px;
+  border: 1px solid #d8cfb6;
+  border-radius: 9px;
+  background: #fffaf0;
+  color: #66583f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
 .friend-visit-reconnect {
   position: fixed;
   top: calc(112px + env(safe-area-inset-top));
@@ -241,51 +324,89 @@
 }
 .visit-return { flex-shrink: 0; min-height: 44px; padding: 0 13px; font-weight: 700; cursor: pointer; }
 .visit-exits { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.visit-company, .visit-connection, .farm-guests {
-  position: fixed;
-  left: max(16px, env(safe-area-inset-left));
-  top: calc(75px + env(safe-area-inset-top));
-  padding: 5px 10px;
-  max-width: min(85vw, 360px);
-  border-radius: 12px;
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* 房间成员：房主与访客共用右上角入口，两人内露名字，超过两人折叠成在线人数。 */
+.room-members {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 20;
+  pointer-events: auto;
 }
-.farm-guests { top: calc(79px + env(safe-area-inset-top)); left: auto; right: max(16px, env(safe-area-inset-right)); }
-/* 在场访客：点开名单才能请离，默认只露一行名字 */
-.farm-guests-wrap {
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right));
-  top: calc(79px + env(safe-area-inset-top));
-  z-index: 14;
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-}
-.farm-guests-wrap .farm-guests { position: static; top: auto; left: auto; right: auto; cursor: pointer; }
-.farm-guest-list {
-  display: grid;
-  gap: 4px;
-  min-width: 176px;
-  padding: 8px;
+.room-member-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 11px;
   border: 1px solid #d7ccb0;
   border-radius: 14px;
   background: #fff9edf5;
-  box-shadow: 0 6px 18px #34432b26;
+  box-shadow: 0 3px 14px #34432b24;
+  color: #3d513b;
+  font: inherit;
+  cursor: pointer;
 }
-.farm-guest-row {
+.room-member-trigger[aria-expanded="true"] { background: #fff4dc; border-color: #c8b78d; }
+.room-member-trigger svg { flex-shrink: 0; }
+.room-member-summary {
+  max-width: min(170px, 22vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+}
+.room-member-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: min(238px, calc(100vw - 20px));
+  max-height: min(46vh, 330px);
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #d7ccb0;
+  border-radius: 14px;
+  background: #fff9edf7;
+  box-shadow: 0 8px 22px #34432b30;
+}
+.room-member-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 6px;
+  border-bottom: 1px solid #e7dfcc;
+}
+.room-member-head b { font-size: 13px; }
+.room-member-head small { color: #6a715d; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.room-member-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12.5px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 2px 4px;
   color: #3d513b;
+  font-size: 12.5px;
 }
-.farm-guest-row button {
-  min-height: 36px;
-  padding: 0 10px;
+.room-member-dot { width: 8px; height: 8px; border-radius: 50%; background: #6d9b58; flex-shrink: 0; }
+.room-member-dot.off { background: #b7b0a0; }
+.room-member-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-member-row em {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f1e8d2;
+  color: #7b7058;
+  font-style: normal;
+  font-size: 10px;
+}
+.room-member-row em.off { background: #f7e5dd; color: #8a4a33; }
+.room-member-row button {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 0 9px;
   border: 1px solid #d9b7a6;
   border-radius: 9px;
   background: #f7e5dd;
@@ -293,14 +414,9 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
-} 
-.farm-guest-row button:disabled { opacity: 0.6; cursor: default; }
-.farm-guests span { overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 561px) and (max-width: 840px) {
-  .farm-guests { top: calc(128px + env(safe-area-inset-top)); }
 }
+.room-member-row button:disabled { opacity: .6; cursor: default; }
 .visit-connection { margin: 0; z-index: 1; }
-.visit-company { max-width: min(360px, calc(100vw - 134px)); }
 .visit-ride {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
@@ -354,14 +470,16 @@
 .hud[data-input="touch"] .friend-actions button { min-height: 44px; }
 @media (max-width: 560px) {
   .visit-header { inset: calc(8px + env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) auto max(9px, env(safe-area-inset-left)); }
-  .visit-company, .visit-connection { top: calc(67px + env(safe-area-inset-top)); left: 9px; }
+  .visit-connection { top: calc(67px + env(safe-area-inset-top)); left: 9px; }
   .visit-ride { top: calc(60px + env(safe-area-inset-top)); right: max(9px, env(safe-area-inset-right)); }
   .visit-tools { top: calc(116px + env(safe-area-inset-top)); right: max(9px, env(safe-area-inset-right)); gap: 6px; }
   .visit-tools .visit-ride { max-width: 54vw; padding: 0 10px; font-size: 13px; }
   .visit-tools .action-pop { width: min(210px, 62vw); }
-  .farm-guests { top: calc(112px + env(safe-area-inset-top)); right: 9px; max-width: 50vw; }
-  .farm-guests-wrap { top: calc(112px + env(safe-area-inset-top)); right: 9px; }
-  .farm-guests-wrap .farm-guests { max-width: 62vw; }
+  .room-member-trigger { min-height: 40px; padding: 0 8px; gap: 4px; border-radius: 12px; }
+  .room-member-summary { max-width: 92px; font-size: 11px; }
+  .room-member-list { width: min(232px, calc(100vw - 16px)); }
+  .mount-picker-friend { max-width: min(156px, 46vw); }
+  .mount-picker-menu { width: min(222px, calc(100vw - 18px)); max-height: min(44vh, 300px); }
   .hud[data-input="touch"] .visit-nav { right: max(12px, env(safe-area-inset-right)); left: auto; transform: none; }
   .visit-nav small { font-size: 10px; }
   .friend-search input { font-size: 16px; }

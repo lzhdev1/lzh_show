@@ -23,7 +23,7 @@ import { SpecialVarietyBanner } from "./SpecialVarietyBanner";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
-import { FarmGuests, FriendHomeButton, FriendMountButton, FriendVisitInfo, FriendVisitOverlay, VisitHUD } from "./VisitHUD";
+import { FriendHomeButton, FriendMountButton, FriendVisitInfo, FriendVisitOverlay, RoomMembers, VisitHUD } from "./VisitHUD";
 import { ChatDock } from "./ChatDock";
 import { MarketPanel } from "./MarketPanel";
 import { CarStorePanel } from "./CarStorePanel";
@@ -190,6 +190,7 @@ export function App() {
           <button className="bag-trigger" onClick={() => setBackpackOpen(true)} aria-label="打开背包">
             <BagIcon /><span>背包</span>
           </button>
+          <RoomMembers/>
           <ChatDock belowChat={visit ? <FriendMountButton/> : undefined} />
           {visit && <FriendHomeButton/>}
           {!away && <HudMenu items={menuItems} force={visiting}>
@@ -202,11 +203,10 @@ export function App() {
       {visit && <FriendVisitOverlay visit={visit}/>}
 
       {selectedPlot === null && !panelOpen && <>
-        {!visit && <FarmGuests/>}
         {driving ? <DriveTouchControls/> : <TouchControls/>}
         {!driving && <FishingDock />}
         {!driving && <MobileControls />}
-        {!visit && <PlotAction onOpenShop={() => setShopOpen(true)} />}
+        {!visit && <PlotAction />}
         {!visit && <RanchHUD onOpenRanch={() => setRanchOpen(true)} />}
         <ForageHUD />
         <MushroomHUD />
