@@ -460,7 +460,7 @@ function buildRiver(obstacles: WorldObstacles) {
     if (isRock) {
       const rock = buildRock(0.7 + (placed % 4) * 0.12);
       rock.position.set(x, y, z);
-      obstacles.addCircle(x, z, rock.scale.x * 0.40, "terrain");
+      obstacles.addCircle(x, z, rock.scale.x * 0.40, "terrain", y + (rock.userData.landTop as number));
       group.add(rock);
     } else {
       const tuft = buildGrassTuft();
@@ -496,7 +496,7 @@ function buildRiver(obstacles: WorldObstacles) {
     }
     const rock = buildRock(1.12);
     rock.position.set(x,RIVER_BED.waterY-.06,z);
-    obstacles.addCircle(x, z, rock.scale.x * 0.40, "terrain");
+    obstacles.addCircle(x, z, rock.scale.x * 0.40, undefined, RIVER_BED.waterY-.06 + (rock.userData.landTop as number));
     shallows.add(rock);
   }
   const bankDetail = bakeScenery(shallows);
@@ -766,9 +766,9 @@ export function createWorld(initialDecor?: FarmDecor): World {
   barn.rotation.y = FARM_BARN.yaw;
   obstacles.addBox(barn.position.x, barn.position.z, 1.75, 1.55, barn.rotation.y);
   const hay = barn.localToWorld(new THREE.Vector3(-2.05, 0, 0.6));
-  obstacles.addBox(hay.x, hay.z, 0.25, 0.34, barn.rotation.y);
+  obstacles.addBox(hay.x, hay.z, 0.25, 0.34, barn.rotation.y, undefined, 0.63);
   const barrel = barn.localToWorld(new THREE.Vector3(1.95, 0, 0.8));
-  obstacles.addCircle(barrel.x, barrel.z, 0.28);
+  obstacles.addCircle(barrel.x, barrel.z, 0.28, undefined, 0.56);
   const barnMesh = bakeScenery(barn);
   barnMesh.material = withSnow(barnMesh.material.clone(), snowCover);
   barnMesh.name = "farm-barn";
@@ -816,6 +816,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
   pathRocks.forEach(([x, z, s]) => {
     const rock = buildRock(s);
     rock.position.set(x, 0, z);
+    obstacles.addCircle(x, z, rock.scale.x * 0.45, undefined, rock.userData.landTop as number);
     group.add(rock);
   });
 
@@ -858,7 +859,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
     const rock = buildRock(s);
     rock.position.x = x;
     rock.position.z = z;
-    obstacles.addCircle(x, z, 0.40 * rock.scale.x);
+    obstacles.addCircle(x, z, 0.40 * rock.scale.x, undefined, rock.userData.landTop as number);
     group.add(rock);
   });
 

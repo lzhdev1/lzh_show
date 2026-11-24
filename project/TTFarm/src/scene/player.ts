@@ -269,7 +269,8 @@ export class Player {
       if (this.target || (strength > 0 && this.swimAmount >= 0.5)) dir.normalize();
       else dir.set(Math.sin(this.facing), 0, Math.cos(this.facing));
       this.position.addScaledVector(dir, Math.min(distanceLeft, speedForStep * dt));
-      this.obstacles.move(this.previous, this.position, this.onDeck ? "deck" : "terrain");
+      // 脚底已经高过某个低矮物体顶面时，水平移动可以越过它。
+      this.obstacles.move(this.previous, this.position, this.onDeck ? "deck" : "terrain", this.root.position.y);
       this.onDeck = advanceBridge(this.previous.x, this.previous.z, this.position, this.onDeck);
     }
     const distance = this.position.distanceTo(this.previous);
@@ -310,7 +311,9 @@ export class Player {
 
     // Capture frames 32–108 gather and extend, 108–178 are airborne,
     // then 178–248 absorb impact and recover. The parabola starts at toe-off.
+    const jumpFootBefore = this.root.position.y;
     if (this.jumpTime >= 0) {
+      const previousJumpHeight = this.jumpHeight;
       this.jumpTime += dt;
       const prepare = 0.24, flight = 0.58, settle = 0.40;
       const t = this.jumpTime, landing = prepare + flight, end = landing + settle;
@@ -322,10 +325,30 @@ export class Player {
       motion.jumpWeight = THREE.MathUtils.smoothstep(t, 0, 0.11)
         * (1 - THREE.MathUtils.smoothstep(t, landing + 0.14, end));
       this.jumpHeight = 4 * Player.JUMP_HEIGHT * air * (1 - air);
+      // 下落时若脚下正好穿过某个可落脚顶面，就落在它上面，而不是继续穿过去。
+      const platformTop = this.obstacles.platformTopAt(
+        this.position.x, this.position.z, jumpFootBefore + 0.02);
+      const descending = this.jumpHeight < previousJumpHeight - 1e-5;
+      const newFootY = this.groundY + this.jumpHeight;
+      if (descending && platformTop !== undefined && platformTop > surface.floorY + 0.02 &&
+          jumpFootBefore >= platformTop - 0.02 && newFootY <= platformTop + 0.02) {
+        this.groundY = platformTop;
+        this.cameraFloorY = Math.max(platformTop, surface.waterY);
+        this.jumpHeight = 0;
+        this.jumpTime = -1;
+        motion.jumpWeight = 0;
+      }
       if (t >= end) this.jumpTime = -1;
     }
-    const support = THREE.MathUtils.lerp(surface.floorY, surface.waterY, motion.swimming);
+    // 站在平台顶面时持续跟随它；跳跃中保持起跳基座不塌回地面。
+    const platformTop = this.jumpTime < 0
+      ? this.obstacles.platformTopAt(this.position.x, this.position.z, this.root.position.y + 0.10)
+      : undefined;
+    const support = this.jumpTime >= 0
+      ? this.groundY
+      : THREE.MathUtils.lerp(Math.max(surface.floorY, platformTop ?? -Infinity), surface.waterY, motion.swimming);
     this.groundY = THREE.MathUtils.damp(this.groundY, support, 16, dt);
+    this.cameraFloorY = Math.max(this.cameraFloorY, platformTop ?? -Infinity);
     // 动作状态机：移动输入、跳跃、下水、骑乘都会打断；一次性动作播完自动收尾。
     if (this.actionId) {
       if (strength > 0 || this.jumpTime >= 0 || motion.swimming > 0.35 || riding) this.actionId = null;

@@ -575,6 +575,8 @@ export function buildRock(scale: number, variant = Math.floor(between(0, 3))) {
   mesh.scale.set(scale, scale * 0.90, scale * 1.04);
   // 底边负偏移已经烘进几何体，这里不再额外加高度，避免叠加后埋得过深。
   mesh.position.y = 0;
+  // 记录可落脚顶面（相对模型原点），供碰撞层判断能不能跳上去。
+  mesh.userData.landTop = 0.575 * mesh.scale.y;
   mesh.rotation.y = variant * 1.7 + between(0, Math.PI);
   return mesh;
 }

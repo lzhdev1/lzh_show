@@ -7,6 +7,8 @@ type Point = { x: number; z: number };
 type Edge = Point & { nx: number; nz: number; length: number };
 type Footprint = {
   x: number; z: number; radius: number; edges?: Edge[]; layer?: CollisionLayer;
+  /** 可落脚顶面高度。只有不高于它时才会参与碰撞；为空表示整根实心障碍。 */
+  top?: number;
   xmin: number; xmax: number; zmin: number; zmax: number; stamp: number;
 };
 type Hit = { time: number; nx: number; nz: number };
@@ -82,12 +84,12 @@ export class WorldObstacles {
       for (let x = bin(shape.xmin); x <= bin(shape.xmax); x++) this.bins[z * BINS + x].push(shape);
   }
 
-  addCircle(x: number, z: number, radius: number, layer?: CollisionLayer) {
+  addCircle(x: number, z: number, radius: number, layer?: CollisionLayer, top?: number) {
     const r = radius + PLAYER_RADIUS;
-    this.add({x, z, radius: r, layer, xmin: x-r, xmax: x+r, zmin: z-r, zmax: z+r, stamp: 0});
+    this.add({x, z, radius: r, layer, top, xmin: x-r, xmax: x+r, zmin: z-r, zmax: z+r, stamp: 0});
   }
 
-  private addPolygon(points: Point[], layer?: CollisionLayer) {
+  private addPolygon(points: Point[], layer?: CollisionLayer, top?: number) {
     if (points.length < 3) return;
     let xmin = Infinity, xmax = -Infinity, zmin = Infinity, zmax = -Infinity;
     const edges: Edge[] = [];
@@ -99,16 +101,16 @@ export class WorldObstacles {
       xmin = Math.min(xmin, a.x); xmax = Math.max(xmax, a.x);
       zmin = Math.min(zmin, a.z); zmax = Math.max(zmax, a.z);
     }
-    const shape = {x: 0, z: 0, radius: 0, edges, layer, xmin: xmin - PLAYER_RADIUS,
+    const shape = {x: 0, z: 0, radius: 0, edges, layer, top, xmin: xmin - PLAYER_RADIUS,
       xmax: xmax + PLAYER_RADIUS, zmin: zmin - PLAYER_RADIUS, zmax: zmax + PLAYER_RADIUS, stamp: 0};
     this.add(shape);
     return shape;
   }
 
-  addBox(x: number, z: number, halfX: number, halfZ: number, yaw = 0, layer?: CollisionLayer) {
+  addBox(x: number, z: number, halfX: number, halfZ: number, yaw = 0, layer?: CollisionLayer, top?: number) {
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     const shape = this.addPolygon([[-halfX,-halfZ],[halfX,-halfZ],[halfX,halfZ],[-halfX,halfZ]].map(([u,v]) =>
-      ({x: x + cos*u + sin*v, z: z - sin*u + cos*v})), layer);
+      ({x: x + cos*u + sin*v, z: z - sin*u + cos*v})), layer, top);
     return () => {
       if (!shape) return;
       for (let row = bin(shape.zmin); row <= bin(shape.zmax); row++) {
@@ -163,24 +165,38 @@ export class WorldObstacles {
     return false;
   }
 
-  private blocked(x: number, z: number, layer: CollisionLayer) {
-    return this.visit(x, x, z, z, layer, shape => overlaps(shape, x, z));
+  private blocked(x: number, z: number, layer: CollisionLayer, clearY = 0) {
+    return this.visit(x, x, z, z, layer, shape =>
+      !(shape.top !== undefined && clearY >= shape.top - 0.02) && overlaps(shape, x, z));
   }
 
-  private trace(x: number, z: number, dx: number, dz: number, layer: CollisionLayer) {
+  private trace(x: number, z: number, dx: number, dz: number, layer: CollisionLayer, clearY = 0) {
     const hit = this.hit;
     hit.time = 1;
     this.visit(Math.min(x,x+dx), Math.max(x,x+dx), Math.min(z,z+dz), Math.max(z,z+dz), layer, shape => {
+      // 脚底已高过这个物体的顶面：本次水平位移可以直接越过它。
+      if (shape.top !== undefined && clearY >= shape.top - 0.02) return false;
       sweep(shape, x, z, dx, dz, hit);
       return hit.time === 0;
     });
     return hit;
   }
 
-  canWalk(a: Point, b: Point, layer: CollisionLayer = "terrain") {
+  canWalk(a: Point, b: Point, layer: CollisionLayer = "terrain", clearY = 0) {
     if (Math.abs(b.x) > WORLD_HALF || Math.abs(b.z) > WORLD_HALF ||
-        this.blocked(a.x,a.z,layer) || this.blocked(b.x,b.z,layer)) return false;
-    return this.trace(a.x, a.z, b.x-a.x, b.z-a.z, layer).time === 1;
+        this.blocked(a.x,a.z,layer,clearY) || this.blocked(b.x,b.z,layer,clearY)) return false;
+    return this.trace(a.x, a.z, b.x-a.x, b.z-a.z, layer, clearY).time === 1;
+  }
+
+  /** 玩家脚下最高的可落脚顶面；maxTop 用来避免吸到头顶上方的高台。 */
+  platformTopAt(x: number, z: number, maxTop: number): number | undefined {
+    let best: number | undefined;
+    this.visit(x, x, z, z, "terrain", shape => {
+      if (shape.top === undefined || shape.top > maxTop + 0.02 || !overlaps(shape, x, z)) return false;
+      if (best === undefined || shape.top > best) best = shape.top;
+      return false;
+    });
+    return best;
   }
 
   /**
@@ -199,13 +215,13 @@ export class WorldObstacles {
 
   /** Mutates only desired.x/z. The unused displacement slides along the contact;
    * subsequent sweeps stop a slide at a second wall or at a concave corner. */
-  move(from: Point, desired: Point, layer: CollisionLayer = "terrain") {
+  move(from: Point, desired: Point, layer: CollisionLayer = "terrain", clearY = 0) {
     let x = from.x, z = from.z;
     let dx = clamp(desired.x) - x, dz = clamp(desired.z) - z;
     for (let pass = 0; pass < 4; pass++) {
       const length = Math.hypot(dx,dz);
       if (length < 1e-8) break;
-      const hit = this.trace(x, z, dx, dz, layer);
+      const hit = this.trace(x, z, dx, dz, layer, clearY);
       if (hit.time === 1) { x += dx; z += dz; break; }
       const advance = Math.max(0, hit.time - SKIN / length);
       x += dx * advance; z += dz * advance;

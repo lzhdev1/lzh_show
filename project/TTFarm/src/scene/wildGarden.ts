@@ -92,9 +92,14 @@ function blockedForWild(x: number, z: number, pad = 2) {
 }
 
 function addHostObstacle(host: Host, obstacles: WorldObstacles) {
-  if (host.kind === "log") obstacles.addCircle(host.position.x, host.position.z, 0.55);
-  else if (host.kind === "stump") obstacles.addCircle(host.position.x, host.position.z, 0.42);
-  else if (host.kind === "trunk") obstacles.addCircle(host.position.x, host.position.z, 0.32);
+  if (host.kind === "log") {
+    // 横卧朽木顶面约两倍半径；低于跳跃高度，可以作为落脚台。
+    const top = 2 * (0.22 + host.seed * 0.08) - 0.03;
+    obstacles.addCircle(host.position.x, host.position.z, 0.55, undefined, top);
+  } else if (host.kind === "stump") {
+    const top = 0.55 + host.seed * 0.18 - 0.03;
+    obstacles.addCircle(host.position.x, host.position.z, 0.42, undefined, top);
+  } else if (host.kind === "trunk") obstacles.addCircle(host.position.x, host.position.z, 0.32);
 }
 
 function barkMaterial(color: string) {
@@ -410,7 +415,7 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group): Moun
         rock.position.set(x, 0, z);
         rock.rotation.set(rnd() * 0.08, rnd() * 6.28, rnd() * 0.08);
         group.add(rock);
-        obstacles.addCircle(x, z, scale * 0.58);
+        obstacles.addCircle(x, z, scale * 0.58, undefined, rock.userData.landTop as number);
       }
       return;
     }
