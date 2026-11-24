@@ -1,5 +1,5 @@
 import { MathUtils, Vector3 } from "three";
-import { BRIDGE, FENCE_X, FENCE_Z, RIVER_BED, bridgeHeightAt, riverBedHeight, riverInfo } from "../scene/layout";
+import { BRIDGE, RIVER_BED, bridgeHeightAt, riverBedHeight, riverInfo } from "../scene/layout";
 import { PLAYER_RADIUS } from "../scene/obstacles";
 
 const toe = BRIDGE.halfLength + BRIDGE.rampLength;
@@ -83,8 +83,9 @@ export function advanceBridge(fromX: number, fromZ: number, desired: Vector3, wa
 export function sampleTravelSurface(x: number, z: number, onDeck: boolean, fieldHeightAt: (x: number, z: number) => number) {
   const waterY = RIVER_BED.waterY;
   const deck = onDeck ? bridgeHeightAt(x, z) : undefined;
-  // The terraced farm is entirely on dry ground.
-  const inFarm = Math.abs(x) <= FENCE_X && Math.abs(z) <= FENCE_Z;
-  const floorY = deck ?? (inFarm ? fieldHeightAt(x, z) : riverBedHeight(riverInfo(x, z).dist));
+  // 干地优先用 fieldHeightAt：农场台地、城外土丘、大厅台阶都靠它抬脚；
+  // 只有它没有正高度时才退回河床，避免把水面也抬到 0。
+  const dryY = fieldHeightAt(x, z);
+  const floorY = deck ?? (dryY > 0 ? dryY : riverBedHeight(riverInfo(x, z).dist));
   return { floorY, waterY, depth: Math.max(0, waterY - floorY) };
 }

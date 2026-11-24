@@ -94,6 +94,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     // 河东小城的铺装比草地略高，走上去要抬脚
     const townH = townSurfaceHeight(x, z);
     if (townH > 0) return townH;
+    // 野外土丘是可走地形：脚底跟随丘坡高度，而不是被旧碰撞圈挡在外面
+    const moundH = wildGarden.heightAt(x, z);
+    if (moundH !== null) return moundH;
     return 0;
   };
   // 车轮不能只踩地形：桥面和两端坡道是独立于 fieldHeightAt 的抬升面。

@@ -626,11 +626,13 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
   templates.forEach((tree, index) => {
     group.add(instanceTiles(tree.geometry, tree.material, treeBeds[index], 70, true));
   });
-  const rock = buildRock(1);
-  rock.geometry.scale(1,0.72,1.05);
-  rock.geometry.translate(0,0.14,0);
+  const rockTemplate = buildRock(1);
+  // 必须克隆：草甸石头要压扁，若直接改 rockGeometry 的缓存几何，
+  // 会把同变体的野生石头、路边石头一起抬高 14cm，整批变成悬浮石。
+  const meadowRock = rockTemplate.geometry.clone();
+  meadowRock.scale(1, 0.72, 1.05);
   group.add(
-    instanceTiles(rock.geometry, rock.material, rocks, 80, false),
+    instanceTiles(meadowRock, rockTemplate.material, rocks, 80, false),
     instanceTiles(grassTuftGeometry(), grassTuftMaterial(), tufts, 40, false),
     instanceTiles(flowerGeometry(PALETTE.flowerPink), flowerMaterial(), pinkFlowers, 40, false),
     instanceTiles(flowerGeometry(PALETTE.flowerYellow), flowerMaterial(), yellowFlowers, 40, false),
@@ -801,7 +803,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
     const edge = i%4<2 ? -.83 : .87;
     const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(.12+(i%3)*.039),clay([0xc4b494,0xa79b82,0xb8ab92][i%3]));
     rock.scale.set(1.25,.26,.73); rock.rotation.y = i*.71;
-    rock.position.set(p.x+edge+.21*Math.sin(i*2.3),.035,p.z+.23*Math.cos(i*4.31));
+    rock.position.set(p.x+edge+.21*Math.sin(i*2.3),-0.015,p.z+.23*Math.cos(i*4.31));
     trail.add(rock);
   }
   group.add(bakeScenery(trail));

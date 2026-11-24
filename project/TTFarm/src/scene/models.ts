@@ -497,6 +497,9 @@ const rockMat = new THREE.MeshStandardMaterial({
 });
 
 const rockGeoCache = new Map<number, THREE.BufferGeometry>();
+/** 石头底部统一埋入地面的深度；几何体本身带这个负偏移，
+ * 这样调用方即使 position.y=0 也不会把石头重新抬到地表上当悬浮物。 */
+const ROCK_SINK = 0.045;
 
 /** 硬边岩块：低模二十面体被“劈”出几组斜面，再按面刷上冷灰、暖灰和苔藓。
  * 关键不是面数，而是每个三角面都保留自己的法线，轮廓才有石头该有的棱角。 */
@@ -529,6 +532,11 @@ export function rockGeometry(variant = 0): THREE.BufferGeometry {
   geo.translate(0, -box.min.y, 0);
   geo.scale(0.36, 0.62 / height, 0.40);
   geo.computeVertexNormals();
+  // 统一把几何底边压到地下 4.5cm；几何自身带负底，
+  // 任何调用点把 y 归零都不会重新制造悬空。
+  geo.computeBoundingBox();
+  geo.translate(0, -geo.boundingBox!.min.y - ROCK_SINK, 0);
+  geo.computeBoundingBox();
 
   const colors = new Float32Array(pos.count * 3);
   const light = new THREE.Color(0xd9d3c4);
@@ -565,7 +573,8 @@ export function rockGeometry(variant = 0): THREE.BufferGeometry {
 export function buildRock(scale: number, variant = Math.floor(between(0, 3))) {
   const mesh = addShadow(new THREE.Mesh(rockGeometry(variant), rockMat));
   mesh.scale.set(scale, scale * 0.90, scale * 1.04);
-  mesh.position.y = -0.035;
+  // 底边负偏移已经烘进几何体，这里不再额外加高度，避免叠加后埋得过深。
+  mesh.position.y = 0;
   mesh.rotation.y = variant * 1.7 + between(0, Math.PI);
   return mesh;
 }

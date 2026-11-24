@@ -33,6 +33,16 @@ interface Host {
   radius: number;
 }
 
+interface MoundSpec {
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+  seed: number;
+  rotation: number;
+  stretch: number;
+}
+
 interface MushroomActor {
   id: string;
   species: MushroomSpecies;
@@ -354,9 +364,10 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
   return geometry;
 }
 
-function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
+function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group): MoundSpec[] {
   const rnd = randomSource(0x6f756e67);
   const used: Array<[number, number]> = [];
+  const mounds: MoundSpec[] = [];
 
   const place = (radius: number, kind: "mound" | "rock") => {
     for (let attempt = 0; attempt < 90; attempt++) {
@@ -371,15 +382,18 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
       if (kind === "mound") {
         const h = Math.min(1.7, 0.45 + radius * 0.24 + rnd() * 0.16);
         const seed = rnd() * 100;
+        const rotation = rnd() * 6.28;
+        const stretch = 0.84 + (Math.sin(seed * 4.1) + 1) * 0.08;
         const mound = new THREE.Mesh(createMoundGeometry(radius, h, seed), gardenMoundMaterial);
+        mound.name = "wild-mound";
         mound.position.copy(p);
-        mound.rotation.y = rnd() * 6.28;
+        mound.rotation.y = rotation;
         mound.castShadow = true;
         mound.receiveShadow = true;
         group.add(mound);
-        // 土丘没有单独的地面高度采样，碰撞圈按视觉半径收口，
-        // 只留最外圈薄边可踩，避免玩家走进坡面后腰部以下埋进土里。
-        obstacles.addCircle(x, z, radius * 0.99);
+        mounds.push({ x, z, radius, height: h, seed, rotation, stretch });
+        // 土丘本身不再用一圈圆柱碰撞堵死：脚底高度由 heightAt() 采样，
+        // 玩家可以从坡脚走上去，而不是在边缘被空气墙挡住。
         // 坡脚嵌一块小石，坡面再露一块，打破一水的绿色。
         const pebble = buildRock(0.16 + rnd() * 0.12, Math.floor(rnd() * 3));
         const pa = rnd() * 6.28, pt = 0.7 + rnd() * 0.22;
@@ -404,6 +418,7 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
 
   for (let i = 0; i < 34; i++) place(1.5 + rnd() * 2.3, "mound");
   for (let i = 0; i < 46; i++) place(0.3 + rnd() * 0.55, "rock");
+  return mounds;
 }
 
 /** 野外菌圃：灌木、朽木、树桩与树干常驻，雨后一个阶段才长出菌子。 */
@@ -413,7 +428,41 @@ export function createWildGarden(obstacles: WorldObstacles) {
   const hostGroup = new THREE.Group();
   hostGroup.name = "fungi-hosts";
   group.add(hostGroup);
-  buildGardenTerrain(obstacles, group);
+  const mounds = buildGardenTerrain(obstacles, group);
+
+  /** 土丘坡面的近似高度：按几何同源的椭圆半径、边缘起伏和肩部/细碎坡面
+   * 采样，让脚底贴着真实坡面，而不是按光滑旋转体低估半只脚。 */
+  function heightAt(x: number, z: number): number | null {
+    let best: number | null = null;
+    for (const m of mounds) {
+      const dx = x - m.x;
+      const dz = z - m.z;
+      const c = Math.cos(m.rotation);
+      const s = Math.sin(m.rotation);
+      const lx = c * dx - s * dz;
+      const lz = s * dx + c * dz;
+      const theta = Math.atan2(lz / m.stretch, lx);
+      const d = Math.hypot(lx, lz / m.stretch);
+      if (d > m.radius * 1.2) continue;
+      let t = Math.min(1, d / m.radius);
+      // 边缘不是标准圆：几何半径按 theta 起伏，反解 t 才能贴合坡面。
+      for (let i = 0; i < 3; i++) {
+        const rim = 1 + t * (
+          Math.sin(theta * 3 + m.seed * 2.7) * 0.115
+          + Math.sin(theta * 5 - m.seed * 1.9) * 0.072
+          + Math.sin(theta * 8 + m.seed * 4.3) * 0.040
+        );
+        t = Math.min(1, d / (m.radius * rim));
+      }
+      const profile = moundProfile(t);
+      const shoulder = Math.sin(theta * 4 + m.seed * 3.1) * Math.sin(t * Math.PI) * 0.15;
+      const ripple = Math.sin(theta * 7 - m.seed * 1.3) * Math.sin(t * Math.PI) * 0.05;
+      const h = Math.max(0, m.height * (profile + shoulder * profile + ripple)
+        + (t > 0.995 ? -0.05 : 0));
+      if (best === null || h > best) best = h;
+    }
+    return best;
+  }
 
   const hosts: Host[] = [];
   const rnd = randomSource(0x1a2b3c4d);
@@ -421,6 +470,7 @@ export function createWildGarden(obstacles: WorldObstacles) {
     const x = (rnd() * 2 - 1) * (WORLD_HALF - 22);
     const z = (rnd() * 2 - 1) * (WORLD_HALF - 22);
     if (blockedForWild(x, z, 4)) continue;
+    if (heightAt(x, z) !== null) continue;
     if (hosts.some((host) => Math.hypot(x - host.position.x, z - host.position.z) < 8.5)) continue;
     if (!obstacles.canWalk({ x, z }, { x, z })) continue;
     const kind = HOST_KINDS[Math.floor(rnd() * HOST_KINDS.length)];
@@ -641,6 +691,7 @@ export function createWildGarden(obstacles: WorldObstacles) {
 
   return {
     group,
+    heightAt,
     update(t: number, now: number, player: THREE.Vector3, inspectable: boolean) {
       sync(now);
       playerPoint.copy(player);
