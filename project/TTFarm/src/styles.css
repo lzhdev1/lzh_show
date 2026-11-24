@@ -1344,6 +1344,74 @@ button {
   .hud-menu { top: calc(116px + env(safe-area-inset-top)); max-height: min(58vh, 320px); }
 }
 
+/* 桌面好友串门：功能按钮也收进菜单，菜单需要突破 820px 的默认隐藏。 */
+@media (min-width: 821px) {
+  .hud-menu-trigger.force {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid #d7ccb0;
+    border-radius: 14px;
+    background: #fff9ed;
+    color: #3d513b;
+    box-shadow: 0 3px 14px #34432b24;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .hud-menu-trigger.force.active { background: #eef3dc; border-color: #a9bd8c; }
+  .hud-menu-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(28, 34, 24, 0.32);
+    backdrop-filter: blur(2px);
+  }
+  .hud-menu.force {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 56;
+    top: calc(76px + env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    width: min(380px, calc(100vw - 32px));
+    max-height: min(72vh, 560px);
+    overflow: auto;
+    padding: 12px;
+    gap: 10px;
+    border: 1px solid #d9d4b6;
+    border-radius: 18px;
+    background: #fcf8ee;
+    box-shadow: 0 18px 44px rgba(40, 46, 32, 0.28);
+    animation: menu-pop 0.16s ease-out;
+  }
+  .hud-menu.force .hud-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #3d513b; }
+  .hud-menu.force .hud-menu-head button {
+    min-height: 34px; padding: 0 10px; border: 1px solid #d8d1b8; border-radius: 10px;
+    background: #fffdf4; color: #56684c; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  .hud-menu.force .hud-menu-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .hud-menu.force .hud-menu-item {
+    display: flex; align-items: center; gap: 7px; min-height: 46px; padding: 8px 10px;
+    border: 1px solid #e1dcc2; border-radius: 12px; background: #fffdf4;
+    color: #34513e; font: inherit; font-size: 13.5px; font-weight: 650;
+    text-align: left; cursor: pointer;
+  }
+  .hud-menu.force .hud-menu-item .hud-menu-icon { font-size: 18px; line-height: 1; }
+  .hud-menu.force .hud-menu-item small { margin-left: auto; font-size: 10.5px; font-weight: 500; color: #a06a3e; }
+  .hud-menu.force .hud-menu-extra { display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed #ddd6bd; }
+  .hud-menu.force .hud-menu-extra .action-pop { position: static; width: 100%; margin-top: 8px; }
+  .hud-menu.force .hud-menu-extra .guide-copy { position: static; width: 100%; margin-top: 8px; }
+  .hud-menu.force .hud-menu-extra .action-menu,
+  .hud-menu.force .hud-menu-extra .control-guide { justify-self: stretch; }
+  .hud-menu.force .hud-menu-extra .ranch-trigger { width: 100%; justify-content: center; }
+}
+
 @keyframes menu-pop {
   from { transform: translateY(-8px) scale(0.98); opacity: 0; }
 }

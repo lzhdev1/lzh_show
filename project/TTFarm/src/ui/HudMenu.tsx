@@ -14,7 +14,7 @@ export interface HudMenuItem {
  * 图鉴、排行、好友、动作、天气、操作说明与返回登录都收进这里。
  * 抽屉用 portal 挂到 body，避免被顶栏的 fixed 层叠上下文压住。
  */
-export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: ReactNode }) {
+export function HudMenu({ items, children, force = false }: { items: HudMenuItem[]; children?: ReactNode; force?: boolean }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -23,7 +23,7 @@ export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: 
     return () => window.removeEventListener("keydown", dismiss);
   }, [open]);
   return <>
-    <button type="button" className={`hud-menu-trigger${open ? " active" : ""}`} aria-label="功能菜单"
+    <button type="button" className={`hud-menu-trigger${open ? " active" : ""}${force ? " force" : ""}`} aria-label="功能菜单"
       aria-expanded={open} onClick={() => setOpen(value => !value)}>
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"
         strokeLinecap="round" aria-hidden="true">
@@ -33,7 +33,7 @@ export function HudMenu({ items, children }: { items: HudMenuItem[]; children?: 
     </button>
     {open && createPortal(<>
       <div className="hud-menu-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
-      <nav className="hud-menu" aria-label="功能菜单">
+      <nav className={`hud-menu${force ? " force" : ""}`} aria-label="功能菜单">
         <div className="hud-menu-head">
           <b>功能菜单</b>
           <button type="button" onClick={() => setOpen(false)}>收起</button>

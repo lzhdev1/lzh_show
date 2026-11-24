@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { sendChat, useChat, CHAT_LIMIT, markChatRead } from "../game/chat";
 import { useAccount } from "../game/account";
 import { DriveDock } from "./DriveDock";
@@ -12,7 +12,7 @@ function clockOf(at: number) {
  * 房间发言：点按钮弹出「历史 + 输入」的卡片。
  * 消息同时会以头顶气泡显示 30 秒，聊天记录只保留当前房间。
  */
-export function ChatDock() {
+export function ChatDock({ belowChat }: { belowChat?: ReactNode } = {}) {
   const [open, setOpen] = useState(false);
   const messages = useChat(state => state.messages);
   const unread = useChat(state => state.unread);
@@ -90,5 +90,6 @@ export function ChatDock() {
       <span aria-hidden="true">💬</span><b>发言</b>
       {unread > 0 && <span className="chat-dot" aria-hidden="true" />}
     </button>
+    {belowChat}
   </div>;
 }

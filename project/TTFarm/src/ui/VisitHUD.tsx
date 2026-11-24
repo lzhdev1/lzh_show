@@ -108,13 +108,26 @@ export function GuestAction({ visit }: { visit: Visit }) {
   </div>;
 }
 
-export function FriendVisitBar({ visit }: { visit: Visit }) {
-  const reconnecting = useSocial(state => state.reconnecting);
+/** 好友房间身份：贴在头像下方，只显示房主农场与协作状态，不再占一整条顶栏。 */
+export function FriendVisitInfo({ visit }: { visit: Visit }) {
+  const guestNames = useSocial(state => state.players.map(player => player.nickname).join("、"));
+  return <div className="friend-visit-info">
+    <span className="friend-visit-icon" aria-hidden="true"><FriendsIcon/></span>
+    <div className="friend-visit-text">
+      <strong>{visit.ownerName}的农场</strong>
+      <small>{visit.canManage ? "协作串门 · 消耗与收获都记在房主账上" : "自由游玩 · 未获协作授权"}
+        {guestNames ? ` · 同场 ${guestNames}` : ""}
+      </small>
+    </div>
+  </div>;
+}
+
+/** 坐骑按钮：挂在发言按钮正下方，和好友条拆开。 */
+export function FriendMountButton() {
   const onFoot = useSocial(state => state.visitOnFoot);
   const ranch = useGame(state => state.ranch);
   const mount = ranch.animals.find(animal => animal.id === ranch.ridingId);
   const rideReady = mount ?? ranch.animals.find(isMountAnimal);
-  const guestNames = useSocial(state => state.players.map(player => player.nickname).join("、"));
   const toggleRide = () => {
     if (!onFoot) { useSocial.setState({ visitOnFoot: true }); return; }
     if (!rideReady) {
@@ -124,22 +137,22 @@ export function FriendVisitBar({ visit }: { visit: Visit }) {
     if (!mount && !useGame.getState().setRiding(rideReady.id)) return;
     useSocial.setState({ visitOnFoot: false });
   };
+  return <button type="button" className={`friend-mount-top friend-visit-ride${rideReady ? "" : " empty"}`} onClick={toggleRide}
+    title={rideReady ? animalName(rideReady) : "还没有可骑的动物"}
+    aria-label={onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : "下坐骑"}>
+    {onFoot ? (rideReady ? `骑 ${animalName(rideReady)}` : "召唤坐骑") : `下坐骑 · ${animalName(mount!)}`}
+  </button>;
+}
+
+/** 回家按钮：紧挨功能菜单左侧。 */
+export function FriendHomeButton() {
+  return <button type="button" className="friend-visit-home friend-home-top" onClick={leaveVisit}>回家</button>;
+}
+
+/** 好友串门时仍需显示协作卡与重连提示，但不参与顶栏排布。 */
+export function FriendVisitOverlay({ visit }: { visit: Visit }) {
+  const reconnecting = useSocial(state => state.reconnecting);
   return <>
-    <div className="friend-visit-bar">
-      <span className="friend-visit-icon" aria-hidden="true"><FriendsIcon/></span>
-      <div className="friend-visit-text">
-        <strong>{visit.ownerName}的农场</strong>
-        <small>{visit.canManage ? "协作串门 · 消耗与收获都记在房主账上" : "自由游玩 · 未获协作授权"}
-          {guestNames ? ` · 同场 ${guestNames}` : ""}
-        </small>
-      </div>
-      <button type="button" className={`friend-visit-ride${rideReady ? "" : " empty"}`} onClick={toggleRide}
-        title={rideReady ? animalName(rideReady) : "还没有可骑的动物"}
-        aria-label={onFoot ? (rideReady ? `召唤${animalName(rideReady)}` : "召唤坐骑") : "下坐骑"}>
-        {onFoot ? (rideReady ? `骑 ${animalName(rideReady)}` : "召唤坐骑") : `下坐骑 · ${animalName(mount!)}`}
-      </button>
-      <button type="button" className="friend-visit-home" onClick={leaveVisit}>回家</button>
-    </div>
     {reconnecting && <p className="friend-visit-reconnect" role="status">正在重新连接农场…</p>}
     {visit.canManage && !reconnecting && <GuestAction visit={visit}/>}
   </>;

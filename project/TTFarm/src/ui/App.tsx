@@ -23,7 +23,7 @@ import { SpecialVarietyBanner } from "./SpecialVarietyBanner";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
-import { FarmGuests, FriendVisitBar, VisitHUD } from "./VisitHUD";
+import { FarmGuests, FriendHomeButton, FriendMountButton, FriendVisitInfo, FriendVisitOverlay, VisitHUD } from "./VisitHUD";
 import { ChatDock } from "./ChatDock";
 import { MarketPanel } from "./MarketPanel";
 import { CarStorePanel } from "./CarStorePanel";
@@ -129,18 +129,26 @@ export function App() {
   if (!token) return <LoginPage />;
 
   const menuItems = [
+    ...(visiting ? [
+      { key: "farm", label: "农场", icon: "🌱", onClick: () => setFarmOpen(true) },
+      { key: "ranch", label: "牧场", icon: "🏡", onClick: () => setRanchOpen(true) },
+      { key: "shop", label: "商店", icon: "🛒", onClick: () => setShopOpen(true) },
+      { key: "backpack", label: "背包", icon: "🎒", onClick: () => setBackpackOpen(true) },
+    ] : []),
     { key: "codex", label: "图鉴", icon: "📖", onClick: () => setCodexOpen(true) },
     { key: "rank", label: "排行榜", icon: "🏆", onClick: () => setRankingOpen(true) },
     { key: "friends", label: "好友", icon: "👥", onClick: () => setFriendsOpen(true),
       hint: friendRoster.users?.filter(item => item.status === "incoming").length ? "有待处理" : undefined },
-    { key: "weather", label: "天气 / 农场", icon: "🌤️", onClick: () => setFarmOpen(true) },
+    ...(visiting ? [] : [
+      { key: "weather", label: "天气 / 农场", icon: "🌤️", onClick: () => setFarmOpen(true) },
+    ]),
   ];
 
   return (
     <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
       {!away && <SpecialVarietyBanner />}
       {visit?.mode === "spectate" ? <VisitHUD visit={visit}/> : <>
-      <header className="topbar">
+      <header className={`topbar${visiting ? " topbar-visit" : ""}`}>
         <button className="profile-chip" onClick={() => setProfileOpen(true)} aria-label="查看农场主资料">
           <img src={avatar.portrait} alt="" />
           <span className="profile-meta">
@@ -153,6 +161,7 @@ export function App() {
             </span>
           </span>
         </button>
+        {visit && <FriendVisitInfo visit={visit}/>}
 
         <div className="field-status">
           {selectedPlot === null && <>
@@ -181,15 +190,16 @@ export function App() {
           <button className="bag-trigger" onClick={() => setBackpackOpen(true)} aria-label="打开背包">
             <BagIcon /><span>背包</span>
           </button>
-          <ChatDock />
-          {!away && <HudMenu items={menuItems}>
+          <ChatDock belowChat={visit ? <FriendMountButton/> : undefined} />
+          {visit && <FriendHomeButton/>}
+          {!away && <HudMenu items={menuItems} force={visiting}>
             <div className="hud-menu-actions"><ActionTrigger /></div>
             <ControlGuide />
             <ReturnToLoginButton />
           </HudMenu>}
         </div>
       </header>
-      {visit && <FriendVisitBar visit={visit}/>}
+      {visit && <FriendVisitOverlay visit={visit}/>}
 
       {selectedPlot === null && !panelOpen && <>
         {!visit && <FarmGuests/>}
