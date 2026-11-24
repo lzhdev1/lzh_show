@@ -33,6 +33,8 @@ const arrivals = new Map<string, number>();
 // 已经处理过的消息；首次拉取到房间历史时只做基线，不补红点和顶部提示
 const seen = new Map<string, true>();
 let primedRoom: string | null = null;
+/** 本次进入房间的基线时刻：早于它的消息一律不冒泡，避免登录后历史消息重新冒头 */
+let bubbleFloor = 0;
 
 function prune(records: Map<string, unknown>) {
   while (records.size > META_LIMIT) {
@@ -63,9 +65,16 @@ function remember(message: ChatMessage, onlyNew = true) {
 }
 
 function merge(previous: ChatMessage[], incoming: ChatMessage[], rememberNew = true) {
+  return mergeChatMessages(previous, incoming, rememberNew);
+}
+
+/** 合并本轮拉到的消息；只有本次新出现的消息才记录“到达时刻” */
+export function mergeChatMessages(previous: ChatMessage[], incoming: ChatMessage[], rememberNew = true) {
   const map = new Map(previous.map(message => [message.id, message]));
   for (const message of incoming) {
-    remember(message, rememberNew);
+    // 只有这次新出现的消息才算到达；否则每一轮轮询都会把房间历史重新计时，
+    // 用户一上线就会看到旧消息气泡。
+    if (!map.has(message.id)) remember(message, rememberNew);
     map.set(message.id, message);
   }
   return [...map.values()].sort((a, b) => a.at - b.at).slice(-KEEP);
@@ -80,6 +89,9 @@ export async function pullChat(signal?: AbortSignal) {
   const current = useChat.getState();
   if (current.room !== active.room) return;
   const primed = primedRoom === active.room;
+  // 第一次成功拉取只建基线：这一批全部视为房间历史，即便它是在本次
+  // startChatSync 之后才写进服务端的，也不在头顶冒泡。
+  if (!primed) bubbleFloor = Date.now();
   const selfId = String(useAccount.getState().user?.id ?? "");
   let unread = current.unread;
   for (const message of result.messages) {
@@ -122,9 +134,10 @@ export function bubbleText(userId: string, now = Date.now()): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
     if (message.userId !== userId) continue;
-    // 只认本地到达时刻：首次拉到的历史没有到达记录，不因两端时钟偏差而冒泡。
+    // 只认本次进入房间后本地首次到达的消息：历史消息没有到达记录，
+    // 也不会因为轮询重合并或旧会话残留而重新冒泡。
     const since = arrivals.get(message.id);
-    if (since === undefined) return null;
+    if (since === undefined || since < bubbleFloor) return null;
     return now < since + BUBBLE_MS ? message.body : null;
   }
   return null;
@@ -149,6 +162,8 @@ export function kickGuest(targetId: string, nickname: string) {
 export function startChatSync() {
   let timer = 0;
   let busy = false;
+  // 每次进入游戏（包括同一会话内重新挂载）都重新划一条气泡基线
+  bubbleFloor = Date.now();
   const tick = async () => {
     const active = roomNow();
     const room = active?.room ?? null;
@@ -156,6 +171,7 @@ export function startChatSync() {
       seen.clear();
       arrivals.clear();
       primedRoom = null;
+      bubbleFloor = Date.now();
       useChat.setState({ room, messages: [], unread: 0, notice: "" });
     }
     if (active && !document.hidden && !busy) {

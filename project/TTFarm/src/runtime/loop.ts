@@ -23,7 +23,7 @@ import { Player } from "../scene/player";
 import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
 import { ranchBounds } from "../scene/ranchLayout";
-import { createChatBubble } from "../scene/chatBubble";
+import { createScreenChatBubble, renderScreenChatBubbles } from "../scene/chatBubble";
 import { bubbleText } from "../game/chat";
 import { useAccount } from "../game/account";
 import { setLocalPresence, useSocial } from "../game/social";
@@ -111,7 +111,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   view.scene.add(fishingScene.group);
   const riverFish = createRiverFishScene();
   view.scene.add(riverFish.group);
-  const localBubble = createChatBubble();
+  const localBubble = createScreenChatBubble();
   localBubble.sprite.position.set(0, 1.86, 0);
   player.root.add(localBubble.sprite);
   const peers = createFarmPeers(world.obstacles, fieldHeightAt, ranchScene.animalLibrary);
@@ -598,6 +598,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     town.update(dt, elapsed);
     fishingScene.update(dt, nowMs);
     riverFish.update(dt, elapsed, player.root.position);
+    // 聊天气泡是屏幕层 HTML：相机最终位置确定后再投影，字始终正对镜头且清晰
+    renderScreenChatBubbles(view.camera, view.renderer.domElement);
     view.renderer.render(view.scene, view.camera);
   };
 
@@ -620,6 +622,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     controls.dispose();
     riverAudio.dispose();
     unsubscribeAppearance();
+    localBubble.dispose();
     peers.clear();
     if (vehicle) { vehicle.dispose(); vehicle = null; }
     horseTrail.dispose();

@@ -7,7 +7,7 @@ import { createAnimalLibrary, saddleHeight } from "./ranchAnimals";
 import type { WorldObstacles } from "./obstacles";
 import type { AvatarMotion, ActionId } from "./rig";
 import { ACTIONS, actionWeight, isActionId } from "./actionMotion";
-import { createChatBubble } from "./chatBubble";
+import { createScreenChatBubble } from "./chatBubble";
 import { bubbleText } from "../game/chat";
 import type { createRanchAuras } from "./ranchAuras";
 import type { RanchAnimal } from "../game/ranch";
@@ -51,7 +51,7 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
     group.add(root);
     let label = nameplate(sample.nickname);
     root.add(label.sprite);
-    const bubble = createChatBubble();
+    const bubble = createScreenChatBubble();
     bubble.sprite.position.set(0, 2.4, 0);
     root.add(bubble.sprite);
     const start = root.position.clone(), end = start.clone();
