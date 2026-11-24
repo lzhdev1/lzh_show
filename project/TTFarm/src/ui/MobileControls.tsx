@@ -4,6 +4,7 @@ import { requestAction, requestStopAction, useAction } from "../game/actionStore
 import { BOOST_CARDS, BAITS, baitById } from "../game/items";
 import { isReady } from "../game/growth";
 import { useFishing } from "../game/fishing";
+import { helpAtFarm, useSocial } from "../game/social";
 import { useGame } from "../game/state";
 import { farmInput, setSprintEnabled, sprintEnabled, subscribeSprint } from "../game/input";
 import { unlockFishingAudio } from "../scene/fishingAudio";
@@ -28,11 +29,17 @@ function FishMark() {
 
 /** 手机右下角：一个大按钮加三个小按钮，从上方绕到左侧。 */
 export function MobileControls() {
-  const rodId = useGame(s => s.fishingRod);
-  const materials = useGame(s => s.materials);
+  const ownRodId = useGame(s => s.fishingRod);
+  const ownMaterials = useGame(s => s.materials);
+  const ownSelectedBait = useGame(s => s.selectedBait);
+  const ownSelectBait = useGame(s => s.selectBait);
   const items = useGame(s => s.items);
-  const selectedBait = useGame(s => s.selectedBait);
-  const selectBait = useGame(s => s.selectBait);
+  const visit = useSocial(s => s.visit);
+  const guest = Boolean(visit?.mode === "friend" && visit.canManage);
+  const hostFishing = guest ? visit?.state.fishing : undefined;
+  const rodId = ownRodId ?? hostFishing?.rod ?? null;
+  const materials = hostFishing ? hostFishing.materials : ownMaterials;
+  const selectedBait = hostFishing ? hostFishing.selectedBait : ownSelectedBait;
   const selectedPlot = useGame(s => s.selectedPlot);
   const plots = useGame(s => s.plots);
   const useBoostCard = useGame(s => s.useBoostCard);
@@ -63,10 +70,20 @@ export function MobileControls() {
     .sort((a, b) => (items[b.id] ?? 0) - (items[a.id] ?? 0) || a.minutes - b.minutes);
   const pickedCard = itemId && (items[itemId] ?? 0) > 0 ? itemId : ownedCards[0]?.id ?? null;
   const baitChoices = [...BAITS].sort((a, b) => (materials[b.id] ?? 0) - (materials[a.id] ?? 0));
+  const selectBait = (id: string | null) => {
+    if (hostFishing) {
+      void helpAtFarm({ action: "bait", baitId: id }).catch((error) => {
+        useGame.getState().notify(error instanceof Error ? error.message : "暂时不能切换好友的鱼饵", "warn");
+      });
+      return;
+    }
+    ownSelectBait(id);
+  };
   const fishLabel = phase === "idle" ? "钓鱼" : phase === "casting" ? "抛竿" : phase === "waiting" ? "收竿"
     : phase === "bite" ? "提竿" : phase === "reeling" ? "起竿" : "渔获";
 
   const useItem = () => {
+    if (visit) { notify("串门时不能用加速卡，好友的作物请等房主自己照料", "warn"); return; }
     if (!pickedCard) { notify("背包里没有加速卡，先去商店「道具」页买一张", "warn"); return; }
     const now = Date.now();
     const picked = selectedPlot !== null && plots[selectedPlot]?.crop && !isReady(plots[selectedPlot], now)

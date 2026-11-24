@@ -4,6 +4,7 @@ import { useAccount } from "./account";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import type { CropId } from "./crops";
 import type { FarmDecor } from "./decor";
+import type { ForageState } from "./forage";
 import type { PlotState } from "./growth";
 import type { AnimalElement, AnimalSpecies, RanchState } from "./ranch";
 import type { ActionId } from "../scene/rig";
@@ -54,6 +55,16 @@ export interface Visit {
     ranch: RanchState;
     seeds: Partial<Record<CropId, number>>;
     harvest: Record<string, number>;
+    /** 只有拿到协作授权才会下发：房主的野菜刷新记录 */
+    forage?: ForageState;
+    /** 只有拿到协作授权才会下发：房主鱼竿、鱼饵、鱼篓与背包容量 */
+    fishing?: {
+      rod: string | null;
+      selectedBait: string | null;
+      materials: Record<string, number>;
+      fishCaught: Record<string, number>;
+      backpackLevel: number;
+    };
   };
 }
 
@@ -138,10 +149,15 @@ export function leaveVisit() {
   useSocial.setState({ visit: null, players: [], reconnecting: false, present: false, visitOnFoot:false });
 }
 
-type HelpAction =
+export type HelpAction =
   | { action: "plant"; plotId: number; crop: CropId }
   | { action: "water" | "harvest"; plotId: number }
-  | { action: "tame"; animalId: string; baitKey: string };
+  | { action: "tame"; animalId: string; baitKey: string }
+  | { action: "forage"; patchId: string }
+  | { action: "mushroom"; mushroomId: string }
+  | { action: "bait"; baitId: string | null }
+  | { action: "consumeBait"; baitId: string }
+  | { action: "fish"; fishId: string };
 
 export async function helpAtFarm(action: HelpAction) {
   const { token } = useAccount.getState();

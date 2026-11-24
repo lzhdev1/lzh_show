@@ -147,6 +147,72 @@
 .visit-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: #e4ebd2; flex-shrink: 0; }
 .visit-identity small, .visit-nav small { font-size: 11px; color: #6a715d; }
 .visit-return, .visit-nav, .guest-action { pointer-events: auto; }
+/* 好友串门不再整屏替换 HUD：顶部只留一条窄条，发言、驾驶、背包、菜单和右下操作键继续可用。 */
+.friend-visit-bar {
+  position: fixed;
+  top: calc(62px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(620px, calc(100vw - 24px));
+  padding: 5px 6px 5px 8px;
+  border: 1px solid #d7ccb0;
+  border-radius: 15px;
+  background: #fff9edf5;
+  box-shadow: 0 3px 14px #34432b24;
+  color: #3d513b;
+  pointer-events: auto;
+}
+.friend-visit-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: #e4ebd2;
+  flex-shrink: 0;
+}
+.friend-visit-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.friend-visit-text strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-visit-text small { font-size: 10px; color: #6a715d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-visit-ride, .friend-visit-home {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d4dec2;
+  border-radius: 10px;
+  background: #e9efd9;
+  color: #44653a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.friend-visit-ride.empty { opacity: .62; }
+.friend-visit-home { background: #fffaf0; border-color: #d8cfb6; }
+.friend-visit-reconnect {
+  position: fixed;
+  top: calc(105px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  margin: 0;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: #fff3d7e8;
+  color: #7c5a25;
+  font-size: 11px;
+}
+@media (max-width: 560px) {
+  .friend-visit-bar { top: calc(96px + env(safe-area-inset-top)); gap: 5px; padding: 4px 5px 4px 6px; }
+  .friend-visit-text strong { font-size: 12px; }
+  .friend-visit-text small { font-size: 9px; max-width: 40vw; }
+  .friend-visit-ride, .friend-visit-home { min-height: 36px; padding: 0 8px; font-size: 11px; }
+  .friend-visit-reconnect { top: calc(135px + env(safe-area-inset-top)); }
+}
 .visit-return { flex-shrink: 0; min-height: 44px; padding: 0 13px; font-weight: 700; cursor: pointer; }
 .visit-exits { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .visit-company, .visit-connection, .farm-guests {

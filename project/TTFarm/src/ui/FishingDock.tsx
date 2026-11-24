@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { FISH_RARITY, fishById, rodById } from "../game/fish";
 import { BAITS, baitById } from "../game/items";
 import { ballPosition, describeFishingPhase, useFishing } from "../game/fishing";
+import { helpAtFarm, useSocial } from "../game/social";
 import { useGame } from "../game/state";
 import { unlockFishingAudio } from "../scene/fishingAudio";
 import { FishPortrait } from "./FishPortrait";
@@ -40,10 +41,16 @@ function useNow(active: boolean) {
 }
 
 export function FishingDock() {
-  const rodId = useGame((s) => s.fishingRod);
-  const selectedBait = useGame((s) => s.selectedBait);
-  const materials = useGame((s) => s.materials);
-  const selectBait = useGame((s) => s.selectBait);
+  const ownRodId = useGame((s) => s.fishingRod);
+  const ownSelectedBait = useGame((s) => s.selectedBait);
+  const ownMaterials = useGame((s) => s.materials);
+  const ownSelectBait = useGame((s) => s.selectBait);
+  const visit = useSocial((s) => s.visit);
+  const guest = Boolean(visit?.mode === "friend" && visit.canManage);
+  const hostFishing = guest ? visit?.state.fishing : undefined;
+  const rodId = ownRodId ?? hostFishing?.rod ?? null;
+  const selectedBait = hostFishing ? hostFishing.selectedBait : ownSelectedBait;
+  const materials = hostFishing ? hostFishing.materials : ownMaterials;
   const phase = useFishing((s) => s.phase);
   const near = useFishing((s) => s.nearRiver);
   const banner = useFishing((s) => s.banner);
@@ -66,7 +73,17 @@ export function FishingDock() {
   const baitCount = bait ? materials[bait.id] ?? 0 : 0;
   const [baitOpen, setBaitOpen] = useState(false);
 
-  if (!rod) return null;
+  const selectBait = (id: string | null) => {
+    if (hostFishing) {
+      void helpAtFarm({ action: "bait", baitId: id }).catch((error) => {
+        useGame.getState().notify(error instanceof Error ? error.message : "暂时不能切换好友的鱼饵", "warn");
+      });
+      return;
+    }
+    ownSelectBait(id);
+  };
+
+  if (!rod || (visit && !guest)) return null;
 
   const click = () => {
     unlockFishingAudio();
@@ -173,7 +190,7 @@ export function FishingDock() {
 
     {phase === "result" && result && (
       <FishingResultModal ok={result.ok} fishId={result.fishId} length={result.length} weight={result.weight}
-        reason={result.reason} fishCount={result.fishId ? useGame.getState().fishCaught[result.fishId] ?? 0 : 0}
+        reason={result.reason} fishCount={result.fishId ? (hostFishing?.fishCaught[result.fishId] ?? useGame.getState().fishCaught[result.fishId] ?? 0) : 0}
         onClose={closeResult} />
     )}
   </>;

@@ -34,7 +34,7 @@ import { setStandingPlot } from "./fieldInteraction";
 import { farmInput, releaseTouchInput } from "./input";
 import { weatherAt } from "./weather";
 import { tickClock } from "./clock";
-import { useFishing, updateCastSite, tickFishing } from "./fishing";
+import { useFishing, updateCastSite, tickFishing, effectiveRodId } from "./fishing";
 import { rodById } from "./fish";
 import { createFishingScene } from "../scene/fishingScene";
 import { createRiverFishScene } from "../scene/riverFish";
@@ -348,6 +348,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const { visit, players, visitOnFoot } = useSocial.getState();
     const sceneState = visit?.state ?? useGame.getState();
     const spectator = visit?.mode === "spectate";
+    const helpAllowed = !visit || (visit.mode === "friend" && visit.canManage);
     const nextRoom = visit ? visit.mode + "/" + visit.ownerId : "home";
     if (roomKey !== nextRoom) {
       if (vehicle) stopDriving();
@@ -393,7 +394,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     // —— 钓鱼状态机：先推进咬钩/超时，再决定是否锁住移动 ——
     tickFishing(nowMs);
     const fishingPhase = useFishing.getState().phase;
-    if ((vehicle || spectator || visit || farmInput.blocked) && fishingPhase !== "idle") {
+    if ((vehicle || spectator || !helpAllowed || farmInput.blocked) && fishingPhase !== "idle") {
       useFishing.getState().cancel(true);
     }
     if (fishingPhase !== lastFishingPhase) {
@@ -413,9 +414,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (!fishingBusy && nowMs >= nextFishingSite) {
       nextFishingSite = nowMs + 140;
       let site: { x: number; z: number; y: number; waterY: number } | null = null;
-      const rod = rodById(useGame.getState().fishingRod);
+      const rod = rodById(effectiveRodId());
       const p = player.root.position;
-      const onFoot = player.isOnFoot && player.swimAmount < 0.08 && !vehicle && !spectator && !visit && !useTownInteraction.getState().place;
+      const onFoot = player.isOnFoot && player.swimAmount < 0.08 && !vehicle && !spectator && helpAllowed && !useTownInteraction.getState().place;
       if (rod && onFoot && !onBridge(p.x, p.z, 1.2)) {
         const info = riverInfo(p.x, p.z);
         if (info.dist >= RIVER_HALF_WIDTH + 0.12 && info.dist <= rod.castRange + 2.6) {
@@ -555,8 +556,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     peers.update(players, dt, elapsed, focus);
     peers.localRide(visit?.mode === "friend" ? mount : undefined, player, dt, elapsed);
     ranchScene.update(elapsed, dt, wallTime, herd, player.root, player.isMoving, rider, spectator ? spectatorFocus : undefined, peers.emitAuras, player.isRunning);
-    forageScene.update(elapsed, wallTime, useGame.getState().forage, focus, !visit);
-    wildGarden.update(elapsed, wallTime, focus, !visit);
+    forageScene.update(elapsed, wallTime, sceneState.forage ?? state.forage, focus, helpAllowed);
+    wildGarden.update(elapsed, wallTime, focus, helpAllowed);
     if (ranchLevel !== herd.level) {
       if (!spectator) player.adjustToChangedFences();
       ranchLevel = herd.level;

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { fishBallSpeed, fishById, fishSize, fishZoneWidth, rodById, rollFish } from "./fish";
 import { baitById } from "./items";
 import { useGame } from "./state";
+import { helpAtFarm, useSocial } from "./social";
 
 export type FishingPhase = "idle" | "casting" | "waiting" | "bite" | "reeling" | "result";
 export type BiteKind = "sink" | "rise";
@@ -80,9 +81,33 @@ export function ballPosition(elapsed: number, speed: number): number {
   return phase <= 1 ? phase : 2 - phase;
 }
 
-function rodOf() {
-  return rodById(useGame.getState().fishingRod);
+/** 当前可用的协作现场；没有好友授权时返回 null。 */
+function guestFarm() {
+  const visit = useSocial.getState().visit;
+  return visit?.mode === "friend" && visit.canManage ? visit : null;
 }
+
+/** 串门时优先用自己的鱼竿；自己没有装备才借房主已装备的那根。 */
+export function effectiveRodId(): string | null {
+  const own = useGame.getState().fishingRod;
+  if (own) return own;
+  return guestFarm()?.state.fishing?.rod ?? null;
+}
+
+/** 鱼饵库存与选中项：串门时用房主的，离开后回到自己的。 */
+function baitSource() {
+  const guest = guestFarm()?.state.fishing;
+  if (guest) return guest;
+  const own = useGame.getState();
+  return { selectedBait: own.selectedBait, materials: own.materials };
+}
+
+function rodOf() {
+  return rodById(effectiveRodId());
+}
+
+let guestBitePending = false;
+let guestCatchPending = false;
 
 export const useFishing = create<FishingStore>()((set, get) => ({
   phase: "idle",
@@ -103,6 +128,11 @@ export const useFishing = create<FishingStore>()((set, get) => ({
 
   cast: () => {
     if (get().phase !== "idle" && get().phase !== "result") return false;
+    const visit = useSocial.getState().visit;
+    if (visit?.mode === "spectate" || (visit && !guestFarm())) {
+      notifyOnce("还没有好友的协作授权，不能在这里下竿", "warn");
+      return false;
+    }
     const rod = rodOf();
     if (!rod) {
       notifyOnce("先去商店买鱼竿，再到背包「装备」页装上", "warn");
@@ -113,13 +143,15 @@ export const useFishing = create<FishingStore>()((set, get) => ({
       return false;
     }
     const now = performance.now();
-    const game = useGame.getState();
-    const chosen = baitById(game.selectedBait);
-    const baitId = chosen && (game.materials[chosen.id] ?? 0) > 0 ? chosen.id : null;
+    const source = baitSource();
+    const chosen = baitById(source.selectedBait);
+    const baitId = chosen && (source.materials[chosen.id] ?? 0) > 0 ? chosen.id : null;
+    guestBitePending = false;
+    guestCatchPending = false;
     set({
       phase: "casting", phaseAt: now, biteAt: 0, biteStart: 0, fishId: null, result: null,
       castSeed: Math.floor(Math.random() * 97), baitId,
-      banner: baitId ? `抛竿 · ${chosen?.name ?? ""}` : "抛竿 · 空钩",
+      banner: baitId ? `抛竿 · ${chosen?.name ?? ""}${guestFarm() ? "（好友的鱼饵）" : ""}` : "抛竿 · 空钩",
     });
     if (!baitId && chosen) notifyOnce(`${chosen.name}用完了，空钩不会有鱼咬`, "warn");
     return true;
@@ -168,6 +200,27 @@ export const useFishing = create<FishingStore>()((set, get) => ({
         return;
       }
       const size = fishSize(fish);
+      const guest = guestFarm();
+      if (guest) {
+        if (guestCatchPending) return;
+        guestCatchPending = true;
+        // 先让 QTE 结束，再把鱼记到房主鱼篓；网络慢时若鱼篓满会改成脱钩结果。
+        set({
+          phase: "result",
+          banner: "钓到了！",
+          result: { ok: true, fishId: fish.id, length: size.length, weight: size.weight, reason: "", at: now },
+        });
+        void helpAtFarm({ action: "fish", fishId: fish.id }).then(() => {
+          notifyOnce(`渔获已放进${guest.ownerName}的鱼篓`, "ok");
+        }).catch((error) => {
+          useFishing.setState({
+            banner: "鱼篓满了",
+            result: { ok: false, fishId: fish.id, length: 0, weight: 0,
+              reason: error instanceof Error ? error.message : "好友的鱼篓装不下，这条鱼只能放回河里", at: now },
+          });
+        }).finally(() => { guestCatchPending = false; });
+        return;
+      }
       const added = useGame.getState().collectFish(fish.id);
       set({
         phase: "result",
@@ -204,8 +257,45 @@ export function tickFishing(now: number) {
   }
   if (s.phase === "waiting" && now >= s.biteAt) {
     const bait = baitById(s.baitId);
+    const guest = guestFarm();
+    if (!bait) {
+      useFishing.setState({
+        phase: "result",
+        result: {
+          ok: false, fishId: null, length: 0, weight: 0,
+          reason: "钩上一直没有鱼饵，鱼连看都没看一眼", at: now,
+        },
+        banner: "空钩",
+      });
+      return;
+    }
+    if (guest) {
+      if (guestBitePending) return;
+      guestBitePending = true;
+      const bittenAt = s.biteAt;
+      void helpAtFarm({ action: "consumeBait", baitId: bait.id }).then(() => {
+        const current = useFishing.getState();
+        if (current.phase !== "waiting" || current.biteAt !== bittenAt) return;
+        const fish = rollFish(Math.random, bait.weights);
+        useFishing.setState({
+          phase: "bite", phaseAt: performance.now(), biteStart: performance.now(), fishId: fish.id,
+          biteKind: Math.random() < 0.52 ? "sink" : "rise",
+          banner: `${fish.name}咬钩！5 秒内提竿`,
+        });
+      }).catch((error) => {
+        const current = useFishing.getState();
+        if (current.phase !== "waiting" || current.biteAt !== bittenAt) return;
+        useFishing.setState({
+          phase: "result",
+          result: { ok: false, fishId: null, length: 0, weight: 0,
+            reason: error instanceof Error ? error.message : "好友的鱼饵没能挂上钩", at: performance.now() },
+          banner: "鱼饵不足",
+        });
+      }).finally(() => { guestBitePending = false; });
+      return;
+    }
     const game = useGame.getState();
-    if (!bait || (game.materials[bait.id] ?? 0) <= 0) {
+    if ((game.materials[bait.id] ?? 0) <= 0) {
       useFishing.setState({
         phase: "result",
         result: {

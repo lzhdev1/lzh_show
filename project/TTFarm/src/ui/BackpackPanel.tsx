@@ -5,6 +5,7 @@ import { isReady } from "../game/growth";
 import { BAITS, BOOST_CARDS } from "../game/items";
 import type { Mutation } from "../game/weather";
 import { useGame } from "../game/state";
+import { useSocial } from "../game/social";
 import {
   BAG_MAX_LEVEL,
   BAG_STACK_LIMIT,
@@ -75,6 +76,7 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
   const selectBait = useGame((s) => s.selectBait);
   const useBoostCard = useGame((s) => s.useBoostCard);
   const notify = useGame((s) => s.notify);
+  const visit = useSocial((s) => s.visit);
   const [tab, setTab] = useState<BagTab>("seed");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(pageSizeForWidth);
@@ -221,6 +223,8 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
           <span>每格 1 件，同类最多叠加 {BAG_STACK_LIMIT}</span>
           <span>每类 {slots} 格 · 分页 {pageSize} 格</span>
         </div>
+
+        {visit && <p className="bag-visit-note">串门中：这里只显示你自己的背包；协作采到的作物、野菜和鱼会进入{visit.ownerName}的仓库。</p>}
 
         {over && <p className="bag-over">当前分类已有 {used} 格，超出容量。先升级背包，或卖出/消耗一部分。</p>}
 

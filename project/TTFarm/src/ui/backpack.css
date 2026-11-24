@@ -284,6 +284,16 @@
 .bag-wallet span { display: inline-flex; align-items: center; gap: 5px; }
 .bag-wallet strong { display: inline-flex; align-items: center; gap: 5px; color: #80551e; font-size: 17px; font-variant-numeric: tabular-nums; }
 .bag-wallet strong svg { width: 19px; height: 19px; }
+.bag-visit-note {
+  margin: 8px 0 0;
+  padding: 7px 9px;
+  border: 1px dashed #d8c9a4;
+  border-radius: 9px;
+  background: #fff8e6;
+  color: #6f5a33;
+  font-size: 12px;
+  line-height: 1.45;
+}
 
 @media (max-width: 720px) {
   .bag-grid.compact { grid-template-columns: repeat(5, minmax(0, 1fr)); }

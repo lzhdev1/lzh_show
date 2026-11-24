@@ -23,7 +23,7 @@ import { SpecialVarietyBanner } from "./SpecialVarietyBanner";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
-import { FarmGuests, VisitHUD } from "./VisitHUD";
+import { FarmGuests, FriendVisitBar, VisitHUD } from "./VisitHUD";
 import { ChatDock } from "./ChatDock";
 import { MarketPanel } from "./MarketPanel";
 import { CarStorePanel } from "./CarStorePanel";
@@ -63,13 +63,14 @@ export function App() {
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   useEffect(() => startChatSync(), []);
-  const away = !!visit;
+  const away = visit?.mode === "spectate";
+  const visiting = !!visit;
   useEffect(() => {
-    if (!away && token) return;
+    if (!visiting && token) return;
     setFriendsOpen(false); setRankingOpen(false); setShopOpen(false);
     setProfileOpen(false); setFarmOpen(false); setRanchOpen(false); setCodexOpen(false);
     setMarketOpen(false); setCarStoreOpen(false); setBackpackOpen(false);
-  }, [away, token]);
+  }, [visiting, token]);
 
   // 打开页面时如果本地还留着登录票据，就去服务端拉一次最新存档（多端切换不至于读到旧进度）
   useEffect(() => {
@@ -137,8 +138,8 @@ export function App() {
 
   return (
     <div className="hud" data-input={touchActive ? "touch" : "desktop"}>
-      {!visit && <SpecialVarietyBanner />}
-      {visit ? <VisitHUD visit={visit}/> : <>
+      {!away && <SpecialVarietyBanner />}
+      {visit?.mode === "spectate" ? <VisitHUD visit={visit}/> : <>
       <header className="topbar">
         <button className="profile-chip" onClick={() => setProfileOpen(true)} aria-label="查看农场主资料">
           <img src={avatar.portrait} alt="" />
@@ -188,20 +189,21 @@ export function App() {
           </HudMenu>}
         </div>
       </header>
+      {visit && <FriendVisitBar visit={visit}/>}
 
       {selectedPlot === null && !panelOpen && <>
-        <FarmGuests/>
+        {!visit && <FarmGuests/>}
         {driving ? <DriveTouchControls/> : <TouchControls/>}
         {!driving && <FishingDock />}
         {!driving && <MobileControls />}
-        <PlotAction onOpenShop={() => setShopOpen(true)} />
-        <RanchHUD onOpenRanch={() => setRanchOpen(true)} />
+        {!visit && <PlotAction onOpenShop={() => setShopOpen(true)} />}
+        {!visit && <RanchHUD onOpenRanch={() => setRanchOpen(true)} />}
         <ForageHUD />
         <MushroomHUD />
         <TownHUD onOpenMarket={() => setMarketOpen(true)} onOpenCarStore={() => setCarStoreOpen(true)} />
       </>}
 
-      <div className="dock">
+      {!visit && <div className="dock">
         <div className="dock-label">
           <SeedIcon />
           <span>种子</span>
@@ -233,9 +235,9 @@ export function App() {
         <button className="dock-shop" onClick={() => setShopOpen(true)} aria-label="打开商店">
           <ShopIcon />
         </button>
-      </div>
+      </div>}
 
-      {!panelOpen && <PlotSheet onOpenFarm={() => setFarmOpen(true)} />}
+      {!panelOpen && !visit && <PlotSheet onOpenFarm={() => setFarmOpen(true)} />}
       {shopOpen && <ShopPanel onClose={() => setShopOpen(false)} />}
       {marketOpen && <MarketPanel onClose={() => setMarketOpen(false)} />}
       {carStoreOpen && <CarStorePanel onClose={() => setCarStoreOpen(false)} />}
