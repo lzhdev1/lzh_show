@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS farm_states (
   plots         JSONB        NOT NULL DEFAULT '[]'::jsonb,
   seeds         JSONB        NOT NULL DEFAULT '{}'::jsonb,
   harvest       JSONB        NOT NULL DEFAULT '{}'::jsonb,
+  meat          JSONB        NOT NULL DEFAULT '{}'::jsonb,
   selected_seed VARCHAR(32)  NOT NULL DEFAULT 'radish',
   backpack_level INTEGER     NOT NULL DEFAULT 1,
   codex_collected JSONB      NOT NULL DEFAULT '{}'::jsonb,
@@ -101,6 +102,9 @@ ALTER TABLE farm_states
 -- 商店库存：加速卡、鱼饵、已购鱼竿与当前鱼饵，旧号默认送 3 条蚯蚓
 ALTER TABLE farm_states
   ADD COLUMN IF NOT EXISTS shop_extras JSONB NOT NULL DEFAULT '{"items":{},"materials":{"worm":3},"ownedRods":["bamboo"],"selectedBait":"worm"}'::jsonb;
+
+-- 肉品库存：键为动物物种或「物种:元素」，由客户端与服务端共用 normalizeMeat 校验
+ALTER TABLE farm_states ADD COLUMN IF NOT EXISTS meat JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS farm_states_xp_idx ON farm_states (xp DESC);
 CREATE INDEX IF NOT EXISTS farm_states_coins_idx ON farm_states (coins DESC, user_id);

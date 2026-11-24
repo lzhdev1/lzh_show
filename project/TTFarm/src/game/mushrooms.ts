@@ -143,7 +143,6 @@ export const MUSHROOM_SHAPE_LABEL: Record<MushroomShape, string> = {
 export const MUSHROOM_RARITY_LABEL: Record<number, string> = { 1: "常见", 2: "少见", 3: "稀有", 4: "珍稀", 5: "传说" };
 
 /** 雨后一整个天气阶段的菌季；若紧接着下雪，菌季直接取消。 */
-export const MUSHROOM_PHASE_MS = WEATHER_INTERVAL_MS;
 export function mushroomSeasonAt(now: number): { active: boolean; key: number; phaseEnds: number } {
   const slot = Math.floor(now / WEATHER_INTERVAL_MS);
   const current = weatherAt(now);
@@ -172,11 +171,6 @@ export function mushroomMutationAt(id: string, seasonKey: number): MushroomMutat
 
 export const MUSHROOM_MUTATION_LABEL: Record<Exclude<MushroomMutation, null>, string> = {
   magic: "魔气", mist: "氤氲", spirit: "通灵",
-};
-export const MUSHROOM_MUTATION_BLURB: Record<Exclude<MushroomMutation, null>, string> = {
-  magic: "暗紫色透明雾气缠身，雾里偶尔飘过一两个透明的小骷髅影。",
-  mist: "七色透明雾气裹着菌盖，菌顶上方架着一道若隐若现的小彩虹。",
-  spirit: "外形与普通菌一样，但会隔一阵冒出一句牢骚，每十秒偷偷换一个位置。",
 };
 
 export const MUSHROOM_COMPLAINTS = [

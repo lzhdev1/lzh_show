@@ -14,9 +14,9 @@ import { townSurfaceHeight, DEALERSHIP, SHOPS, insideFacingRect, inTown } from "
 import { createSalesHall } from "../scene/salesHall";
 import { createHallParking } from "../scene/hallParking";
 import { salesHallHeight, inSalesHall, HALL_COUNTER, hallParkingHeight } from "../scene/salesHallLayout";
-import { useTownInteraction, type TownPlace } from "./townInteraction";
-import { useTownNav } from "./townNav";
-import { useDrive } from "./drive";
+import { useTownInteraction, type TownPlace } from "../game/townInteraction";
+import { useTownNav } from "../game/townNav";
+import { useDrive } from "../game/drive";
 import { PlayerVehicle } from "../scene/vehicle";
 import { bridgeHeightAt, onBridge, riverInfo, RIVER_BED, RIVER_HALF_WIDTH, WORLD_HALF } from "../scene/layout";
 import { Player } from "../scene/player";
@@ -24,20 +24,22 @@ import { createFarmPeers } from "../scene/farmPeers";
 import { createHorseTrail } from "../scene/horseTrail";
 import { ranchBounds } from "../scene/ranchLayout";
 import { createChatBubble } from "../scene/chatBubble";
-import { bubbleText } from "./chat";
-import { useAccount } from "./account";
-import { setLocalPresence, useSocial } from "./social";
-import { useAction } from "./actionStore";
+import { bubbleText } from "../game/chat";
+import { useAccount } from "../game/account";
+import { setLocalPresence, useSocial } from "../game/social";
+import { useAction } from "../game/actionStore";
 import { ACTIONS, ACTION_IDS, isActionId } from "../scene/actionMotion";
-import { useGame } from "./state";
-import { setStandingPlot } from "./fieldInteraction";
-import { farmInput, releaseTouchInput } from "./input";
-import { weatherAt } from "./weather";
-import { tickClock } from "./clock";
-import { useFishing, updateCastSite, tickFishing, effectiveRodId } from "./fishing";
-import { rodById } from "./fish";
+import { useGame } from "../game/state";
+import { setStandingPlot } from "../game/fieldInteraction";
+import { farmInput, releaseTouchInput } from "../game/input";
+import { weatherAt } from "../game/weather";
+import { tickClock } from "../game/clock";
+import { useFishing, updateCastSite, tickFishing, effectiveRodId } from "../game/fishing";
+import { rodById } from "../game/fish";
 import { createFishingScene } from "../scene/fishingScene";
 import { createRiverFishScene } from "../scene/riverFish";
+import { disposeObject3D } from "../scene/dispose";
+import { disposeClayMaterials } from "../scene/materials";
 
 export interface GameHandle {
   dispose: () => void;
@@ -627,16 +629,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     fishingScene.dispose();
     riverFish.dispose();
     view.scene.remove(salesHall);
-    salesHall.traverse(node => {
-      if (!(node instanceof THREE.Mesh || node instanceof THREE.Line)) return;
-      node.geometry.dispose();
-      const list = Array.isArray(node.material) ? node.material : [node.material];
-      list.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
-    });
+    disposeObject3D(salesHall);
+    view.scene.remove(hallParking);
+    disposeObject3D(hallParking);
     town.dispose();
     world.dispose();
     player.dispose();
     disposePlots(plots);
+    disposeClayMaterials();
     view.dispose();
   };
 

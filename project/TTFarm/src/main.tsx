@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./ui/App";
-import type { GameHandle } from "./game/loop";
+import type { GameHandle } from "./runtime/loop";
 import { useGame } from "./game/state";
 import { startAutoSave } from "./game/account";
 import "./styles.css";
@@ -21,7 +21,7 @@ root.render(<App />);
 const stopAutoSave = startAutoSave();
 let game: GameHandle | undefined;
 let disposed = false;
-import("./game/loop").then(({ startGame }) => {
+import("./runtime/loop").then(({ startGame }) => {
   if (!disposed) game = startGame(canvas);
 }).catch((error) => {
   console.error("[TT农场] 场景初始化失败", error);

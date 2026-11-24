@@ -211,15 +211,6 @@ export function SeedIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-export function WaterIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <path d="M12 3.6c3 4.2 5.2 7 5.2 10.2a5.2 5.2 0 0 1-10.4 0c0-3.2 2.2-6 5.2-10.2Z" fill="#69a9c9" />
-      <path d="M9.6 14.6a2.6 2.6 0 0 0 2.4 2.6" stroke="#d9eef7" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
 export function SowIcon({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" strokeLinejoin="round" aria-hidden="true">

@@ -81,7 +81,7 @@
 - 2026-11-07：作品卡已接入 `blog_front/src/lib/projects.ts`（`slug: "ttfarm"`，featured，封面用游戏内真实截图 `blog_front/public/covers/ttfarm.png`），首页精选与 `/projects` 列表均已展示。
 - 2026-11-07：已完成生产部署，`https://lzhshow.top/ttfarm/` 可直接打开（服务器重建前端镜像，`public/ttfarm/` 随镜像进入运行时）。
 - 2026-11-08：相机由正交等距改为**透视 + 自由环绕**（OrbitControls），拖拽旋转、滚轮缩放、R / 双击复位；WASD 改为按当前相机朝向移动；地面扩到 220×220 以免环绕时露出地平线硬边。
-- 2026-11-08：视角进一步放开到「贴地到俯视」：距离 5.5–46、极角 16°–84°（`src/game/loop.ts`），构图不再固定在 45° 三分之一处。
+- 2026-11-08：视角进一步放开到「贴地到俯视」：距离 5.5–46、极角 16°–84°（`src/runtime/loop.ts`），构图不再固定在 45° 三分之一处。
 - 2026-11-08：主角「小穗」换成贴图化的日系长发少女（`src/scene/character.ts`）：四张可平铺贴图（面部/发丝/上衣/裙布，`public/textures/`）+ `MeshToonMaterial` 三阶卡通明暗 + 背面壳描边，程序化百褶裙、水手领、双马尾与呆毛，走动时发尾与裙摆做次级摆动。另外三套形象仍是低模。
 - 2026-11-08：补光效：`view.ts` 加逆光轮廓光（`0xffd9b0`，把角色从背景剥出来）与地面反弹光（`HemisphereLight` 暖色），主光阴影贴图提到 1536；`world.ts` 加 72 点加法混合的暖色光尘，挂到 `World.update` 随主循环飘动。
 - 2026-11-22：新增 18 种农田作物（含六色玫瑰）与 20 种野外野菜；野菜采摘 / 掉种子 / 回种全链路（`game/forage*.ts`、`scene/forageScene.ts`），存档新增 `forage` 列并打通服务端白名单与旧客户端兼容；野菜专属阴阳 / 长生三级变异与柔光特效（`scene/wildAuras.ts`：黑白双雾 + 星辰、玉质云雾 + 金龙）。容器内 typecheck / vite build 通过，存档接口 11 项回归全过，浏览器实测采摘到阴阳·二星鱼腥草并掉种子。
@@ -134,7 +134,7 @@
 
 - 2026-11-23：修复好友农场不能开车的问题，详见 [`docs/修复-好友农场驾驶.md`](docs/修复-好友农场驾驶.md)。原先把任何 `visit` 状态都拦掉，现在只拦排行榜参观模式；好友串门可以直接从「驾驶」入口选自己的车，车库、车牌、碰撞、桥梁高度与手机按键全部沿用现有驾驶链路。访客上车时同步置 `visitOnFoot`，与坐骑互斥；离场仍自动结束驾驶。
 
-- 2026-11-23：第十九轮钓鱼系统，详见 [`docs/迭代计划-第十九轮-钓鱼系统.md`](docs/迭代计划-第十九轮-钓鱼系统.md)。新增 50 种鱼（常见 20 / 少见 15 / 稀有 8 / 史诗 4 / 传说 3）与河面自由游动鱼群；四根按农场等级自动解锁的鱼竿，右下角钓鱼入口，抛竿 / 浮漂点动 / 咬钩下沉与上浮 / 5 秒提竿窗口；拉鱼 30 秒 QTE 用小球与随机金色高亮区判定，鱼越贵亮区越窄、球越快，点错或超时脱钩。渔获进入新的背包「鱼篓」页签与图鉴「鱼类」页签，图鉴总数 191。鱼竿与鱼获写入 `fishing_rod`、`fish_caught`，`save_version` 升到 7；附带程序化抛竿、咬钩、卷线与断线音效。
+- 2026-11-23：第十九轮钓鱼系统，详见 [`docs/迭代计划-第十九轮-钓鱼系统.md`](docs/迭代计划-第十九轮-钓鱼系统.md)。新增 50 种鱼（常见 20 / 少见 15 / 稀有 8 / 史诗 4 / 传说 3）与河面自由游动鱼群；四根按农场等级自动解锁的鱼竿，右下角钓鱼入口，抛竿 / 浮漂点动 / 咬钩下沉与上浮 / 5 秒提竿窗口；拉鱼 30 秒 QTE 用小球与随机金色高亮区判定，鱼越贵亮区越窄、球越快，点错或超时脱钩。渔获进入新的背包「鱼篓」页签与图鉴「鱼类」页签，图鉴总数当时为 191（后续加入百种菌类与草药后已扩到 291）。鱼竿与鱼获写入 `fishing_rod`、`fish_caught`，`save_version` 升到 7；附带程序化抛竿、咬钩、卷线与断线音效。
 
 - 2026-11-23：修复河鱼上浮、拉鱼过快与 NPC 踩水，详见 [`docs/修复-钓鱼水下与NPC避水.md`](docs/修复-钓鱼水下与NPC避水.md)。河鱼按体高下潜，背鳍不再露出水面，水面只保留淡鱼影；QTE 高亮区加宽、小球整体降速，传说鱼可点击窗口从约 0.04 秒提升到约 0.28 秒；城内行人、过桥顾客、野生动物与访客全部加入避水判定。
 
@@ -153,11 +153,21 @@ Three.js + TypeScript + Vite + Zustand + React（仅 DOM 覆盖层 UI）。**不
 
 ```
 TTFarm/
-├── docs/          # 设计与技术文档
-├── src/           # 源码（game 纯逻辑 / scene 渲染 / ui 面板）
-├── scripts/       # sync-to-site.mjs：把 dist 同步进主站 public/ttfarm
-└── public/        # 静态资源（4 张角色头像 avatars/、4 张角色贴图 textures/）
+├── src/
+│   ├── api/       # 账号/存档 HTTP 客户端
+│   ├── game/      # 纯规则与 Zustand store：作物、天气、成长、牧场、野菜、钓鱼、商店、背包、存档
+│   ├── runtime/   # 主循环编排：场景装配、输入、相机、帧更新与释放
+│   ├── scene/     # Three.js 场景、角色、动物、作物与城镇模型
+│   └── ui/        # React HUD、面板、图标与各模块样式
+│                  # 单元测试与源码同目录，命名为 *.test.ts
+├── public/        # 头像、服装、动物模型、音频与许可页（路径由代码动态拼接）
+├── scripts/       # 资源烘焙、同步与数据校验工具
+├── db/            # schema.sql（幂等的本地/生产数据库结构）
+├── docs/          # 设计、迭代记录、修复记录与本轮审计计划
+└── dist/          # 构建产物（不入库）
 ```
+
+模块边界：`game` 存放规则、数据与 store，`runtime` 负责场景装配和主循环，`scene` 读取 `game` 状态并负责渲染，`ui` 只通过 store action 改状态；不要把新规则写进面板或 Three.js 对象。新增存档字段时，必须同时改客户端 `pickSave`、服务端 `normalizeSave`、`db/schema.sql` 和冲突合并逻辑。文档索引见 [docs/README.md](docs/README.md)。
 
 ## 本地开发与发布
 
@@ -172,11 +182,12 @@ docker compose up -d frontend
 docker logs -f lzh_show_frontend    # 两个进程的日志都在这里
 ```
 
-- 依赖只存在容器内（`/ttfarm/node_modules`、`/app/node_modules` 是匿名卷），宿主机不留 `node_modules`
+- 测试与构建在容器内执行：`docker exec lzh_show_frontend sh -lc "cd /ttfarm && pnpm typecheck && pnpm test && pnpm build"`。
+- 依赖只存在容器内（`/ttfarm/node_modules`、`/app/node_modules` 是匿名卷），宿主机不留 `node_modules`。
 - 已有开发数据库可在仓库根目录用 PowerShell 运行 `Get-Content -Raw project/TTFarm/db/schema.sql | docker exec -i shared-postgres psql -U ttfarm -d ttfarm -v ON_ERROR_STOP=1` 升级。部署工作流会自动应用同一份幂等结构脚本。
-- 镜像重建（重装依赖）：`docker compose build frontend` 后 `docker compose up -d frontend`
-- 发布：产物由镜像的 builder 阶段自己构建（`vite build` → `public/ttfarm`），随主站镜像一起发布，**不需要本地构建、也不需要 `sync-to-site`**
-- `scripts/sync-to-site.mjs` 仅作为手动同步的备用手段保留（需要本机有 Node 才能跑）
+- 镜像重建（重装依赖）：`docker compose build frontend` 后 `docker compose up -d frontend`。
+- 发布：产物由镜像的 builder 阶段自己构建（`vite build` → `public/ttfarm`），随主站镜像一起发布，**不需要本地构建、也不需要 `sync-to-site`**。
+- `scripts/sync-to-site.mjs` 仅作为手动同步的备用手段保留（需要本机有 Node 才能跑）。
 
 发布链路：提交源码 → GitHub Actions SSH 进服务器 → `git reset --hard origin/main` → `docker compose -f docker-compose.prod.yml up -d --build`。游戏是主站的一次静态发布，**同域名、同端口、同容器**；`blog_front/src/proxy.ts` 负责把 `/ttfarm`、`/ttfarm/` 改写到 `/ttfarm/index.html`（该路径不参与 next-intl 语言路由）。
 

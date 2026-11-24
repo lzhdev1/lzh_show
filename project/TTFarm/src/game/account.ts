@@ -13,6 +13,7 @@ import { normalizeGarage } from "./garage";
 import { normalizeBackpackLevel } from "./backpack";
 import { normalizeFishingState } from "./fish";
 import { migrateShopExtras } from "./items";
+import { normalizeMeat } from "./market";
 import {
   codexFromHoldings,
   mergeCodexCollections,
@@ -62,6 +63,7 @@ function applyRemoteState(state: RemoteState): void {
     plots,
     seeds: state.seeds,
     harvest: state.harvest,
+    meat: normalizeMeat(state.meat),
     nickname: useAccount.getState().user?.nickname ?? state.nickname,
     ...normalizeAppearance(state.avatarId, state.outfitId, state.bottomId),
     decor: normalizeDecor(state.decor),
@@ -92,6 +94,7 @@ function pickSave() {
     plots: s.plots,
     seeds: s.seeds,
     harvest: s.harvest,
+    meat: s.meat,
     nickname: s.nickname,
     avatarId: s.avatarId,
     outfitId: s.outfitId,
@@ -142,6 +145,26 @@ function readDraft(owner: number): string | null {
   }
 }
 
+/** 草稿可能因断电、浏览器配额或旧客户端写坏；损坏时保留备份并回退服务端存档 */
+function parseDraft(raw: string | null): Draft | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    // 空对象或半截 JSON 也是合法 JSON；缺少核心字段的草稿不能覆盖账号。
+    if (!Array.isArray(value.plots) || typeof value.coins !== "number" || !Number.isFinite(value.coins)) return null;
+    return value as Draft;
+  } catch {
+    return null;
+  }
+}
+
+function quarantineDraft(owner: number, raw: string | null) {
+  if (!raw) return;
+  try { window.localStorage.setItem(`${draftKey(owner)}-corrupt-${Date.now()}`, raw); } catch { /* storage unavailable */ }
+  forget(owner, raw);
+}
+
 function remember(owner: number, json: string): void {
   drafts.set(owner, json);
   try {
@@ -173,7 +196,12 @@ function forget(owner: number, json: string) {
 }
 
 function checkpoint(owner: number, json: string, remote: RemoteState) {
-  const { base, writeId, ...local }: Draft = JSON.parse(json);
+  const draft = parseDraft(json);
+  if (!draft) {
+    quarantineDraft(owner, json);
+    return remote;
+  }
+  const { base, writeId, ...local } = draft;
   let resolved: RemoteState | null = local;
   if (local.ranch === undefined && (remote.saveVersion ?? 1) >= 2) resolved = null;
   else if ((local.revision ?? 0) !== (remote.revision ?? 0))
@@ -201,8 +229,15 @@ function upload(owner: number, token: string): Promise<void> {
   const send = async () => {
     let json = flight(owner) ?? readDraft(owner);
     while (json) {
+      const draft = parseDraft(json);
+      if (!draft) {
+        quarantineDraft(owner, json);
+        flight(owner, null);
+        json = readDraft(owner);
+        continue;
+      }
       flight(owner,json);
-      const {base: _base, writeId, ...sent}: Draft = JSON.parse(json);
+      const {base: _base, writeId, ...sent} = draft;
       try {
         const { revision } = await ttfarmApi.saveState(token, sent, writeId);
         const remote = { ...sent, revision };
@@ -210,9 +245,10 @@ function upload(owner: number, token: string): Promise<void> {
         const next = readDraft(owner);
         if (next === json) forget(owner, json);
         else if (next) {
-          const newer: Draft = JSON.parse(next);
-          if ((newer.revision ?? 0) < revision)
+          const newer = parseDraft(next);
+          if (newer && (newer.revision ?? 0) < revision)
             remember(owner, JSON.stringify({ ...newer, revision, base: remote }));
+          else if (!newer) quarantineDraft(owner, next);
         }
       } catch (error) {
         if (!(error instanceof FarmApiError && error.status === 409 && error.state)) throw error;
@@ -257,6 +293,7 @@ export function startAutoSave(): () => void {
       state.plots === prev.plots &&
       state.seeds === prev.seeds &&
       state.harvest === prev.harvest &&
+      state.meat === prev.meat &&
       state.avatarId === prev.avatarId &&
       state.outfitId === prev.outfitId &&
       state.bottomId === prev.bottomId &&
@@ -310,7 +347,7 @@ export const useAccount = create<AccountStore>()(
           const result = nickname === undefined ? await ttfarmApi.login(username) : await ttfarmApi.register(username,nickname);
           const pending = readDraft(result.user.id);
           baselines.set(result.user.id, result.state);
-          const cached = pending ? JSON.parse(pending) as Draft : null;
+          const cached = parseDraft(pending);
           set({ token: result.token, user: result.user, identityChecked:true, lastVerifiedUserId:result.user.id, pending:false, error:"" });
           restore(cached?.writeId ? cached : pending ? checkpoint(result.user.id, pending, result.state) : result.state);
           if (result.user.nickname && (pending || flight(result.user.id))) void get().refresh();
@@ -359,7 +396,7 @@ export const useAccount = create<AccountStore>()(
           useGame.setState({nickname:profile.nickname});
           if (!profile.nickname) { baselines.set(user.id,state); return; }
           const queued = readDraft(user.id);
-          if (flight(user.id) || (queued && (JSON.parse(queued) as Draft).writeId)) {
+          if (flight(user.id) || parseDraft(queued)?.writeId) {
             await upload(user.id, token);
             if (get().token !== token) return;
             ({ state } = await ttfarmApi.loadState(token));

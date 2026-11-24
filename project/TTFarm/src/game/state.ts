@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestLots, harvestValue, levelFromXp, produceName } from "./crops";
-import { isMutation, isRainy, rollHerbMutation, rollMutation, rollWildMutation, weatherAt } from "./weather";
+import { MUTATIONS, isMutation, isRainy, rollHerbMutation, rollMutation, rollWildMutation, weatherAt, type Mutation } from "./weather";
 import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
@@ -42,6 +42,28 @@ export const LAND_PRICES = [
   150, 220, 300, 420, 560, 720, 900, 1100, 1320, 1580, 1860, 2180, 2520, 2900,
   3300, 3740, 4200, 4700, 5200, 5800, 6400, 7000, 7700, 8400,
 ];
+const SEED_KEYS = new Set<string>(CROP_LIST.map((crop) => crop.id));
+const HARVEST_KEYS = new Set<string>(
+  CROP_LIST.flatMap((crop) => [
+    crop.id,
+    ...Object.keys(MUTATIONS).map((mutation) => harvestKey(crop.id, mutation as Mutation)),
+  ]),
+);
+const finiteInt = (value: unknown, min: number, max: number, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : fallback;
+};
+const cleanCounts = (raw: unknown, fallback: Record<string, number>, allowed: Set<string>): Record<string, number> => {
+  const out = { ...fallback };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!allowed.has(key)) continue;
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) out[key] = Math.min(1_000_000, Math.round(n));
+    else if (Number.isFinite(n) && n === 0) out[key] = 0;
+  }
+  return out;
+};
 /** 测试期金币：先给一大笔，方便试扩建和买东西 */
 export const TEST_COINS = 99_999_999;
 
@@ -227,6 +249,8 @@ export const useGame = create<GameStore>()(
 
       buySeed: (crop, qty = 1) => {
         const def = CROPS[crop];
+        if (!def) return;
+        const count = Number.isFinite(qty) ? Math.max(1, Math.min(99, Math.trunc(qty))) : 1;
         if (def.wild) {
           get().notify("野菜种子不卖，去野外采摘有机会捡到", "warn");
           return;
@@ -240,22 +264,22 @@ export const useGame = create<GameStore>()(
           get().notify(`${def.name}需要 ${def.unlockLevel} 级解锁`, "warn");
           return;
         }
-        const cost = def.seedPrice * qty;
+        const cost = def.seedPrice * count;
         if (get().coins < cost) {
           get().notify("金币不够啦", "warn");
           return;
         }
-        const room = bagAddCheck(get().seeds, crop, qty, get().backpackLevel);
+        const room = bagAddCheck(get().seeds, crop, count, get().backpackLevel);
         if (!room.ok) {
           get().notify(`种子背包已满（${room.used}/${room.slots} 格），先升级背包`, "warn");
           return;
         }
         set((s) => ({
           coins: s.coins - cost,
-          seeds: { ...s.seeds, [crop]: s.seeds[crop] + qty },
+          seeds: { ...s.seeds, [crop]: s.seeds[crop] + count },
           codexCollected: markCodexCollected(s.codexCollected, [codexPlantKey(crop)]),
         }));
-        get().notify(`买入 ${def.name}种子 ×${qty}`);
+        get().notify(`买入 ${def.name}种子 ×${count}`);
       },
 
       plant: (plotId) => {
@@ -378,7 +402,8 @@ export const useGame = create<GameStore>()(
           get().notify("冷柜里没有这批肉", "warn");
           return;
         }
-        const qty = Math.max(1, Math.min(lot.count, Math.trunc(count ?? lot.count)));
+        const raw = Math.trunc(count ?? lot.count);
+        const qty = Number.isFinite(raw) ? Math.max(1, Math.min(lot.count, raw)) : lot.count;
         const total = lot.price * qty;
         set((s) => {
           const meat = { ...s.meat };
@@ -530,7 +555,7 @@ export const useGame = create<GameStore>()(
       buyBoostCard: (id, qty = 1) => {
         const card = boostCardById(id);
         if (!card) return false;
-        const count = Math.max(1, Math.min(99, Math.trunc(qty)));
+        const count = Number.isFinite(qty) ? Math.max(1, Math.min(99, Math.trunc(qty))) : 1;
         const s = get();
         const cost = card.price * count;
         if (s.coins < cost) {
@@ -555,7 +580,7 @@ export const useGame = create<GameStore>()(
       buyBait: (id, qty = 1) => {
         const bait = baitById(id);
         if (!bait) return false;
-        const count = Math.max(1, Math.min(99, Math.trunc(qty)));
+        const count = Number.isFinite(qty) ? Math.max(1, Math.min(99, Math.trunc(qty))) : 1;
         const s = get();
         const cost = bait.price * count;
         if (s.coins < cost) {
@@ -725,14 +750,19 @@ export const useGame = create<GameStore>()(
         const base = initialData();
         const plots = base.plots.map((plot) => {
           const old = saved.plots?.find((p) => p.id === plot.id);
-          return old ? {
+          if (!old) return plot;
+          const crop = typeof old.crop === "string" && SEED_KEYS.has(old.crop) ? old.crop as CropId : null;
+          return {
             ...plot,
-            ...old,
-            mutation: old.crop && isMutation(old.mutation) && cropMutationValid(old.crop, old.mutation) ? old.mutation : null,
-          } : plot;
+            unlocked: Boolean(old.unlocked),
+            crop,
+            plantedAt: crop ? finiteInt(old.plantedAt, 0, 9_999_999_999_999, 0) : 0,
+            watered: crop ? finiteInt(old.watered, 0, MAX_WATER, 0) : 0,
+            mutation: crop && isMutation(old.mutation) && cropMutationValid(crop, old.mutation) ? old.mutation : null,
+          };
         });
-        const seeds = { ...base.seeds, ...saved.seeds };
-        const harvest = { ...base.harvest, ...saved.harvest };
+        const seeds = cleanCounts(saved.seeds, base.seeds, SEED_KEYS);
+        const harvest = cleanCounts(saved.harvest, base.harvest, HARVEST_KEYS);
         const ranch = normalizeRanch(saved.ranch);
         const fishing = normalizeFishingState({ rod: saved.fishingRod, fish: saved.fishCaught });
         const extras = migrateShopExtras(
@@ -751,17 +781,17 @@ export const useGame = create<GameStore>()(
         );
         return {
           ...current,
-          ...base,
-          ...saved,
-          coins: saved.coins ?? base.coins,
-          ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
-          decor: normalizeDecor(saved.decor),
-          ranch,
-          forage: normalizeForage(saved.forage),
+          coins: finiteInt(saved.coins, 0, 9_999_999_999, base.coins),
+          xp: finiteInt(saved.xp, 0, 99_999_999, 0),
           plots,
           seeds,
           harvest,
           meat: normalizeMeat(saved.meat),
+          nickname: typeof saved.nickname === "string" && saved.nickname.trim() ? saved.nickname.trim() : base.nickname,
+          ...normalizeAppearance(saved.avatarId, saved.outfitId, saved.bottomId),
+          decor: normalizeDecor(saved.decor),
+          ranch,
+          forage: normalizeForage(saved.forage),
           garage: normalizeGarage(saved.garage),
           backpackLevel: normalizeBackpackLevel(saved.backpackLevel),
           codexCollected,
@@ -771,6 +801,9 @@ export const useGame = create<GameStore>()(
           materials: extras.materials,
           ownedRods: extras.ownedRods,
           selectedBait: extras.selectedBait,
+          selectedSeed: typeof saved.selectedSeed === "string" && SEED_KEYS.has(saved.selectedSeed)
+            ? saved.selectedSeed
+            : base.selectedSeed,
         };
       },
     }

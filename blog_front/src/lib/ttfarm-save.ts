@@ -7,6 +7,7 @@ import { normalizeGarage as readGarage } from "@farm-rules/garage";
 import { normalizeBackpackLevel } from "@farm-rules/backpack";
 import { normalizeFishingState } from "@farm-rules/fish";
 import { migrateShopExtras, normalizeShopExtras, type ShopExtras } from "@farm-rules/items";
+import { normalizeMeat } from "@farm-rules/market";
 import {
   codexFromHoldings,
   mergeCodexCollections,
@@ -58,6 +59,7 @@ export interface FarmSave {
   plots: PlotState[];
   seeds: Record<string, number>;
   harvest: Record<string, number>;
+  meat: Record<string, number>;
   nickname: string;
   avatarId: string;
   outfitId: string;
@@ -97,6 +99,7 @@ export function initialSave(nickname = "农场主"): FarmSave {
     plots,
     seeds,
     harvest: { ...zero },
+    meat: {},
     nickname,
     avatarId: "xiaosui",
     outfitId: "field",
@@ -165,6 +168,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
   const outfitId = stageSet || isBasicOutfit(selected) ? selected : base.outfitId;
   const seeds = record(src.seeds, base.seeds, CROP_IDS);
   const harvest = record(src.harvest, base.harvest, HARVEST_KEYS);
+  const meat = normalizeMeat(src.meat);
   const ranch = readRanch(src.ranch);
   const fishing = normalizeFishingState({ rod: src.fishingRod, fish: src.fishCaught });
   const extras = migrateShopExtras(
@@ -181,6 +185,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
     plots,
     seeds,
     harvest,
+    meat,
     nickname,
     avatarId,
     outfitId,
@@ -210,6 +215,7 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
     plots: PlotState[];
     seeds: Record<string, number>;
     harvest: Record<string, number>;
+    meat: Record<string, number>;
     selected_seed: string;
     nickname: string;
     avatar_id: string;
@@ -227,7 +233,7 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
     save_version: number;
     revision: number;
   }>(
-    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.forage, s.garage, s.backpack_level, s.codex_collected, s.fishing_rod, s.fish_caught, s.shop_extras, s.save_version, s.revision,
+    `SELECT s.coins, s.xp, s.plots, s.seeds, s.harvest, s.meat, s.selected_seed, s.outfit_id, s.bottom_id, s.decor, s.ranch, s.forage, s.garage, s.backpack_level, s.codex_collected, s.fishing_rod, s.fish_caught, s.shop_extras, s.save_version, s.revision,
             CASE WHEN u.nickname_key IS NULL THEN '' ELSE u.nickname END AS nickname, u.avatar_id
        FROM farm_states s JOIN users u ON u.id = s.user_id WHERE s.user_id = $1`,
     [userId]
@@ -250,6 +256,7 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
       plots: row.plots,
       seeds: row.seeds,
       harvest: row.harvest,
+      meat: row.meat,
       selectedSeed: row.selected_seed,
       nickname: row.nickname,
       avatarId: row.avatar_id,
@@ -274,18 +281,19 @@ export async function loadSave(pool: Queryable, userId: number, nickname: string
 }
 
 export async function saveState(pool: Queryable, userId: number, save: FarmSave,
-                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, includeForage = true, includeGarage = true, includeBackpack = true, expectedRevision: number | null = null, includeCodex = true, includeFishing = true, includeShop = true): Promise<number | null> {
+                                includeWardrobe = true, includeDecor = true, includeBottom = true, includeRanch = true, includeForage = true, includeGarage = true, includeBackpack = true, expectedRevision: number | null = null, includeCodex = true, includeFishing = true, includeShop = true, includeMeat = true): Promise<number | null> {
   const result = await pool.query(
     `WITH written AS (
-     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, selected_seed, outfit_id, decor, bottom_id, ranch, forage, garage, backpack_level, codex_collected, fishing_rod, fish_caught, shop_extras, save_version, revision, updated_at)
-     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb, $18::jsonb, $20::jsonb, $22, $24::jsonb, $26, $27::jsonb, $29::jsonb,
-            CASE WHEN $30 THEN 8 WHEN $28 THEN 7 WHEN $25 THEN 6 WHEN $23 THEN 5 WHEN $21 THEN 4 WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
+     INSERT INTO farm_states (user_id, coins, xp, plots, seeds, harvest, meat, selected_seed, outfit_id, decor, bottom_id, ranch, forage, garage, backpack_level, codex_collected, fishing_rod, fish_caught, shop_extras, save_version, revision, updated_at)
+     SELECT id, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $31::jsonb, $7, $9, $10::jsonb, $13, $15::jsonb, $18::jsonb, $20::jsonb, $22, $24::jsonb, $26, $27::jsonb, $29::jsonb,
+            CASE WHEN $32 THEN 9 WHEN $30 THEN 8 WHEN $28 THEN 7 WHEN $25 THEN 6 WHEN $23 THEN 5 WHEN $21 THEN 4 WHEN $17::integer IS NOT NULL THEN 3 WHEN $16 THEN 2 ELSE 1 END, 0, now() FROM users WHERE id = $1
      ON CONFLICT (user_id) DO UPDATE SET
        coins = EXCLUDED.coins,
        xp = EXCLUDED.xp,
        plots = EXCLUDED.plots,
        seeds = EXCLUDED.seeds,
        harvest = EXCLUDED.harvest,
+       meat = CASE WHEN $32 THEN EXCLUDED.meat ELSE farm_states.meat END,
        selected_seed = EXCLUDED.selected_seed,
        outfit_id = CASE WHEN $11 THEN EXCLUDED.outfit_id ELSE farm_states.outfit_id END,
        bottom_id = CASE
@@ -305,7 +313,7 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
        shop_extras = CASE WHEN $30 THEN EXCLUDED.shop_extras ELSE farm_states.shop_extras END,
        save_version = GREATEST(farm_states.save_version, EXCLUDED.save_version),
        revision = farm_states.revision + 1, updated_at = now()
-     WHERE ($16 OR $21 OR $23 OR $25 OR $28 OR $30 OR farm_states.save_version < 2)
+     WHERE ($16 OR $21 OR $23 OR $25 OR $28 OR $30 OR $32 OR farm_states.save_version < 2)
        AND (farm_states.revision = $17 OR ($17 IS NULL AND farm_states.save_version < 3))
      RETURNING user_id,revision)
      UPDATE users SET avatar_id = CASE WHEN $11 THEN $8 ELSE avatar_id END
@@ -346,6 +354,8 @@ export async function saveState(pool: Queryable, userId: number, save: FarmSave,
         selectedBait: save.selectedBait,
       }),
       includeShop,
+      JSON.stringify(save.meat),
+      includeMeat,
     ]
   );
   return result.rows[0]?.revision ?? null;

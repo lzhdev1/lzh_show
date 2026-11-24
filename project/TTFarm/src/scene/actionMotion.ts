@@ -18,7 +18,7 @@ export const ACTION_IDS = Object.keys(ACTIONS) as ActionId[];
 export const MENU_ACTION_IDS = ACTION_IDS.filter((id) => !ACTIONS[id].hidden);
 
 export function isActionId(value: unknown): value is ActionId {
-  return typeof value === "string" && value in ACTIONS;
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(ACTIONS, value);
 }
 
 /** 淡入 + 一次性动作的淡出；好友端与本地共用，保证观感一致。 */

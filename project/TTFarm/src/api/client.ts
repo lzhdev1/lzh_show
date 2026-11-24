@@ -42,6 +42,8 @@ export interface RemoteState {
   plots: RemotePlot[];
   seeds: Record<CropId, number>;
   harvest: Record<string, number>;
+  /** 肉品库存，键为「物种」或「物种:元素」 */
+  meat?: Record<string, number>;
   nickname: string;
   avatarId: string;
   selectedSeed: CropId;

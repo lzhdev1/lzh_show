@@ -20,17 +20,33 @@ export function mergeFarmSave(base: RemoteState, local: RemoteState, remote: Rem
     if (!equal(base[field], remote[field])) return null;
     Object.assign(result, { [field]: local[field] });
   }
-  if (base.plots.length !== local.plots.length || result.plots.length !== local.plots.length) return null;
-  for (let i = 0; i < local.plots.length; i++) {
-    if (equal(base.plots[i], local.plots[i])) continue;
-    if (!equal(base.plots[i], remote.plots[i])) return null;
-    result.plots[i] = local.plots[i];
+  const plotSet = (plots: RemoteState["plots"], ids: Set<number>) => {
+    const map = new Map<number, RemoteState["plots"][number]>();
+    for (const plot of plots) {
+      if (!Number.isSafeInteger(plot.id) || plot.id < 0 || map.has(plot.id) || ids.has(plot.id) === false) return null;
+      map.set(plot.id, plot);
+    }
+    return map;
+  };
+  const ids = new Set(remote.plots.map((plot) => plot.id));
+  if (ids.size !== remote.plots.length) return null;
+  const basePlots = plotSet(base.plots, ids) ?? new Map();
+  const localPlots = plotSet(local.plots, ids) ?? new Map();
+  const remotePlots = plotSet(remote.plots, ids) ?? new Map();
+  if (basePlots.size !== ids.size || localPlots.size !== ids.size || remotePlots.size !== ids.size) return null;
+  for (const [id, localPlot] of localPlots) {
+    const before = basePlots.get(id), current = remotePlots.get(id);
+    if (!before || !current) return null;
+    if (equal(before, localPlot)) continue;
+    if (!equal(before, current)) return null;
+    remotePlots.set(id, localPlot);
   }
+  result.plots = [...remotePlots.values()].sort((a, b) => a.id - b.id);
   for (const field of ["coins", "xp"] as const) {
     result[field] += local[field] - base[field];
     if (result[field] < 0) return null;
   }
-  for (const field of ["seeds", "harvest", "items", "materials"] as const) {
+  for (const field of ["seeds", "harvest", "meat", "items", "materials"] as const) {
     const counts: Record<string, number> = { ...(remote[field] ?? {}) };
     const before: Record<string, number> = base[field] ?? {}, after: Record<string, number> = local[field] ?? {};
     for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {

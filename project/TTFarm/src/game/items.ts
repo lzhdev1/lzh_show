@@ -26,7 +26,9 @@ export const BOOST_CARDS: readonly BoostCard[] = [2, 5, 10, 20, 30, 40, 50, 60, 
 export const BOOST_BY_ID: Record<string, BoostCard> = Object.fromEntries(BOOST_CARDS.map((card) => [card.id, card]));
 
 export function boostCardById(id: unknown): BoostCard | null {
-  return typeof id === "string" ? BOOST_BY_ID[id] ?? null : null;
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(BOOST_BY_ID, id)
+    ? BOOST_BY_ID[id]
+    : null;
 }
 
 /** 鱼饵：稀有度权重决定更容易吸引哪一档鱼。 */
@@ -87,7 +89,9 @@ export const BAITS: readonly BaitItem[] = [
 export const BAIT_BY_ID: Record<string, BaitItem> = Object.fromEntries(BAITS.map((bait) => [bait.id, bait]));
 
 export function baitById(id: unknown): BaitItem | null {
-  return typeof id === "string" ? BAIT_BY_ID[id] ?? null : null;
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(BAIT_BY_ID, id)
+    ? BAIT_BY_ID[id]
+    : null;
 }
 
 export interface ShopExtras {

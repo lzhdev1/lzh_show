@@ -19,9 +19,13 @@ export function meatKey(species: AnimalSpecies, element: AnimalElement | null): 
 
 export function parseMeatKey(key: string): { species: AnimalSpecies; element: AnimalElement | null } | null {
   const [species, element] = key.split(":");
-  if (!(species in ANIMALS)) return null;
-  const validElement = element && element in ANIMAL_ELEMENTS ? element as AnimalElement : null;
-  return { species: species as AnimalSpecies, element: validElement };
+  // 不能用 `in`：toString / constructor 等原型键会被误判成合法物种。
+  if (!Object.prototype.hasOwnProperty.call(ANIMALS, species)) return null;
+  if (element !== undefined) {
+    if (!Object.prototype.hasOwnProperty.call(ANIMAL_ELEMENTS, element)) return null;
+    return { species: species as AnimalSpecies, element: element as AnimalElement };
+  }
+  return { species: species as AnimalSpecies, element: null };
 }
 
 export function meatName(species: AnimalSpecies, element: AnimalElement | null): string {

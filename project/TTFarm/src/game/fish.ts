@@ -277,7 +277,9 @@ export const FISH_BY_ID: Record<string, FishSpecies> = Object.fromEntries(
 export const FISH_TOTAL = FISH_LIST.length;
 
 export function fishById(id: unknown): FishSpecies | null {
-  return typeof id === "string" ? FISH_BY_ID[id] ?? null : null;
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(FISH_BY_ID, id)
+    ? FISH_BY_ID[id]
+    : null;
 }
 
 /** 按稀有度加权抽一条鱼；可以传入鱼饵的稀有度权重，未传则使用基础权重。 */
@@ -343,7 +345,9 @@ export const FISHING_RODS: readonly FishingRod[] = [
 export const ROD_BY_ID: Record<string, FishingRod> = Object.fromEntries(FISHING_RODS.map((rod) => [rod.id, rod]));
 
 export function rodById(id: unknown): FishingRod | null {
-  return typeof id === "string" ? ROD_BY_ID[id] ?? null : null;
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(ROD_BY_ID, id)
+    ? ROD_BY_ID[id]
+    : null;
 }
 
 export function normalizeFishingState(raw: unknown): { rod: string | null; fish: Record<string, number> } {
@@ -352,7 +356,7 @@ export function normalizeFishingState(raw: unknown): { rod: string | null; fish:
   const fish: Record<string, number> = {};
   if (src.fish && typeof src.fish === "object") {
     for (const [id, count] of Object.entries(src.fish as Record<string, unknown>)) {
-      if (!FISH_BY_ID[id]) continue;
+      if (!Object.prototype.hasOwnProperty.call(FISH_BY_ID, id)) continue;
       const n = Number(count);
       if (Number.isFinite(n) && n > 0) fish[id] = Math.min(1_000_000, Math.round(n));
     }
@@ -363,9 +367,4 @@ export function normalizeFishingState(raw: unknown): { rod: string | null; fish:
 /** 鱼竿是否已解锁：升级后自动获得，避免再叠一层购买流程。 */
 export function rodUnlocked(rod: FishingRod, level: number): boolean {
   return level >= rod.level;
-}
-
-export function rodAutoEquip(level: number): string {
-  const best = [...FISHING_RODS].reverse().find((rod) => rodUnlocked(rod, level));
-  return best?.id ?? FISHING_RODS[0].id;
 }
