@@ -44,6 +44,8 @@ export class Player {
   };
   private static readonly WALK_SPEED = 1.72;
   private static readonly RUN_SPEED = 3.82;
+  /** 起跳抛物线的最高点；略微抬高，落地和原有动作帧仍由同一套时序控制。 */
+  private static readonly JUMP_HEIGHT = 1.0;
 
   static maxMountedRunSpeed(species: AnimalSpecies) {
     return Player.RUN_SPEED * RIDING_SPEED_MULTIPLIER * (species === "horse" ? HORSE_SPEED_FACTOR : 1);
@@ -319,7 +321,7 @@ export class Player {
       motion.jumpPhase = (frame - 32) / 216;
       motion.jumpWeight = THREE.MathUtils.smoothstep(t, 0, 0.11)
         * (1 - THREE.MathUtils.smoothstep(t, landing + 0.14, end));
-      this.jumpHeight = 4 * 0.72 * air * (1 - air);
+      this.jumpHeight = 4 * Player.JUMP_HEIGHT * air * (1 - air);
       if (t >= end) this.jumpTime = -1;
     }
     const support = THREE.MathUtils.lerp(surface.floorY, surface.waterY, motion.swimming);

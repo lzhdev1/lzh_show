@@ -23,7 +23,7 @@ import { SpecialVarietyBanner } from "./SpecialVarietyBanner";
 import { Leaderboard, TrophyIcon } from "./Leaderboard";
 import { FriendsPanel, FriendsTrigger, useFriendRoster } from "./FriendsPanel";
 import { CodexPanel, CodexTrigger } from "./CodexPanel";
-import { FriendHomeButton, FriendMountButton, FriendVisitInfo, FriendVisitOverlay, RoomMembers, VisitHUD } from "./VisitHUD";
+import { FriendHomeButton, FriendVisitInfo, FriendVisitOverlay, MountButton, RoomMembers, VisitHUD } from "./VisitHUD";
 import { ChatDock } from "./ChatDock";
 import { MarketPanel } from "./MarketPanel";
 import { CarStorePanel } from "./CarStorePanel";
@@ -187,11 +187,12 @@ export function App() {
               <TrophyIcon /><span>排行</span>
             </button>
           </div>
+          <MountButton/>
           <button className="bag-trigger" onClick={() => setBackpackOpen(true)} aria-label="打开背包">
             <BagIcon /><span>背包</span>
           </button>
           <RoomMembers/>
-          <ChatDock belowChat={visit ? <FriendMountButton/> : undefined} />
+          <ChatDock/>
           {visit && <FriendHomeButton/>}
           {!away && <HudMenu items={menuItems} force={visiting}>
             <div className="hud-menu-actions"><ActionTrigger /></div>

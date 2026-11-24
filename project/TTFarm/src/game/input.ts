@@ -1,16 +1,16 @@
 /**
  * Analog input lives outside React so pointer motion never re-renders the HUD.
- * Sprint is a deliberate toggle, so it is kept in a tiny external store:
- * the button label and the movement loop always read the same flag.
+ * Sprint starts enabled and remains a deliberate toggle, so it is kept in a tiny
+ * external store: the button label and the movement loop always read the same flag.
  */
 export const farmInput = {
   x: 0,
   forward: 0,
-  running: false,
+  running: true,
   steering: false,
   jump: false,
   blocked: true,
-  sprint: false,
+  sprint: true,
   brake: false,
 };
 

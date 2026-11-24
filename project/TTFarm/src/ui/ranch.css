@@ -1,11 +1,11 @@
-.ranch-trigger, .riding-action, .wild-encounter, .ranch-gate-action {
+.ranch-trigger, .wild-encounter, .ranch-gate-action {
   background: #fcf8eef7;
   color: #34513e;
   border: 1px solid #d8d3b7;
   box-shadow: 0 3px 12px #293f2e24;
   pointer-events: auto;
 }
-.ranch-trigger, .riding-action {
+.ranch-trigger {
   min-height: 44px;
   border-radius: 14px;
   display: inline-flex;
@@ -26,12 +26,6 @@
   border-color: #d9c6a0;
   color: #6b5430;
   font-weight: 700;
-}
-.riding-action {
-  position: fixed;
-  top: calc(128px + env(safe-area-inset-top));
-  left: max(17px, env(safe-area-inset-left));
-  min-height: 44px;
 }
 .wild-encounter, .ranch-gate-action {
   position: fixed;
@@ -132,9 +126,6 @@
 .sell-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #3f6b45; font-weight: 650; }
 .butcher-button { background: none; border: none; min-width: 44px; min-height: 44px; font-size: 12px; cursor: pointer; color: #a35c3d; font-weight: 650; }
 .btn.mini.danger { background: #f6e2d9; border-color: #d8a58f; color: #8a452f; }
-@media (max-width: 560px) {
-  .riding-action { top: calc(109px + env(safe-area-inset-top)); left: max(9px, env(safe-area-inset-left)); }
-}
 @media (max-width: 390px) and (orientation: portrait) {
   .hud[data-input="touch"] .wild-encounter { bottom: calc(195px + env(safe-area-inset-bottom)); }
 }

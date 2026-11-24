@@ -473,7 +473,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     const animatedSeat=mount && (visit ? peers : ranchScene).seatHeight(mount.id);
     player.setSaddleHeight(animatedSeat ?? seat, mount?.species);
     if (spectator) {
-      spectatorFocus.addScaledVector(inputDir.clampLength(0, 1), dt * (keys.has("shift") || farmInput.running ? 22 : 11));
+      spectatorFocus.addScaledVector(inputDir.clampLength(0, 1), dt * (keys.has("shift") ? 22 : 11));
       spectatorFocus.x = THREE.MathUtils.clamp(spectatorFocus.x, -WORLD_HALF, WORLD_HALF);
       spectatorFocus.z = THREE.MathUtils.clamp(spectatorFocus.z, -WORLD_HALF, WORLD_HALF);
     } else if (vehicle) {
@@ -485,14 +485,14 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         throttle,
         steer,
         brake: farmInput.jump || farmInput.brake || keys.has(" "),
-        boost: keys.has("shift") || farmInput.running,
+        boost: keys.has("shift"),
       }, world.obstacles, vehicleHeightAt);
       useTownInteraction.getState().set(null, "");
       if (elapsed >= nextPresence) {
         nextPresence = elapsed + .08;
         const { x, z } = vehicle.root.position;
         setLocalPresence({ x, y: vehicle.root.position.y, z, yaw: vehicle.yaw, moving: Math.abs(vehicle.currentSpeed) > 1.2,
-          running: (keys.has("shift") || farmInput.running) && Math.abs(vehicle.currentSpeed) > 2,
+          running: keys.has("shift") && Math.abs(vehicle.currentSpeed) > 2,
           jumping: false, swimming: false, action: null, actionTime: 0, mount: null });
       }
     } else {

@@ -97,9 +97,19 @@
   .decor-parts select, .farm-tabs button { min-height: 42px; }
   .wardrobe-modal input, .estate-modal input { font-size: 16px; }
 }
+@media (max-width:560px) {
+  .topbar .profile-chip { flex: 0 0 130px; width: 130px; }
+  .topbar .profile-meta { flex: 1 1 auto; }
+  .topbar .profile-name { max-width: 19ch; font-size: 13px; }
+}
 @media (max-width:380px) {
-  .topbar .profile-chip { padding: 3px; min-width: 42px; justify-content: center; }
-  .topbar .profile-meta { display: none; }
+  /* 安卓窄屏仍要保留昵称和等级，只压缩进度条与内边距，不能整块隐藏身份。 */
+  .topbar .profile-chip { flex: 0 0 148px; width: 148px; padding: 3px 8px 3px 3px; min-width: 0; justify-content: flex-start; gap: 6px; }
+  .topbar .profile-chip img { width: 32px; height: 32px; flex-shrink: 0; }
+  .topbar .profile-meta { display: flex; min-width: 52px; }
+  .topbar .profile-name { max-width: 10ch; font-size: 12.5px; }
+  .topbar .profile-sub { font-size: 10.5px; gap: 0; white-space: nowrap; }
+  .topbar .xp-track { display: none; }
   .suit-thumbnail { width: 23px; }
   .closet-footer .btn { width: 100%; }
 }

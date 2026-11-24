@@ -94,6 +94,7 @@ export function RoomMembers({ includeSelf = true }: { includeSelf?: boolean }) {
     <button type="button" className="room-member-trigger" aria-expanded={open} aria-haspopup="menu"
       aria-label={`房间成员，在线 ${online} 人`} onClick={() => setOpen(value => !value)}>
       <FriendsIcon/><span className="room-member-summary">{summary}</span>
+      <span className="room-member-count" aria-hidden="true">{online}</span>
     </button>
     {open && <div className="room-member-list" role="menu" aria-label="房间成员">
       <div className="room-member-head">
@@ -190,14 +191,16 @@ const MOUNT_EMOJI: Partial<Record<AnimalSpecies, string>> = {
 };
 
 /**
- * 串门坐骑：先列出自己牧场里已拥有的可骑动物，玩家选一只才骑上去。
- * 正在骑乘时同样先打开列表，由玩家选择换乘或下坐骑。
+ * 坐骑按钮：自己农场与好友农场共用顶栏入口，位置固定在背包左侧。
+ * 点击只打开自己已拥有的可骑动物列表，选一只才骑上去。
  */
-function MountPicker({ variant }: { variant: "friend" | "visit" }) {
+function MountPicker() {
   const onFoot = useSocial(state => state.visitOnFoot);
+  const visit = useSocial(state => state.visit);
   const ranch = useGame(state => state.ranch);
   const mounts = useMemo(() => ranch.animals.filter(isMountAnimal), [ranch.animals]);
   const mount = mounts.find(animal => animal.id === ranch.ridingId);
+  const ridingMount = !visit || !onFoot ? mount : undefined;
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -218,7 +221,8 @@ function MountPicker({ variant }: { variant: "friend" | "visit" }) {
     setOpen(false);
   };
   const dismount = () => {
-    useSocial.setState({ visitOnFoot: true });
+    if (useSocial.getState().visit) useSocial.setState({ visitOnFoot: true });
+    else useGame.getState().setRiding(null);
     setOpen(false);
   };
   const toggle = () => {
@@ -228,34 +232,38 @@ function MountPicker({ variant }: { variant: "friend" | "visit" }) {
     }
     setOpen(value => !value);
   };
-  const label = !onFoot && mount ? `下坐骑 · ${animalName(mount)}` : mounts.length ? `选择坐骑 · ${mounts.length}只` : "召唤坐骑";
+  const label = "坐骑";
+  const icon = ridingMount ? MOUNT_EMOJI[ridingMount.species] ?? "🐎" : "🐎";
 
-  return <div className={`mount-picker mount-picker-${variant}`} ref={wrap}>
-    <button type="button" className={`${variant === "friend" ? "friend-visit-ride" : "visit-ride"}${mounts.length ? "" : " empty"}`}
+  return <div className="mount-picker" ref={wrap}>
+    <button type="button" className={`mount-toggle-top${mounts.length ? "" : " empty"}`}
       onClick={toggle} aria-haspopup="menu" aria-expanded={open}
-      title={mounts.length ? "点击选择要骑的坐骑" : "还没有可骑的动物"}>
-      {label}
+      aria-label={ridingMount ? `坐骑，正在骑乘${animalName(ridingMount)}，点击换乘或下坐骑`
+        : mounts.length ? `坐骑，已拥有 ${mounts.length} 只可骑动物` : "坐骑，暂无可用动物"}
+      title={ridingMount ? `正在骑乘${animalName(ridingMount)}，点击换乘或下坐骑`
+        : mounts.length ? `点击选择坐骑，共 ${mounts.length} 只` : "还没有可骑的动物"}>
+      <span className="mount-toggle-icon" aria-hidden="true">{icon}</span>
+      <span className="mount-toggle-label">{label}</span>
     </button>
     {open && <div className="mount-picker-menu" role="menu" aria-label="我的坐骑">
       <div className="mount-picker-head"><b>我的坐骑</b><small>{mounts.length} 只</small></div>
       {mounts.map(animal => <button key={animal.id} type="button" role="menuitem"
-        className={`mount-picker-item${animal.id === ranch.ridingId && !onFoot ? " active" : ""}`}
+        className={`mount-picker-item${animal.id === ranch.ridingId && ridingMount ? " active" : ""}`}
         onClick={() => ride(animal.id)}>
         <span className="mount-picker-icon" aria-hidden="true">{MOUNT_EMOJI[animal.species] ?? "🐾"}</span>
         <span className="mount-picker-copy">
           <strong>{animalName(animal)}</strong>
           <small>{animal.element ? "五行变异坐骑" : "牧场坐骑"}</small>
         </span>
-        {animal.id === ranch.ridingId && !onFoot && <em>骑乘中</em>}
+        {animal.id === ranch.ridingId && ridingMount && <em>骑乘中</em>}
       </button>)}
-      {!onFoot && <button type="button" className="mount-picker-dismount" onClick={dismount}>下坐骑</button>}
+      {ridingMount && <button type="button" className="mount-picker-dismount" onClick={dismount}>下坐骑</button>}
     </div>}
   </div>;
 }
 
-/** 坐骑按钮：挂在发言按钮正下方，和好友条拆开。 */
-export function FriendMountButton() {
-  return <MountPicker variant="friend"/>;
+export function MountButton() {
+  return <MountPicker/>;
 }
 
 /** 回家按钮：紧挨功能菜单左侧。 */
@@ -298,7 +306,6 @@ export function VisitHUD({ visit }: { visit: Visit }) {
     </nav> : <>
       <div className="visit-tools">
         <ActionTrigger/>
-        <MountPicker variant="visit"/>
       </div>
       {visit.canManage && !reconnecting && <GuestAction visit={visit}/>}
     </>}

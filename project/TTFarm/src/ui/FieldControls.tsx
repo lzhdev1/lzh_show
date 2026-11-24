@@ -53,8 +53,8 @@ export function ControlGuide() {
   return <div className="control-guide">
     <button type="button" className="guide-trigger" aria-label="操作说明" aria-expanded={open} onClick={() => setOpen(!open)}>?</button>
     {open && <div className="guide-copy">
-      <p className="desktop-guide"><b>移动</b> WASD / 方向键<br/><b>奔跑</b> 按住 Shift　<b>跳跃</b> 空格<br/><b>镜头</b> 左键或右键拖动，Q / E 左右转，滚轮缩放</p>
-      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆，点左侧「冲刺」切换加速，再点恢复常速<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
+      <p className="desktop-guide"><b>移动</b> WASD / 方向键（默认冲刺）<br/><b>跳跃</b> 空格<br/><b>镜头</b> 左键或右键拖动，Q / E 左右转，滚轮缩放</p>
+      <p className="touch-guide"><b>移动</b> 拖动左侧摇杆；冲刺默认开启，点左侧「冲刺中」可切换常速<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
       <p><b>种菜</b> 点选下方种子，走到菜地上点「撒种」。生长时可浇水，作物上方出成熟标志后，走到那块地上点「收获」。</p>
       <p><b>采野菜</b> 野外每 10 分钟长出一批野菜丛，走近点「采摘」获得野菜，还有机会捡到种子种回农场。「农场 → 野外野菜」可以带路。</p>
       <p><b>动作</b> J 出拳　K 踢腿　C 欢呼　X 跳舞　Z 坐下　V 躺下　B 晕倒，也可以点左上角「动作」按钮；移动或跳跃会取消动作。</p>
@@ -105,7 +105,7 @@ export function DriveTouchControls() {
       held.current.clear();
       farmInput.forward = 0;
       farmInput.x = 0;
-      farmInput.running = false;
+      farmInput.running = farmInput.sprint;
       farmInput.brake = false;
     };
     window.addEventListener("blur", reset);
@@ -199,7 +199,7 @@ export function TouchControls({ spectating = false }: { spectating?: boolean } =
   };
 
   return <div className="touch-controls">
-    <div ref={stick} className="touch-stick" aria-label={spectating ? "自由镜头平移摇杆" : "移动摇杆，点左侧冲刺可加速"}
+    <div ref={stick} className="touch-stick" aria-label={spectating ? "自由镜头平移摇杆" : "移动摇杆，冲刺默认开启，可点左侧按钮切换常速"}
       onPointerDown={(e) => {
         if (active.current !== null || e.button !== 0) return;
         active.current = e.pointerId;

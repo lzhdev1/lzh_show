@@ -86,12 +86,7 @@ function WildEncounter({ animal, onOpenRanch }: { animal: WildAnimal; onOpenRanc
 export function RanchHUD({ onOpenRanch }: { onOpenRanch: () => void }) {
   const nearby = useRanchInteraction((s) => s.nearbyAnimal);
   const nearRanch = useRanchInteraction((s) => s.nearRanch);
-  const riding = useGame((s) => s.ranch.animals.find((animal) => animal.id === s.ranch.ridingId));
-  const setRiding = useGame((s) => s.setRiding);
   return <>
-    {riding && <button className="riding-action" onClick={() => setRiding(null)} title={animalName(riding)}>
-      <PawIcon/>下坐骑
-    </button>}
     {nearby ? <WildEncounter key={nearby.id} animal={nearby} onOpenRanch={onOpenRanch}/>
       : nearRanch && <button className="ranch-gate-action btn soft" onClick={onOpenRanch}><RanchIcon/>查看牧场</button>}
   </>;
