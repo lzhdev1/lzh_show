@@ -178,7 +178,7 @@ function buildHost(kind: HostKind, seed: number) {
   } else if (kind === "shrub") {
     // 枝干 + 透空叶片卡片，替换原来四个实心球拼成的“绿馒头”。
     const bush = buildBush(0.72 + seed * 0.18, Math.floor(seed * 3));
-    bush.position.y = 0.015;
+    bush.position.y = -0.04;
     group.add(bush);
   } else {
     // 地面菌床的土包也用带草土色变化的低模土丘，不再是一顶绿色半球帽。
@@ -237,7 +237,7 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
       const shoulder = Math.sin(theta * 4 + seed * 3.1) * Math.sin(t * Math.PI) * 0.15;
       const ripple = Math.sin(theta * 7 - seed * 1.3) * Math.sin(t * Math.PI) * 0.05;
       const y = Math.max(0, height * (profile + shoulder * profile + ripple))
-        + (t === rings ? -0.015 : 0);
+        + (t === rings ? -0.05 : 0);
       const bx = Math.cos(theta) * r * (1 + Math.sin(theta * 2 + seed) * 0.055);
       const bz = Math.sin(theta) * r * stretch;
       positions.push(bx, y, bz);
@@ -248,7 +248,7 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
   for (let segment = 0; segment < segments; segment++) {
     const theta = segment / segments * Math.PI * 2;
     const rr = radius * 1.18;
-    positions.push(Math.cos(theta) * rr, 0.015, Math.sin(theta) * rr * stretch);
+    positions.push(Math.cos(theta) * rr, -0.06, Math.sin(theta) * rr * stretch);
   }
   for (let ring = 0; ring < rings; ring++) {
     for (let segment = 0; segment < segments; segment++) {
@@ -257,7 +257,10 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
       const b = ring * segments + next;
       const c = (ring + 1) * segments + segment;
       const d = (ring + 1) * segments + next;
-      indices.push(a, c, d, a, d, b);
+      // 俯视时内侧在前、外侧在后，保持逆时针；否则坡面会变成背面，正面视角整座土丘消失。
+      indices.push(a, d, c);
+      // 第一圈的两个顶点都是同一个丘顶，第二片三角形退化成零面积，直接跳过。
+      if (ring > 0) indices.push(a, b, d);
     }
   }
   for (let segment = 0; segment < segments; segment++) {
@@ -266,7 +269,7 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
     const b = rings * segments + next;
     const c = skirtStart + segment;
     const d = skirtStart + next;
-    indices.push(a, c, d, a, d, b);
+    indices.push(a, d, c, a, b, d);
   }
 
   const base = new THREE.BufferGeometry();
@@ -380,17 +383,17 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
         // 坡脚嵌一块小石，坡面再露一块，打破一水的绿色。
         const pebble = buildRock(0.16 + rnd() * 0.12, Math.floor(rnd() * 3));
         const pa = rnd() * 6.28, pt = 0.7 + rnd() * 0.22;
-        pebble.position.set(x + Math.cos(pa) * radius * pt, h * moundProfile(pt) + 0.01, z + Math.sin(pa) * radius * pt);
+        pebble.position.set(x + Math.cos(pa) * radius * pt, h * moundProfile(pt) + 0.005, z + Math.sin(pa) * radius * pt);
         group.add(pebble);
         const chip = buildRock(0.12 + rnd() * 0.09, Math.floor(rnd() * 3));
         const ca = pa + 2.2 + rnd() * 1.4, ct = 0.34 + rnd() * 0.20;
-        chip.position.set(x + Math.cos(ca) * radius * ct, h * moundProfile(ct) + 0.01, z + Math.sin(ca) * radius * ct);
+        chip.position.set(x + Math.cos(ca) * radius * ct, h * moundProfile(ct) + 0.002, z + Math.sin(ca) * radius * ct);
         chip.scale.y *= 0.72;
         group.add(chip);
       } else {
         const scale = 0.3 + rnd() * 0.66;
         const rock = buildRock(scale, Math.floor(rnd() * 3));
-        rock.position.set(x, 0.01, z);
+        rock.position.set(x, 0, z);
         rock.rotation.set(rnd() * 0.08, rnd() * 6.28, rnd() * 0.08);
         group.add(rock);
         obstacles.addCircle(x, z, scale * 0.58);
@@ -423,7 +426,8 @@ export function createWildGarden(obstacles: WorldObstacles) {
     const kind = HOST_KINDS[Math.floor(rnd() * HOST_KINDS.length)];
     const seed = rnd();
     const model = buildHost(kind, seed);
-    model.position.set(x, 0, z);
+    // 整组宿主下沉 3cm，让倒木、树桩和灌木根部真正埋进草皮，而不是站在地表。
+    model.position.set(x, -0.03, z);
     model.rotation.y = rnd() * Math.PI * 2;
     hostGroup.add(model);
     const host: Host = {
@@ -433,7 +437,7 @@ export function createWildGarden(obstacles: WorldObstacles) {
       position: new THREE.Vector3(x, 0, z),
       yaw: model.rotation.y,
       seed,
-      surfaceY: hostSurface(kind, seed),
+      surfaceY: hostSurface(kind, seed) - 0.03,
       radius: kind === "log" ? 1.4 : kind === "stump" ? 0.5 : kind === "trunk" ? 0.36 : 0.55,
     };
     hosts.push(host);

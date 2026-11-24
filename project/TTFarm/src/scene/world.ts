@@ -813,7 +813,7 @@ export function createWorld(initialDecor?: FarmDecor): World {
   ];
   pathRocks.forEach(([x, z, s]) => {
     const rock = buildRock(s);
-    rock.position.set(x, 0.02, z);
+    rock.position.set(x, 0, z);
     group.add(rock);
   });
 

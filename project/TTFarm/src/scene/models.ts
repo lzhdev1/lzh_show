@@ -565,7 +565,7 @@ export function rockGeometry(variant = 0): THREE.BufferGeometry {
 export function buildRock(scale: number, variant = Math.floor(between(0, 3))) {
   const mesh = addShadow(new THREE.Mesh(rockGeometry(variant), rockMat));
   mesh.scale.set(scale, scale * 0.90, scale * 1.04);
-  mesh.position.y = 0.018;
+  mesh.position.y = -0.035;
   mesh.rotation.y = variant * 1.7 + between(0, Math.PI);
   return mesh;
 }
