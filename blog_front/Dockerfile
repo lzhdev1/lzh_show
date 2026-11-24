@@ -21,7 +21,7 @@ WORKDIR /ttfarm
 ENV COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
     npm_config_registry=https://registry.npmmirror.com
 RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
-COPY project/TTFarm/package.json project/TTFarm/pnpm-lock.yaml ./
+COPY project/TTFarm/package.json project/TTFarm/pnpm-lock.yaml project/TTFarm/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ---- 开发阶段：主站 + 游戏同时热更新（同一个容器） ----
@@ -49,7 +49,7 @@ COPY blog_front/package.json blog_front/pnpm-lock.yaml blog_front/pnpm-workspace
 RUN pnpm install --frozen-lockfile
 COPY blog_front/ .
 WORKDIR /ttfarm
-COPY project/TTFarm/package.json project/TTFarm/pnpm-lock.yaml ./
+COPY project/TTFarm/package.json project/TTFarm/pnpm-lock.yaml project/TTFarm/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY project/TTFarm/ .
 RUN pnpm build

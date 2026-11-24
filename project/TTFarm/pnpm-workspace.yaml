@@ -1,0 +1,6 @@
+# pnpm 12 no longer reads the package.json "pnpm" field.
+# esbuild needs its install script to place the platform binary used by Vite.
+packages: []
+
+allowBuilds:
+  esbuild: true
