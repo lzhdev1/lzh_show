@@ -85,12 +85,15 @@ export function createRanchScene(obstacles:WorldObstacles) {
           bursts.push({at:actor.rig.group.position.clone(),time:t,element:animal.element},
             {at:anchor.clone(),time:t,element:animal.element});
         }
+        // 野外收服/放归时直接切换所在地，避免动物从原野点一路“滑步”走向牧场。
+        actor.rig.group.position.copy(anchor);
         actor.anchor.copy(anchor);
         actor.range=range;
         actor.wanderLeg=-1;
         actor.wanderTarget.copy(anchor);
       } else if(!actor.wild){
         const anchor=location();
+        actor.rig.group.position.copy(anchor);
         actor.anchor.copy(anchor);actor.range=range;
         actor.wanderLeg=-1;
         actor.wanderTarget.copy(anchor);
