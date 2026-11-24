@@ -8,6 +8,7 @@ import {
 } from "../game/mushroomInteraction";
 import { createChatBubble } from "./chatBubble";
 import { createMushroomModel } from "./mushroomModels";
+import { buildBush, buildRock } from "./models";
 import {
   BRIDGE, FENCE_X, FENCE_Z, RIVER_BED, ROAD_HALF_WIDTH, WORLD_HALF,
   inWorld, onBridge, riverInfo, roadInfo,
@@ -87,43 +88,50 @@ function addHostObstacle(host: Host, obstacles: WorldObstacles) {
 }
 
 function barkMaterial(color: string) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0 });
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, flatShading: true });
 }
 
 function buildHost(kind: HostKind, seed: number) {
   const group = new THREE.Group();
   const bark = barkMaterial(kind === "log" ? "#6c4f36" : kind === "stump" ? "#73563d" : "#5f4934");
-  const cut = new THREE.MeshStandardMaterial({ color: "#cbb58e", roughness: 0.82 });
-  const moss = new THREE.MeshStandardMaterial({ color: "#62834e", roughness: 0.95 });
-  const leaf = new THREE.MeshStandardMaterial({ color: "#4e714a", roughness: 0.9 });
+  const cut = new THREE.MeshStandardMaterial({ color: "#cbb58e", roughness: 0.82, flatShading: true });
+  const moss = new THREE.MeshStandardMaterial({ color: "#62834e", roughness: 0.95, flatShading: true });
   const branchMat = barkMaterial("#76593c");
 
   if (kind === "log") {
     const length = 2.1 + seed * 0.9;
     const radius = 0.22 + seed * 0.08;
+    // 木身和端面放进同一条轴，端面年轮才不会在旋转后飘到木头旁边。
+    const axis = new THREE.Group();
+    axis.rotation.y = seed * 1.8;
+    group.add(axis);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.07, length, 9, 2), bark);
     body.rotation.z = Math.PI / 2;
-    body.rotation.y = seed * 1.8;
     body.position.y = radius;
     body.castShadow = true;
-    group.add(body);
+    axis.add(body);
     const end = new THREE.CylinderGeometry(radius * 0.99, radius * 0.99, 0.035, 10);
+    const ring = new THREE.TorusGeometry(radius * 0.64, 0.012, 3, 16);
     for (const sign of [-1, 1]) {
       const cap = new THREE.Mesh(end, cut);
       cap.rotation.z = Math.PI / 2;
       cap.position.set(sign * (length / 2 + 0.018), radius, 0);
-      group.add(cap);
+      axis.add(cap);
+      const yearRing = new THREE.Mesh(ring, cut);
+      yearRing.rotation.y = Math.PI / 2;
+      yearRing.position.set(sign * (length / 2 + 0.040), radius, 0);
+      axis.add(yearRing);
     }
     for (let i = 0; i < 4; i++) {
       const patch = new THREE.Mesh(new THREE.SphereGeometry(radius * (0.55 + i % 2 * 0.2), 7, 4), moss);
       patch.scale.set(1, 0.28, 0.8);
       patch.position.set((i - 1.5) * length * 0.18, radius * 1.65, (i % 2 ? 0.12 : -0.12));
-      group.add(patch);
+      axis.add(patch);
     }
     const stub = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.45, radius * 0.6, 0.45, 7), branchMat);
     stub.rotation.z = 0.8;
     stub.position.set(-length * 0.2, radius * 1.55, 0.08);
-    group.add(stub);
+    axis.add(stub);
   } else if (kind === "stump") {
     const height = 0.55 + seed * 0.18;
     const radius = 0.32 + seed * 0.08;
@@ -168,44 +176,29 @@ function buildHost(kind: HostKind, seed: number) {
     ivy.position.y = height * 0.28;
     group.add(ivy);
   } else if (kind === "shrub") {
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 0.42, 6), branchMat);
-    body.position.y = 0.21;
-    group.add(body);
-    const geo = new THREE.IcosahedronGeometry(0.34, 1);
-    for (let i = 0; i < 4; i++) {
-      const puff = new THREE.Mesh(geo, i % 3 === 0 ? moss : leaf);
-      const a = i / 4 * Math.PI * 2 + seed * 3;
-      puff.position.set(Math.cos(a) * 0.24, 0.42 + (i % 2) * 0.16, Math.sin(a) * 0.24);
-      puff.scale.set(0.9 + i % 2 * 0.25, 0.75, 0.9);
-      puff.castShadow = true;
-      group.add(puff);
-    }
-    for (let i = 0; i < 5; i++) {
-      const twig = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.03, 0.5, 4), branchMat);
-      const a = i / 5 * Math.PI * 2;
-      twig.rotation.z = Math.cos(a) * 0.35;
-      twig.rotation.x = Math.sin(a) * 0.35;
-      twig.position.set(Math.cos(a) * 0.18, 0.36, Math.sin(a) * 0.18);
-      group.add(twig);
-    }
+    // 枝干 + 透空叶片卡片，替换原来四个实心球拼成的“绿馒头”。
+    const bush = buildBush(0.72 + seed * 0.18, Math.floor(seed * 3));
+    bush.position.y = 0.015;
+    group.add(bush);
   } else {
-    const mound = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), moss);
-    mound.scale.y = 0.3;
+    // 地面菌床的土包也用带草土色变化的低模土丘，不再是一顶绿色半球帽。
+    const mound = new THREE.Mesh(createMoundGeometry(0.62, 0.20, seed * 100 + 3), gardenMoundMaterial);
     mound.position.y = 0.01;
+    mound.castShadow = true;
     group.add(mound);
-    for (let i = 0; i < 5; i++) {
-      const grass = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.26, 4), leaf);
-      const a = i * 1.7;
-      grass.position.set(Math.cos(a) * 0.4, 0.15, Math.sin(a) * 0.4);
-      grass.rotation.z = Math.cos(a) * 0.6;
-      group.add(grass);
-    }
   }
   group.traverse((object) => {
     if (object instanceof THREE.Mesh) object.receiveShadow = true;
   });
   return group;
 }
+
+const gardenMoundMaterial = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.98,
+  flatShading: true,
+  envMapIntensity: 0.25,
+});
 
 function hostSurface(kind: HostKind, seed: number) {
   if (kind === "log") return 0.22 + seed * 0.08;
@@ -221,33 +214,13 @@ function moundProfile(t: number) {
   return Math.pow(s, 0.8);
 }
 
-/** 石头也用一体起伏的岩块，不用方盒/圆柱拼出“平板”。 */
-function createRockGeometry(seed: number) {
-  const geometry = new THREE.IcosahedronGeometry(1, 1);
-  const position = geometry.attributes.position;
-  for (let i = 0; i < position.count; i++) {
-    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
-    const n = 1
-      + Math.sin(x * 2.6 + seed * 3.7) * 0.13
-      + Math.sin(y * 3.2 - seed * 2.1) * 0.10
-      + Math.sin(z * 2.9 + seed * 5.3) * 0.09;
-    position.setXYZ(i, x * n, y * (y < 0 ? 0.42 : 0.72) * n, z * n);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
+/** 土丘几何：外圈平缓接草，坡顶略圆，带草土斑块；坡面直接长出草叶，
+ * 不再额外摆一排圆锥。整座土丘仍然只有一个 draw call。 */
 function createMoundGeometry(radius: number, height: number, seed: number) {
   const rings = 9;
   const segments = 22;
   const positions: number[] = [];
-  const colors: number[] = [];
   const indices: number[] = [];
-  const color = new THREE.Color();
-  const grassDeep = new THREE.Color("#88a05f");
-  const grassMid = new THREE.Color("#a3b671");
-  const grassDry = new THREE.Color("#c4c783");
-  const soil = new THREE.Color("#9b815c");
   const stretch = 0.84 + (Math.sin(seed * 4.1) + 1) * 0.08;
   for (let ring = 0; ring <= rings; ring++) {
     const t = ring / rings;
@@ -255,27 +228,27 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
     for (let segment = 0; segment < segments; segment++) {
       const theta = segment / segments * Math.PI * 2;
       const rim = 1 + t * (
-        Math.sin(theta * 3 + seed * 2.7) * 0.085
-        + Math.sin(theta * 5 - seed * 1.9) * 0.052
-        + Math.sin(theta * 8 + seed * 4.3) * 0.028
+        Math.sin(theta * 3 + seed * 2.7) * 0.115
+        + Math.sin(theta * 5 - seed * 1.9) * 0.072
+        + Math.sin(theta * 8 + seed * 4.3) * 0.040
       );
       const r = radius * t * rim * (t === rings ? 1.08 : 1);
       // 低频肩部起伏 + 细碎坡面起伏：轮廓不是旋转体，坡面也有凹有脊。
-      const shoulder = Math.sin(theta * 4 + seed * 3.1) * Math.sin(t * Math.PI) * 0.09;
-      const ripple = Math.sin(theta * 7 - seed * 1.3) * Math.sin(t * Math.PI) * 0.028;
+      const shoulder = Math.sin(theta * 4 + seed * 3.1) * Math.sin(t * Math.PI) * 0.15;
+      const ripple = Math.sin(theta * 7 - seed * 1.3) * Math.sin(t * Math.PI) * 0.05;
       const y = Math.max(0, height * (profile + shoulder * profile + ripple))
         + (t === rings ? -0.015 : 0);
       const bx = Math.cos(theta) * r * (1 + Math.sin(theta * 2 + seed) * 0.055);
       const bz = Math.sin(theta) * r * stretch;
       positions.push(bx, y, bz);
-      const patch = Math.sin(theta * 5 + seed * 5.2) * 0.5 + 0.5;
-      const bare = profile > 0.4 && patch > 0.78 ? (profile - 0.4) * 0.42 : 0;
-      const soilAmount = Math.min(0.42, bare);
-      color.copy(grassDeep).lerp(grassMid, 0.34 + patch * 0.55);
-      color.lerp(grassDry, profile * 0.42);
-      color.lerp(soil, soilAmount);
-      colors.push(color.r, color.g, color.b);
     }
+  }
+  // 最外圈再压一圈旧土裙边，土丘才有“从草地里拱出来”的接缝。
+  const skirtStart = positions.length / 3;
+  for (let segment = 0; segment < segments; segment++) {
+    const theta = segment / segments * Math.PI * 2;
+    const rr = radius * 1.18;
+    positions.push(Math.cos(theta) * rr, 0.015, Math.sin(theta) * rr * stretch);
   }
   for (let ring = 0; ring < rings; ring++) {
     for (let segment = 0; segment < segments; segment++) {
@@ -287,19 +260,98 @@ function createMoundGeometry(radius: number, height: number, seed: number) {
       indices.push(a, c, d, a, d, b);
     }
   }
+  for (let segment = 0; segment < segments; segment++) {
+    const next = (segment + 1) % segments;
+    const a = rings * segments + segment;
+    const b = rings * segments + next;
+    const c = skirtStart + segment;
+    const d = skirtStart + next;
+    indices.push(a, c, d, a, d, b);
+  }
+
+  const base = new THREE.BufferGeometry();
+  base.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  base.setIndex(indices);
+  base.computeVertexNormals();
+  const faceGeo = base.toNonIndexed();
+  base.dispose();
+
+  // 逐面刷草/干草/土，而不是逐顶点插值；低模土丘的色块才会像一块块草皮。
+  const pos = faceGeo.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const grassDeep = new THREE.Color("#86a35b");
+  const grassMid = new THREE.Color("#b1c97d");
+  const grassDry = new THREE.Color("#ded49c");
+  const soil = new THREE.Color("#a57a51");
+  const c = new THREE.Color();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, i + 1);
+    d.fromBufferAttribute(pos, i + 2);
+    ab.subVectors(b, a);
+    ac.subVectors(d, a);
+    n.crossVectors(ab, ac).normalize();
+    const cx = (a.x + b.x + d.x) / 3;
+    const cz = (a.z + b.z + d.z) / 3;
+    const t = Math.min(1, Math.hypot(cx / (radius * 1.1), cz / (radius * stretch)));
+    const patch = Math.sin(cx * 5.4 + cz * 4.7 + seed * 3.2) * 0.5 + 0.5;
+    const grain = Math.sin((i + 7) * 11.3 + seed * 4.7) * 0.5 + 0.5;
+    c.copy(grassDeep)
+      .lerp(grassMid, 0.48 + patch * 0.38)
+      .lerp(grassDry, (1 - t) * 0.34 + grain * 0.10);
+    // 丘顶露出踏实土和碎石，草从坡脚往上包；这样读起来是土丘，不是绿馒头。
+    if (t < 0.42) c.lerp(soil, 0.42 + (0.42 - t) * 0.72);
+    if (patch > 0.56) c.lerp(soil, (patch - 0.56) * 0.92);
+    if (n.y < 0.42) c.lerp(soil, 0.38);
+    if (t > 0.78) c.lerp(soil, 0.34);
+    c.multiplyScalar(0.90 + grain * 0.18);
+    for (let k = 0; k < 3; k++) c.toArray(colors, (i + k) * 3);
+  }
+
+  // 坡面草叶：每处草簇三片，正反各一份；不再是一根根孤零零的绿色尖刺。
+  const extendedPositions = Array.from(pos.array as Float32Array);
+  const extendedColors = Array.from(colors);
+  const bladeDark = new THREE.Color("#537c40");
+  const bladeLight = new THREE.Color("#abc777");
+  const emitBlade = (p0: number[], p1: number[], p2: number[], c0: THREE.Color, c1: THREE.Color, c2: THREE.Color) => {
+    extendedPositions.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p1);
+    extendedColors.push(c0.r, c0.g, c0.b, c1.r, c1.g, c1.b, c2.r, c2.g, c2.b,
+      c0.r, c0.g, c0.b, c2.r, c2.g, c2.b, c1.r, c1.g, c1.b);
+  };
+  for (let clump = 0; clump < 12; clump++) {
+    const angle = (clump / 12) * Math.PI * 2 + seed * 0.7;
+    const t = 0.30 + ((clump * 7) % 13) / 13 * 0.52;
+    const rr = radius * t * 1.01;
+    const bx = Math.cos(angle) * rr;
+    const bz = Math.sin(angle) * rr * stretch;
+    const by = height * moundProfile(t) + 0.005;
+    const outX = Math.cos(angle), outZ = Math.sin(angle);
+    for (let j = 0; j < 3; j++) {
+      const a2 = angle + (j - 1) * 0.32;
+      const h = 0.11 + ((clump + j * 3) % 5) * 0.022;
+      const w = 0.038 + ((clump + j) % 3) * 0.012;
+      const ox = -Math.sin(a2), oz = Math.cos(a2);
+      const p0 = [bx - ox * w, by, bz - oz * w];
+      const p1 = [bx + ox * w, by, bz + oz * w];
+      const p2 = [
+        bx + outX * h * 0.42 - ox * w * 0.30,
+        by + h,
+        bz + outZ * h * 0.42 - oz * w * 0.30,
+      ];
+      emitBlade(p0, p1, p2, bladeDark, bladeDark, bladeLight);
+    }
+  }
+
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(extendedPositions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(extendedColors, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
 
 function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
-  const matGrassBlade = new THREE.MeshStandardMaterial({ color: "#5f8142", roughness: 0.96 });
-  const moundMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.98, flatShading: true });
-  const stone = new THREE.MeshStandardMaterial({ color: "#a9a798", roughness: 0.95, flatShading: true });
-  const stoneWarm = new THREE.MeshStandardMaterial({ color: "#b9ab91", roughness: 0.95, flatShading: true });
   const rnd = randomSource(0x6f756e67);
   const used: Array<[number, number]> = [];
 
@@ -316,7 +368,7 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
       if (kind === "mound") {
         const h = Math.min(1.7, 0.45 + radius * 0.24 + rnd() * 0.16);
         const seed = rnd() * 100;
-        const mound = new THREE.Mesh(createMoundGeometry(radius, h, seed), moundMaterial);
+        const mound = new THREE.Mesh(createMoundGeometry(radius, h, seed), gardenMoundMaterial);
         mound.position.copy(p);
         mound.rotation.y = rnd() * 6.28;
         mound.castShadow = true;
@@ -325,23 +377,21 @@ function buildGardenTerrain(obstacles: WorldObstacles, group: THREE.Group) {
         // 土丘没有单独的地面高度采样，碰撞圈按视觉半径收口，
         // 只留最外圈薄边可踩，避免玩家走进坡面后腰部以下埋进土里。
         obstacles.addCircle(x, z, radius * 0.99);
-        for (let i = 0; i < 11; i++) {
-          const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.3 + rnd() * 0.22, 5), matGrassBlade);
-          const a = rnd() * 6.28;
-          const t = 0.3 + rnd() * 0.58;
-          const d = radius * t;
-          tuft.position.set(x + Math.cos(a) * d, h * moundProfile(t) + 0.02, z + Math.sin(a) * d);
-          tuft.rotation.set(Math.sin(a) * 0.18, rnd() * 6.28, Math.cos(a) * 0.4);
-          group.add(tuft);
-        }
+        // 坡脚嵌一块小石，坡面再露一块，打破一水的绿色。
+        const pebble = buildRock(0.16 + rnd() * 0.12, Math.floor(rnd() * 3));
+        const pa = rnd() * 6.28, pt = 0.7 + rnd() * 0.22;
+        pebble.position.set(x + Math.cos(pa) * radius * pt, h * moundProfile(pt) + 0.01, z + Math.sin(pa) * radius * pt);
+        group.add(pebble);
+        const chip = buildRock(0.12 + rnd() * 0.09, Math.floor(rnd() * 3));
+        const ca = pa + 2.2 + rnd() * 1.4, ct = 0.34 + rnd() * 0.20;
+        chip.position.set(x + Math.cos(ca) * radius * ct, h * moundProfile(ct) + 0.01, z + Math.sin(ca) * radius * ct);
+        chip.scale.y *= 0.72;
+        group.add(chip);
       } else {
         const scale = 0.3 + rnd() * 0.66;
-        const rock = new THREE.Mesh(createRockGeometry(rnd() * 100), rnd() > 0.45 ? stone : stoneWarm);
-        rock.position.set(x, scale * (0.24 + rnd() * 0.1), z);
-        rock.scale.set(scale * (1.15 + rnd() * 0.4), scale * (0.72 + rnd() * 0.3), scale * (0.9 + rnd() * 0.4));
-        rock.rotation.set(rnd() * 0.1, rnd() * 6.28, rnd() * 0.1);
-        rock.castShadow = true;
-        rock.receiveShadow = true;
+        const rock = buildRock(scale, Math.floor(rnd() * 3));
+        rock.position.set(x, 0.01, z);
+        rock.rotation.set(rnd() * 0.08, rnd() * 6.28, rnd() * 0.08);
         group.add(rock);
         obstacles.addCircle(x, z, scale * 0.58);
       }

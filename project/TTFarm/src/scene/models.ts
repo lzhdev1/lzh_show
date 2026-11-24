@@ -489,12 +489,85 @@ export function buildTree(scale: number, variant: number): THREE.Group {
 
 /* ---------------- 石头 / 草丛 / 花 / 灌木 ---------------- */
 
-export function buildRock(scale: number) {
-  const rock = addShadow(new THREE.Mesh(lumpy(0.36, 2, 0.16), clay(0xcfcaba, { roughness: 0.95 })));
-  rock.scale.set(scale, scale * 0.72, scale * 1.05);
-  rock.position.y = 0.17;
-  rock.rotation.y = between(0, Math.PI);
-  return rock;
+const rockMat = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.97,
+  flatShading: true,
+  envMapIntensity: 0.35,
+});
+
+const rockGeoCache = new Map<number, THREE.BufferGeometry>();
+
+/** 硬边岩块：低模二十面体被“劈”出几组斜面，再按面刷上冷灰、暖灰和苔藓。
+ * 关键不是面数，而是每个三角面都保留自己的法线，轮廓才有石头该有的棱角。 */
+export function rockGeometry(variant = 0): THREE.BufferGeometry {
+  const cached = rockGeoCache.get(variant);
+  if (cached) return cached;
+
+  const geo = new THREE.IcosahedronGeometry(1, 1).toNonIndexed();
+  const pos = geo.attributes.position;
+  const phase = 1.9 + variant * 3.7;
+  const p = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i);
+    const lump = 1
+      + Math.sin(p.x * 2.8 + phase) * 0.17
+      + Math.sin(p.z * 4.2 - phase * 0.7) * 0.13
+      + Math.sin((p.x + p.z) * 6.4 + phase * 1.3) * 0.055;
+    const corner = 1 + Math.sin(p.x * 4.6 - p.z * 3.4 + phase) * 0.10;
+    p.multiplyScalar(lump * corner);
+    // 下半部压扁，石头是坐在土里的，不是一颗悬空的肥皂泡；长条变体再抬一点背。
+    p.y = p.y < 0 ? p.y * 0.32 : p.y * (0.80 + (variant === 1 ? 0.22 : 0));
+    pos.setXYZ(i, p.x, p.y, p.z);
+  }
+  geo.computeVertexNormals();
+
+  // 底部落到 y=0，整体收成大约 0.36m 半径、0.62m 高的路边石体量。
+  geo.computeBoundingBox();
+  const box = geo.boundingBox!;
+  const height = box.max.y - box.min.y;
+  geo.translate(0, -box.min.y, 0);
+  geo.scale(0.36, 0.62 / height, 0.40);
+  geo.computeVertexNormals();
+
+  const colors = new Float32Array(pos.count * 3);
+  const light = new THREE.Color(0xd9d3c4);
+  const warm = new THREE.Color(0xc9bfab);
+  const shade = new THREE.Color(0x8d897d);
+  const moss = new THREE.Color(0x78995a);
+  const c = new THREE.Color();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  const ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, i + 1);
+    d.fromBufferAttribute(pos, i + 2);
+    ab.subVectors(b, a);
+    ac.subVectors(d, a);
+    n.crossVectors(ab, ac).normalize();
+    const face = (i / 3 + variant * 17) % 11;
+    const grain = Math.sin((i + 3) * 7.13 + phase) * 0.5 + 0.5;
+    c.copy(light).lerp(warm, 0.25 + grain * 0.30).lerp(shade, face / 26);
+    // 朝上且位置偏高的面，盖一层很薄的苔；苔藓只染面，不糊成一张渐变的绿皮。
+    if (n.y > 0.20) {
+      const top = (a.y + b.y + d.y) / 3;
+      c.lerp(moss, THREE.MathUtils.smoothstep(top, 0.02, 0.38) * THREE.MathUtils.smoothstep(n.y, 0.18, 0.78) * 0.68);
+    }
+    // 背光、贴近地面的面压暗，给石头一个“落地”的重量。
+    if (n.y < 0.12) c.lerp(shade, 0.22);
+    for (let k = 0; k < 3; k++) c.toArray(colors, (i + k) * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  rockGeoCache.set(variant, geo);
+  return geo;
+}
+
+export function buildRock(scale: number, variant = Math.floor(between(0, 3))) {
+  const mesh = addShadow(new THREE.Mesh(rockGeometry(variant), rockMat));
+  mesh.scale.set(scale, scale * 0.90, scale * 1.04);
+  mesh.position.y = 0.018;
+  mesh.rotation.y = variant * 1.7 + between(0, Math.PI);
+  return mesh;
 }
 
 export function buildGrassTuft(): THREE.Group {
@@ -649,18 +722,154 @@ export function flowerMaterial(): THREE.MeshStandardMaterial {
 
 export function buildBush(scale: number, variant: number): THREE.Group {
   const group = new THREE.Group();
-  const greens = [PALETTE.leafDark, PALETTE.leaf, PALETTE.leafLight];
-  const blobs: Array<[number, number, number, number]> = [
-    [0, 0.3, 0, 0.34],
-    [-0.24, 0.24, 0.1, 0.24],
-    [0.26, 0.26, -0.06, 0.22],
-    [0.05, 0.44, 0.02, 0.2],
-  ];
-  blobs.forEach(([x, y, z, r], i) => {
-    const blob = addShadow(new THREE.Mesh(lumpy(r, 2, 0.12), clay(greens[(i + variant) % greens.length])));
-    blob.position.set(x, y, z);
-    group.add(blob);
-  });
+  const bush = addShadow(new THREE.Mesh(bushGeometry(variant), bushMat));
+  bush.rotation.y = variant * 1.7 + between(0, 0.35);
+  group.add(bush);
   group.scale.setScalar(scale);
   return group;
+}
+
+const bushGeoCache = new Map<number, THREE.BufferGeometry>();
+const bushMat = new THREE.MeshStandardMaterial({
+  vertexColors: true,
+  roughness: 0.91,
+  envMapIntensity: 0.30,
+});
+
+/** 一小段枝干：把圆柱变换到两点之间，所有枝干最后并进同一份几何。 */
+function branchPart(parts: THREE.BufferGeometry[], from: THREE.Vector3, to: THREE.Vector3, r0: number, r1: number, color: number) {
+  const delta = new THREE.Vector3().subVectors(to, from);
+  const length = delta.length();
+  if (length < 0.004) return;
+  const geo = new THREE.CylinderGeometry(r1, r0, length, 5, 1, true).toNonIndexed();
+  const mid = from.clone().add(to).multiplyScalar(0.5);
+  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+  geo.applyMatrix4(new THREE.Matrix4().compose(mid, quat, new THREE.Vector3(1, 1, 1)));
+  parts.push(tinted(geo, color).deleteAttribute("uv") ?? geo);
+}
+
+/** 一片折起来的叶子卡片：两片三角面正反各画一次，FrontSide 材质也能透空。
+ * 叶片基部暗、叶尖亮，整丛灌木只用一个材质和一次 draw call。 */
+function leafCard(
+  parts: THREE.BufferGeometry[], center: THREE.Vector3, dir: THREE.Vector3,
+  length: number, width: number, baseColor: THREE.Color, tipColor: THREE.Color,
+) {
+  const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+  if (side.lengthSq() < 0.0001) side.set(1, 0, 0);
+  side.normalize();
+  const up = new THREE.Vector3(0, 1, 0);
+  const p0 = center.clone();
+  const p1 = center.clone().addScaledVector(side, width).addScaledVector(dir, length * 0.44).addScaledVector(up, 0.012);
+  const p2 = center.clone().addScaledVector(dir, length).addScaledVector(up, 0.035);
+  const p3 = center.clone().addScaledVector(side, -width).addScaledVector(dir, length * 0.44).addScaledVector(up, 0.012);
+  const mid = baseColor.clone().lerp(tipColor, 0.52);
+  const xyz: number[] = [], colors: number[] = [];
+  const emit = (q0: THREE.Vector3, q1: THREE.Vector3, q2: THREE.Vector3, c0: THREE.Color, c1: THREE.Color, c2: THREE.Color) => {
+    xyz.push(q0.x, q0.y, q0.z, q1.x, q1.y, q1.z, q2.x, q2.y, q2.z);
+    colors.push(c0.r, c0.g, c0.b, c1.r, c1.g, c1.b, c2.r, c2.g, c2.b);
+  };
+  const front = [[p0, p1, p2, baseColor, mid, tipColor], [p0, p2, p3, baseColor, tipColor, mid]] as const;
+  for (const [q0, q1, q2, c0, c1, c2] of front) {
+    emit(q0, q1, q2, c0, c1, c2);
+    emit(q0, q2, q1, c0, c2, c1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(xyz, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  parts.push(geo);
+}
+
+export function bushGeometry(variant: number): THREE.BufferGeometry {
+  const v = ((variant % 3) + 3) % 3;
+  const cached = bushGeoCache.get(v);
+  if (cached) return cached;
+
+  const parts: THREE.BufferGeometry[] = [];
+  const profiles = [
+    { h: 0.55, r: 0.40, stems: 5, clusters: 8, cards: 6 },
+    { h: 0.72, r: 0.30, stems: 6, clusters: 9, cards: 5 },
+    { h: 0.36, r: 0.52, stems: 7, clusters: 9, cards: 6 },
+  ];
+  const p = profiles[v];
+  const leafDark = new THREE.Color(0x4d7f3b);
+  const leafMid = new THREE.Color(0x6fa848);
+  const leafLight = new THREE.Color(0x9acb67);
+  const bark = 0x70583d;
+
+  // 贴地的一圈窄草叶，把灌木的根埋进草里，别像一盆浮空的花。
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2 + 0.4;
+    const length = 0.14 + (i % 3) * 0.03;
+    leafCard(parts,
+      new THREE.Vector3(Math.cos(a) * 0.20, 0.01, Math.sin(a) * 0.20),
+      new THREE.Vector3(Math.cos(a) * 0.55, 1, Math.sin(a) * 0.55).normalize(),
+      length, 0.026, leafDark, leafMid);
+  }
+
+  const tips: Array<{ at: THREE.Vector3; angle: number; height: number }> = [];
+  for (let i = 0; i < p.stems; i++) {
+    const angle = i / p.stems * Math.PI * 2 + 0.35 + (i % 2 ? 0.12 : -0.08);
+    const radius = p.r * (i % 2 ? 0.82 : 0.58);
+    const from = new THREE.Vector3(Math.cos(angle) * 0.035, 0.02, Math.sin(angle) * 0.035);
+    const to = new THREE.Vector3(
+      Math.cos(angle) * radius,
+      p.h * (0.64 + (i % 3) * 0.10),
+      Math.sin(angle) * radius * 0.92,
+    );
+    branchPart(parts, from, to, 0.045, 0.016, bark);
+    // 每个主枝再分出一根小枝，剪影不会只有几根直棍。
+    const split = new THREE.Vector3(
+      Math.cos(angle + 0.8) * (radius + 0.12),
+      p.h * (0.48 + (i % 2) * 0.10),
+      Math.sin(angle + 0.8) * (radius + 0.08),
+    );
+    branchPart(parts, to, split, 0.018, 0.009, bark);
+    tips.push({ at: to, angle, height: p.h });
+    tips.push({ at: split, angle: angle + 0.8, height: p.h * 0.55 });
+  }
+
+  // 叶簇集中在枝梢，中心留一点缝隙；每片叶子的方向、长度和颜色都略有差别。
+  const centers = tips.slice(0, p.clusters);
+  for (let ci = 0; ci < p.clusters; ci++) {
+    const tip = centers[ci % centers.length];
+    const clusterCenter = tip.at.clone();
+    clusterCenter.y += 0.03;
+    for (let k = 0; k < p.cards + (ci % 2); k++) {
+      const angle = (k / p.cards) * Math.PI * 2 + tip.angle + (ci - 2) * 0.35;
+      const dir = new THREE.Vector3(
+        Math.cos(angle) * (0.55 + (k % 2) * 0.20),
+        0.44 + ((k + ci) % 3) * 0.10,
+        Math.sin(angle) * (0.55 + (k % 3) * 0.12),
+      ).normalize();
+      const start = clusterCenter.clone().add(new THREE.Vector3(
+        Math.cos(angle) * 0.035, (k % 3) * 0.02, Math.sin(angle) * 0.035,
+      ));
+      const shade = (k + ci) % 4;
+      const base = shade === 0 ? leafDark : leafMid;
+      const tipColor = shade === 3 ? leafLight : leafMid.clone().lerp(leafLight, 0.55);
+      leafCard(parts, start, dir,
+        0.13 + (k % 3) * 0.024 + (ci % 2) * 0.016,
+        0.050 + (k % 2) * 0.016,
+        base, tipColor);
+    }
+  }
+
+  // 中间补两小簇朝上的叶，正面看不会只有一圈外轮廓。
+  for (let i = 0; i < 2; i++) {
+    const angle = i * Math.PI + 0.7;
+    const center = new THREE.Vector3(Math.cos(angle) * 0.12, p.h * 0.46, Math.sin(angle) * 0.08);
+    for (let k = 0; k < 4; k++) {
+      const a = angle + (k - 1.5) * 0.50;
+      leafCard(parts, center.clone(), new THREE.Vector3(Math.cos(a) * 0.4, 1, Math.sin(a) * 0.4).normalize(),
+        0.12 + (k % 2) * 0.022, 0.052, leafDark, leafLight);
+    }
+  }
+
+  const merged = mergeGeometries(parts, false)!;
+  for (const name of Object.keys(merged.attributes)) {
+    if (name !== "position" && name !== "normal" && name !== "color") merged.deleteAttribute(name);
+  }
+  bushGeoCache.set(v, merged);
+  return merged;
 }
