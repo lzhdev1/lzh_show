@@ -570,7 +570,7 @@ function buildMeadow(obstacles: WorldObstacles): THREE.Group {
         obstacles.addCircle(x, z, 0.20 * scale);
       } else if (kind < 6) {
         rocks.push({x, z, s: scale * 0.95, r: r2 * 6.28});
-        obstacles.addCircle(x, z, 0.40 * scale * 0.95);
+        obstacles.addCircle(x, z, 0.40 * scale * 0.95, undefined, 0.575 * (scale * 0.95) * 0.72);
       } else if (Math.hypot(x, z) > 100) {
         // 只有远处的草交给这张疏网格，近处由下面的密网格负责
         tufts.push({ x, z, s: scale * 1.5, r: r3 * 6.28 });
