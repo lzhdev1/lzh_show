@@ -3,6 +3,7 @@ import { CROPS, SHOP_CROPS } from "./crops";
 import {
   applyGuestWater,
   applySelfWater,
+  canShowWaterHint,
   GUEST_WATER_PER_WINDOW,
   growTotal,
   guestWaterGate,
@@ -86,6 +87,31 @@ describe("自己的浇水配额", () => {
     expect(selfWaterGate(plot({ watered: MAX_WATER }), 2_000).reason).toBe("cap");
     const ripe = plot({ plantedAt: 2_000 - CROPS.radish.growMs });
     expect(selfWaterGate(ripe, 2_000).reason).toBe("ready");
+  });
+});
+
+describe("浇水标识按查看者判断", () => {
+  it("自己浇到本小时上限后自己看不到，但好友仍能看到", () => {
+    let p = plot({ crop: "durian" });
+    for (let i = 0; i < SEED_WATER_FREE; i += 1) p = applySelfWater(p, 2_000);
+    p = applySelfWater(p, 2_000);
+    p = applySelfWater(p, 2_001);
+    expect(canShowWaterHint(p, 2_002, "self")).toBe(false);
+    expect(canShowWaterHint(p, 2_002, "guest")).toBe(true);
+    expect(canShowWaterHint(p, 2_002, "none")).toBe(false);
+  });
+
+  it("好友浇过之后好友看不到，主人剩余额度仍可见", () => {
+    const p = applyGuestWater(plot(), 2_000, "42");
+    expect(canShowWaterHint(p, 2_001, "guest")).toBe(false);
+    expect(canShowWaterHint(p, 2_001, "self")).toBe(true);
+    expect(canShowWaterHint(applyGuestWater(plot({ watered: MAX_WATER }), 2_000, "42"), 2_001, "self")).toBe(false);
+  });
+
+  it("成熟后谁都不显示浇水标识", () => {
+    const ripe = plot({ plantedAt: 2_000 - CROPS.radish.growMs });
+    expect(canShowWaterHint(ripe, 2_000, "self")).toBe(false);
+    expect(canShowWaterHint(ripe, 2_000, "guest")).toBe(false);
   });
 });
 

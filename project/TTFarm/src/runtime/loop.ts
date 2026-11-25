@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { createRiverAudio } from "../scene/riverAudio";
+import { startDrive as startDriveAudio, stopDrive as stopDriveAudio, updateDrive as updateDriveAudio,
+  updateWalk, playLanding, silenceDrive } from "../scene/farmAudio";
 import { createFarmCamera } from "../scene/farmCamera";
 import { createView } from "../scene/view";
 import { createWorld } from "../scene/world";
@@ -123,6 +125,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   view.scene.add(horseTrail.mesh);
   let trailHorseId: string | undefined;
   let vehicle: PlayerVehicle | null = null;
+  let wasJumping = false;
   const spectatorFocus = new THREE.Vector3();
   let roomKey = "home";
   let homePose = { x: 0, z: 6.9, yaw: Math.PI, deck: false };
@@ -328,6 +331,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     useDrive.getState().setDriving(true);
     useTownNav.getState().clear();
     useGame.getState().notify(`已上车：${car.plate}`);
+    wasJumping = false;
+    startDriveAudio();
     controls.reset();
   };
 
@@ -342,6 +347,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     player.relocate(p.x, p.z, h + Math.PI / 2, deck);
     vehicle.dispose();
     vehicle = null;
+    stopDriveAudio();
     useDrive.getState().setDriving(false);
     controls.reset();
   };
@@ -490,6 +496,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         brake: farmInput.jump || farmInput.brake || keys.has(" "),
         boost: keys.has("shift"),
       }, world.obstacles, vehicleHeightAt);
+      updateDriveAudio(Math.abs(vehicle.currentSpeed), throttle, keys.has("shift"));
       useTownInteraction.getState().set(null, "");
       if (elapsed >= nextPresence) {
         nextPresence = elapsed + .08;
@@ -500,6 +507,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       }
     } else {
       player.update(dt, elapsed, inputDir.lengthSq() > 0 ? inputDir : null, keys.has("shift") || farmInput.running || farmInput.sprint);
+      updateWalk(player.isMoving && player.isOnFoot, player.isRunning, dt);
+      if (wasJumping && !player.isJumping) playLanding();
+      wasJumping = player.isJumping;
       // 城市场景交互：售货大厅柜台、汽车店室内、便利店室内
       {
         const px = player.root.position.x, pz = player.root.position.z;
@@ -575,7 +585,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       // 发芽 / 成长 / 成熟各判一次变异，成熟阶段才可能出精灵
       state.settleMutations(growthTime);
     }
-    updatePlots(plots, sceneState.plots, standingPlot ?? inspectedPlot, growthTime, elapsed);
+    // 家里看自己的额度；好友家看好友额度（无协作权或参观时不显示）
+    const waterViewer = !visit ? "self" : visit.mode === "friend" && visit.canManage ? "guest" : "none";
+    updatePlots(plots, sceneState.plots, standingPlot ?? inspectedPlot, growthTime, elapsed, waterViewer);
 
     // 城市导览的坐标与可见性：桥上也算“接近城市”，提前显示汽车店入口
     if (elapsed >= nextNav) {
@@ -628,6 +640,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     window.removeEventListener("ttfarm:visit-focus", focusVisit);
     controls.dispose();
     riverAudio.dispose();
+    silenceDrive();
     unsubscribeAppearance();
     localBubble.dispose();
     peers.clear();

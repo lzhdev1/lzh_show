@@ -9,6 +9,7 @@ import type { PlotState } from "./growth";
 import type { AnimalElement, AnimalSpecies, RanchState } from "./ranch";
 import type { ActionId } from "../scene/rig";
 import { useGame } from "./state";
+import { emitSfx } from "./sfx";
 
 export interface FriendUser {
   id: string;
@@ -177,7 +178,13 @@ export async function helpAtFarm(action: HelpAction) {
     const result = await request<Snapshot>(token, "visit", {
       method: "POST", body: JSON.stringify({ ownerId: visit.ownerId, mode: visit.mode, revision: visit.revision, ...action }),
     });
-    if (active()) { snapshotVersion++; applySnapshot(result, visit.mode); }
+    if (active()) {
+      snapshotVersion++;
+      applySnapshot(result, visit.mode);
+      if (action.action === "plant") emitSfx("plant");
+      else if (action.action === "water") emitSfx("water");
+      else if (action.action === "harvest") emitSfx("harvest");
+    }
   } catch (error) {
     if (active() && error instanceof FarmApiError && (error.status === 403 || error.status === 409)) {
       // 权限撤回和版本冲突都需要读取最新现场，不能自动重放操作。

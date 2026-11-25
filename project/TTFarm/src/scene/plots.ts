@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import type { CropId } from "../game/crops";
-import { cropStage, growthProgress, PLOT_COLS, PLOT_ROWS, PLOT_SPACING } from "../game/growth";
+import {
+  canShowWaterHint, cropStage, growthProgress, PLOT_COLS, PLOT_ROWS, PLOT_SPACING,
+  type WaterViewer,
+} from "../game/growth";
 export { plotIdAt, PLOT_SPACING } from "../game/growth";
 import { createCropLibrary, isFlowerCrop } from "./crops3d";
 import { isSpirit, isWildMutation, type Mutation } from "../game/weather";
@@ -109,6 +112,8 @@ export interface PlotVisual {
   mutation: Mutation | null;
   tufts: THREE.InstancedMesh;
   readyMarker: THREE.Sprite;
+  waterMarker: THREE.Sprite;
+  waterBaseY: number;
   selectRing: THREE.Mesh;
 }
 
@@ -153,6 +158,43 @@ function createHarvestMarkerMaterial(): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({ map, depthWrite: false, toneMapped: false });
 }
 
+/** 浇水标识：蓝水滴落在小白牌上，悬浮在仍然可浇的地块上方。 */
+function createWaterMarkerMaterial(): THREE.SpriteMaterial {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(4, 4);
+  ctx.shadowColor = "rgba(26, 122, 170, .35)";
+  ctx.shadowBlur = 3;
+  const pin = new Path2D("M16 2C23 2 28 7 28 14C28 20 24 24 20 25L16 30L12 25C8 24 4 20 4 14C4 7 9 2 16 2Z");
+  ctx.fillStyle = "#effaff";
+  ctx.fill(pin);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#3b9ed2";
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  ctx.stroke(pin);
+
+  const drop = new Path2D("M16 5.4C16 5.4 9.4 13 9.4 17.6C9.4 21.2 12.4 23.8 16 23.8C19.6 23.8 22.6 21.2 22.6 17.6C22.6 13 16 5.4 16 5.4Z");
+  const fill = ctx.createLinearGradient(0, 7, 0, 23);
+  fill.addColorStop(0, "#a8e6ff");
+  fill.addColorStop(0.55, "#55c2ef");
+  fill.addColorStop(1, "#2387c4");
+  ctx.fillStyle = fill;
+  ctx.fill(drop);
+  ctx.strokeStyle = "#f7fdff";
+  ctx.lineWidth = 1.1;
+  ctx.stroke(drop);
+  ctx.fillStyle = "rgba(255,255,255,.78)";
+  ctx.beginPath();
+  ctx.ellipse(13.4, 14.6, 1.5, 2.4, -0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.SpriteMaterial({ map, depthWrite: false, toneMapped: false });
+}
+
 function createFieldMaterials() {
   // 一张小纹理给全部土面叠上断续细笔触。近看有颗粒，缩远时 mipmap 会将其柔化。
   const size = 128;
@@ -181,6 +223,7 @@ function createFieldMaterials() {
     wet: new THREE.MeshLambertMaterial({ color: 0x936b54, vertexColors: true, map: grain }),
     foliage: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, vertexColors: true }),
     harvestMarker: createHarvestMarkerMaterial(),
+    waterMarker: createWaterMarkerMaterial(),
   };
 }
 
@@ -227,6 +270,11 @@ export function createPlots(): Plots {
     readyMarker.scale.set(0.65, 0.65, 1);
     readyMarker.visible = false;
 
+    const waterMarker = new THREE.Sprite(materials.waterMarker);
+    waterMarker.center.set(0.5, 0.5);
+    waterMarker.scale.set(0.72, 0.72, 1);
+    waterMarker.visible = false;
+
     const selectRing = new THREE.Mesh(
       selectGeo,
       new THREE.MeshBasicMaterial({
@@ -247,7 +295,7 @@ export function createPlots(): Plots {
     const holder = new THREE.Group();
     holder.position.copy(pos);
 
-    holder.add(soil, readyMarker);
+    holder.add(soil, readyMarker, waterMarker);
     group.add(holder);
 
     visuals.push({
@@ -262,6 +310,8 @@ export function createPlots(): Plots {
       stage: -1,
       tufts,
       readyMarker,
+      waterMarker,
+      waterBaseY: 1.1,
       selectRing,
     });
     meshes.push(soil);
@@ -324,7 +374,8 @@ export function updatePlots(
   states: PlotState[],
   selectedId: number | null,
   now: number,
-  t: number
+  t: number,
+  waterViewer: WaterViewer = "none"
 ): void {
   plots.library.wind.value = t;
   plots.auras.setTime(t);
@@ -368,9 +419,11 @@ export function updatePlots(
       }
       visual.cropMesh.instanceMatrix.needsUpdate = true;
       visual.cropMesh.computeBoundingSphere();
+      visual.cropMesh.computeBoundingBox();
+      const top = visual.cropMesh.boundingBox!.max.y;
+      visual.waterBaseY = top + 0.58;
       if (stage === 3) {
-        visual.cropMesh.computeBoundingBox();
-        visual.readyMarker.position.y = visual.cropMesh.boundingBox!.max.y + 0.15;
+        visual.readyMarker.position.y = top + 0.15;
       }
     }
     if (visual.cropMesh) visual.cropMesh.visible = Boolean(state.crop);
@@ -390,6 +443,15 @@ export function updatePlots(
     visual.stage = stage;
 
     visual.readyMarker.visible = stage === 3;
+
+    // 浇水标识只看当前查看者自己的额度：主人浇满后自己看不到，好友仍能看到可帮浇
+    const showWater = canShowWaterHint(state, now, waterViewer);
+    visual.waterMarker.visible = showWater;
+    if (showWater) {
+      visual.waterMarker.position.y = visual.waterBaseY + Math.sin(t * 2.5 + visual.id * 1.7) * 0.07;
+      const pulse = 0.70 + Math.sin(t * 3.4 + visual.id) * 0.035;
+      visual.waterMarker.scale.set(pulse, pulse, 1);
+    }
 
     visual.selectRing.visible = selectedId === visual.id;
     if (visual.selectRing.visible) {
@@ -413,6 +475,7 @@ export function disposePlots(plots: Plots): void {
   geometries.forEach((geo) => geo.dispose());
   plots.materials.dry.map?.dispose();
   plots.materials.harvestMarker.map?.dispose();
+  plots.materials.waterMarker.map?.dispose();
   Object.values(plots.materials).forEach((material) => material.dispose());
   plots.library.dispose();
   plots.visuals.forEach((v) => {

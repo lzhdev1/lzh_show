@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { farmInput, releaseStick, setSprintEnabled } from "../game/input";
 import { getRainSoundEnabled, getRiverSoundEnabled, setRainSoundEnabled, setRiverSoundEnabled } from "../game/riverSoundSetting";
+import { getSfxEnabled, setSfxEnabled } from "../game/sfx";
 import { useClock } from "../game/clock";
 import { useAccount } from "../game/account";
 import { WEATHER, weatherAt, weatherEndsAt, type WeatherKind } from "../game/weather";
@@ -50,12 +51,13 @@ export function ControlGuide() {
   const [open, setOpen] = useState(false);
   const [riverEnabled, setRiverEnabled] = useState(getRiverSoundEnabled);
   const [rainEnabled, setRainEnabled] = useState(getRainSoundEnabled);
+  const [sfxEnabled, setSfxOn] = useState(getSfxEnabled);
   return <div className="control-guide">
     <button type="button" className="guide-trigger" aria-label="操作说明" aria-expanded={open} onClick={() => setOpen(!open)}>?</button>
     {open && <div className="guide-copy">
       <p className="desktop-guide"><b>移动</b> WASD / 方向键（默认冲刺）<br/><b>跳跃</b> 空格<br/><b>镜头</b> 左键或右键拖动，Q / E 左右转，滚轮缩放</p>
       <p className="touch-guide"><b>移动</b> 拖动左侧摇杆；冲刺默认开启，点左侧「冲刺中」可切换常速<br/><b>跳跃</b> 点右侧跳跃键<br/><b>驾驶</b> 左侧前进 / 后退，右侧左转 / 右转<br/><b>镜头</b> 按住摇杆时，另一指划动画面转向，在画面上双指捏合缩放</p>
-      <p><b>种菜</b> 点选下方种子，走到菜地上点「撒种」。刚播下可以连浇 3 次水，之后每小时 2 次，每次缩短 2% 的成熟时间（最多减半）；好友每株每小时能帮浇 1 次。作物上方出成熟标志后，走到那块地上点「收获」。</p>
+      <p><b>种菜</b> 点选下方种子，走到菜地上点「撒种」。刚播下可以连浇 3 次水，之后每小时 2 次，每次缩短 2% 的成熟时间（最多减半）；好友每株每小时能帮浇 1 次。还能浇水时作物上方会浮出蓝水滴，自己浇满后自己的水滴消失，好友仍能看到他能帮浇的水滴。作物上方出成熟标志后，走到那块地上点「收获」。</p>
       <p><b>采野菜</b> 野外每 10 分钟整批换新一批野菜（10 株），上一批没摘完会作废；草药每 5 分钟长出一株、最多同时 15 株，不摘就一直留着。走近点「采摘」获得野菜或药材，还有机会捡到种子种回农场。「农场 → 野外野菜」可以带路。</p>
       <p><b>动作</b> J 出拳　K 踢腿　C 欢呼　X 跳舞　Z 坐下　V 躺下　B 晕倒，也可以点左上角「动作」按钮；移动或跳跃会取消动作。</p>
       <p>走进深水会自动游泳，停下会踩水，靠岸后恢复步行。</p>
@@ -72,6 +74,10 @@ export function ControlGuide() {
           setRainSoundEnabled(!rainEnabled);
           setRainEnabled(!rainEnabled);
         }}>风雨雷声{rainEnabled ? "开" : "关"}</button>
+        <button aria-pressed={sfxEnabled} onClick={() => {
+          setSfxEnabled(!sfxEnabled);
+          setSfxOn(!sfxEnabled);
+        }}>动作音效{sfxEnabled ? "开" : "关"}</button>
       </div>
       <p><a href={`${import.meta.env.BASE_URL}credits/animals.html`} target="_blank" rel="noopener noreferrer">动物模型署名与许可</a></p>
     </div>}

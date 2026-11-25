@@ -28,6 +28,7 @@ import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
 import { backpackSlots, backpackUpgradeCost, bagAddCheck, bagAddSlotCost, bagUsedSlots, normalizeBackpackLevel, BAG_MAX_LEVEL } from "./backpack";
 import { remainingMs } from "./growth";
+import { emitSfx } from "./sfx";
 import {
   BAIT_BY_ID,
   baitById,
@@ -368,6 +369,7 @@ export const useGame = create<GameStore>()(
           ),
         }));
         get().notify(`种下了${def.name}${watered ? "，雨水已浇灌" : ""}`);
+        emitSfx("plant");
       },
 
       settleMutations: (now) => {
@@ -397,6 +399,7 @@ export const useGame = create<GameStore>()(
           plots: s.plots.map((p) => (p.id === plotId ? applySelfWater(p, now) : p)),
         }));
         get().notify("浇了水，成熟时间缩短 2%");
+        emitSfx("water");
       },
 
       harvestPlot: (plotId) => {
@@ -447,6 +450,7 @@ export const useGame = create<GameStore>()(
           ),
         }));
         get().notify(`收获${produceName(def, plot.mutation)} ×${yieldCount}${dropSeed && seedRoom.ok ? "，还捡到一颗变异种子" : ""}`);
+        emitSfx("harvest");
         if (isSpecialVarietyMutation(plot.mutation)) announceSpecialCrop(produceName(def, plot.mutation));
         if (after > before) {
           get().notify(after <= 12 ? `升到 ${after} 级，解锁了新作物` : `升到 ${after} 级`);

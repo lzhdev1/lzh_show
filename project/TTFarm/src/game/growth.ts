@@ -142,6 +142,19 @@ export function guestWaterGate(plot: PlotState, now: number): WaterGate {
   return { ok: true, left: GUEST_WATER_PER_WINDOW };
 }
 
+/** 田里浇水标识的查看者：自己看自己剩余额度，好友看好友额度，参观者不显示。 */
+export type WaterViewer = "self" | "guest" | "none";
+
+/**
+ * 这块地的浇水标识是否对当前查看者可见。
+ * 自己浇到上限/冷却时自己看不到，但若好友仍可帮浇，好友依旧能看到。
+ */
+export function canShowWaterHint(plot: PlotState, now: number, viewer: WaterViewer): boolean {
+  if (viewer === "none") return false;
+  const gate = viewer === "self" ? selfWaterGate(plot, now) : guestWaterGate(plot, now);
+  return gate.ok;
+}
+
 /** 记一次自己浇水：次数 +1；免费 3 次不占小时额度，之后滚动保留最近 5 个时间戳 */
 export function applySelfWater(plot: PlotState, now: number): PlotState {
   const total = (plot.selfWaterTotal ?? 0) + 1;
