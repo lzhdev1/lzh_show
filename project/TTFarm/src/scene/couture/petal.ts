@@ -247,9 +247,101 @@ function lilacBallet(a: Atelier) {
   a.bow([-.083,1.537,.052],.057,ink,"head");
 }
 
+// Pink butterfly gauze: a beaded sweetheart bodice under a long, open-front
+// tulle robe. Layered skirts fall to the floor; butterflies and star dust
+// gather at the hem and waist.
+function butterflyVeil(a: Atelier) {
+  const blush=0xf9cbd9, rose=0xefa6bf, pearl=0xfff6f4, crystal=0xffe9ef;
+  a.bodice(blush,pearl,"sweetheart");
+  // The fine halter straps cross the collarbone instead of the shoulder.
+  for(const s of [-1,1]){
+    a.tube([[s*.076,1.222,.086],[s*.055,1.274,.068],[s*.026,1.318,.043],[0,1.332,.036]],
+      .0028,pearl,"metal","torso");
+    // Crystal beading along the sweetheart edge and under the bust.
+    for(let i=0;i<5;i++) a.spark([s*(.028+i*.025),1.232-i*.008,.104-i*.004],.007,crystal,"torso");
+  }
+  // Barely-there boning threads and a narrow ribbon at the natural waist.
+  for(const s of [-1,1]) a.tube([[s*.105,.968,.113],[s*.090,1.053,.121],[s*.058,1.151,.126]],.0022,pearl,"metal","torso");
+  a.bow([0,1.004,.141],.046,rose,"torso");
+  // A pale satin underskirt carries the blush tulle to the floor.
+  a.skirt({hem:.152,width:.246,depth:.205,color:0xf9e4eb,pleats:9,wave:.009});
+  a.skirt({waist:.963,hem:.101,width:.372,depth:.301,color:blush,fabric:"tulle",pleats:15,wave:.024,slant:.020});
+  a.skirt({waist:.974,hem:.116,width:.344,depth:.278,color:pearl,fabric:"tulle",pleats:13,wave:.020,slant:.016});
+  a.skirt({waist:.986,hem:.145,width:.313,depth:.253,color:crystal,fabric:"tulle",pleats:11,wave:.017,slant:.012});
+  // Open-front robe: sheer shoulder panels continue into floor-length side gores.
+  for(const s of [-1,1]){
+    drape(a,cut([
+      [1.304,1.296,.062,.071,s*.07,s*1.67],[1.232,1.208,.166,.129,s*.14,s*2.02],
+      [1.102,1.056,.222,.169,s*.20,s*2.30],[.980,.944,.246,.188,s*.24,s*2.46],
+    ],.008,1,16),pearl,"lace","torso");
+    drape(a,cut([
+      [.970,.970,.178,.149,s*.26,s*2.82],[.842,.820,.252,.206,s*.30,s*2.88],
+      [.642,.608,.320,.254,s*.34,s*2.94],[.418,.378,.382,.301,s*.38,s*2.98],
+      [.144,.108,.428,.336,s*.42,s*3.02],
+    ],.020,2,26),blush,"lace","skirt");
+    // A second transparent layer catches light at the side seams.
+    drape(a,cut([
+      [.958,.958,.168,.140,s*.42,s*2.55],[.780,.758,.230,.187,s*.46,s*2.62],
+      [.540,.508,.303,.239,s*.52,s*2.68],[.300,.266,.371,.284,s*.58,s*2.74],
+      [.120,.092,.427,.324,s*.64,s*2.80],
+    ],.028,3,22),crystal,"tulle","skirt");
+    for(let i=0;i<4;i++){
+      const p:V=[s*(.16+i*.06),.52-i*.11,.15-i*.03];
+      a.spark(p,.026,crystal,"skirt");
+    }
+    // The huge outer sleeve is cut as a hanging side panel, the way the
+    // reference robe falls from the shoulder past the hand.
+    drape(a,cut([
+      [1.306,1.302,.058,.069,s*.05,s*1.50],[1.212,1.176,.128,.112,s*.10,s*1.78],
+      [1.020,.980,.188,.156,s*.15,s*1.96],[.790,.748,.246,.202,s*.19,s*2.08],
+      [.550,.508,.296,.241,s*.23,s*2.16],[.348,.306,.326,.262,s*.25,s*2.22],
+    ],.020,1,18),blush,"lace","torso");
+    drape(a,cut([
+      [1.300,1.296,.062,.073,s*.10,s*1.60],[1.196,1.160,.136,.120,s*.15,s*1.88],
+      [.990,.950,.198,.166,s*.20,s*2.05],[.748,.704,.258,.214,s*.24,s*2.16],
+      [.486,.444,.306,.252,s*.28,s*2.22],[.302,.266,.336,.272,s*.30,s*2.28],
+    ],.026,2,18),crystal,"tulle","torso");
+    a.tube([[s*.25,1.020,.155],[s*.25,.348,.260]],.0026,pearl,"metal","torso");
+  }
+  a.tube([[.015,1.246,.128],[.120,1.276,.110],[.225,1.301,.075],[.330,1.296,.045]],.0024,pearl,"metal","torso");
+  // Ribbon streamers from the waist bow fall over the front of the skirt.
+  for(const s of [-1,1]) drape(a,[
+    [[s*.012,.994,.150],[s*.026,.990,.156]],
+    [[s*.030,.902,.170],[s*.046,.894,.179]],
+    [[s*.038,.760,.194],[s*.060,.742,.203]],
+    [[s*.030,.610,.214],[s*.052,.586,.221]],
+    [[s*.010,.472,.224],[s*.030,.446,.230]],
+  ],rose,"satin","skirt");
+  // Waist and hair butterflies.
+  for(const [center,size,bind] of [
+    [[-.126,.998,.140],.060,"torso"],[[.108,1.040,.142],.045,"torso"],
+    [[-.104,1.548,.058],.075,"head"],[[.096,1.512,.066],.055,"head"],
+    [[-.245,.560,.300],.115,"skirt"],[[.262,.470,.330],.125,"skirt"],
+    [[-.288,.340,.360],.095,"skirt"],[[.300,.250,.370],.085,"skirt"],
+    [[-.110,.380,.385],.075,"skirt"],[[.118,.310,.390],.080,"skirt"],
+  ] as [V,number,Bind][]){
+    const [x,y,z]=center;
+    for(const s of [-1,1]) for(const up of [1,-1]){
+      const wing:V[][]=[
+        [[x,y,z],[x+s*size*.26,y+up*size*.10,z+.007],[x+s*size*.38,y+up*size*.22,z+.005]],
+        [[x+s*size*.42,y+up*size*.13,z+.014],[x+s*size*.70,y+up*size*.40,z+.008],[x+s*size*.78,y+up*size*.28,z+.001]],
+        [[x+s*size*.64,y-up*size*.08,z+.015],[x+s*size*.86,y-up*size*.18,z+.007],[x+s*size*.88,y-up*size*.04,z+.002]],
+      ];
+      a.shell(wing,up>0?0xe36f9d:0xffc6dc,"lace",bind,false);
+      a.spark([x+s*size*.58,y+up*size*.18,z+.020],size*.16,0xfff0f6,bind);
+      a.tube([[x+s*size*.30,y+up*size*.12,z+.010],[x+s*size*.50,y+up*size*.20,z+.012]],size*.008,rose,"satin",bind);
+    }
+    a.tube([[x,y-size*.02,z+.002],[x,y+size*.19,z+.002]],size*.020,rose,"satin",bind);
+  }
+  a.shoes(rose,pearl,"pump");
+  for(let i=0;i<8;i++){
+    const angle=i*Math.PI/4;
+    a.spark([Math.sin(angle)*.278,.24+.02*Math.sin(i*2.1),Math.cos(angle)*.22],.018,crystal,"skirt");
+  }
+}
+
 function champagneBell(a: Atelier) {
   const ivory=0xffedce, goldSilk=0xd8b780, leaf=0x6e8878, lining=0x9ca791;
-  a.bodice(leaf,gold,"jewel");
   a.skirt({hem:.331,width:.245,depth:.201,color:ivory,pleats:5,wave:.006,train:.024});
   // A panelled cone. The sage insert widens from a single point at the waist
   // into a graphic stripe at the front; two ivory gores meet at the back.
@@ -311,5 +403,6 @@ export function buildPetal(a: Atelier, id: string): void {
     case "peach-fan": return peachFan(a);
     case "lilac-ballet": return lilacBallet(a);
     case "champagne-bell": return champagneBell(a);
+    case "butterfly-veil": return butterflyVeil(a);
   }
 }

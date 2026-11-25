@@ -34,6 +34,7 @@ const COUTURE_IDS = new Set([
   "petal-waltz", "rose-cadenza", "peach-fan", "lilac-ballet", "champagne-bell",
   "tide-jelly", "azure-sail", "pearl-opera", "mint-ripple", "glacier-lace",
   "lunar-arc", "violet-nocturne", "aurora-prism", "meteor-idol", "dusk-orbit",
+  "butterfly-veil",
 ]);
 
 const decorStyle = (value: unknown) => value === "lantern" || value === "moon" ? value : "orchard";

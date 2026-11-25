@@ -14,6 +14,7 @@ export const COUTURE = [
   {id:"aurora-prism", name:"极光棱镜", family:"astral", swatch:"#8ed8cd", detail:"薄荷与鸢尾紫斜裙错落交叠，背后两对折叠欧根纱翼向肩外舒展。"},
   {id:"meteor-idol", name:"流星进行曲", family:"astral", swatch:"#637db0", detail:"蓝色飞行短夹克罩住银色束腰马甲，撞色箱褶裙呼应金属耳机。"},
   {id:"dusk-orbit", name:"暮金星轨", family:"astral", swatch:"#c97065", detail:"蜜金到夕橘的螺旋荷叶边绕过酒红单肩裙，肩头缀着一朵折叠丝花。"},
+  {id:"butterfly-veil", name:"蝶羽星纱", family:"petal", swatch:"#f6b7c9", detail:"蜜粉珠绣心形领胸衣束住薄雾长裙，开襟星纱外袍与及地大袖被裙摆的粉蝶和碎光托起。"},
 ] as const;
 
 export type CoutureId = (typeof COUTURE)[number]["id"];
