@@ -15,11 +15,11 @@ function ramp(steps: Uint8Array) {
 const solidRamp = ramp(RAMP_STEPS);
 const glassRamp = ramp(GLASS_STEPS);
 
-export const townSolid = new THREE.MeshToonMaterial({
-  vertexColors: true, gradientMap: solidRamp,
+export const townSolid = new THREE.MeshPhysicalMaterial({
+  vertexColors: true, roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.55,
 });
-export const townGlass = new THREE.MeshToonMaterial({
-  vertexColors: true, gradientMap: glassRamp,
+export const townGlass = new THREE.MeshPhysicalMaterial({
+  vertexColors: true, roughness: 0.3, clearcoat: 0.4, clearcoatRoughness: 0.4,
 });
 export const townInk = new THREE.LineBasicMaterial({
   color: 0x3d3431, transparent: true, opacity: 0.72,
@@ -29,7 +29,7 @@ export const showroomGlass = new THREE.MeshStandardMaterial({
   color: 0xcfe9ef, transparent: true, opacity: 0.3,
   roughness: 0.08, metalness: 0.12, side: THREE.DoubleSide,
 });
-export const signFrame = new THREE.MeshToonMaterial({ color: 0x4c3b30, gradientMap: solidRamp });
+export const signFrame = new THREE.MeshPhysicalMaterial({ color: 0x4c3b30, roughness: 0.5, clearcoat: 0.2, clearcoatRoughness: 0.55 });
 export const lampGlow = new THREE.MeshBasicMaterial({ color: 0xffe6b0 });
 
 const FONT = '"Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif';

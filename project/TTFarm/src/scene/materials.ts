@@ -39,22 +39,24 @@ export interface ClayOptions {
   side?: THREE.Side;
   emissive?: number;
   emissiveIntensity?: number;
+  clearcoat?: number;
 }
 
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
 
 /**
- * 卡通材质：同一组颜色 + 参数复用同一个实例，避免重复对象和重复上传。
- * roughness 默认给 0.85 —— 太光滑会像塑料玩具，粗糙一点更接近游戏里的手绘色块。
+ * 软胶/乙烯基卡通材质（海岛乐园式柔和）：平滑法线 + 柔和高光 + 少量 clearcoat。
+ * 同一组颜色 + 参数复用同一个实例，避免重复对象和重复上传。
+ * roughness 默认 0.55 —— 保留一点哑光但带柔柔的乙烯基高光，不再硬塑料块。
  */
 export function clay(color: number, options: ClayOptions = {}): THREE.MeshStandardMaterial {
   const key = JSON.stringify([color, options]);
   const cached = materialCache.get(key);
   if (cached) return cached;
 
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshPhysicalMaterial({
     color,
-    roughness: options.roughness ?? 0.85,
+    roughness: options.roughness ?? 0.55,
     metalness: options.metalness ?? 0,
     flatShading: options.flatShading ?? false,
     transparent: options.transparent ?? false,
@@ -62,10 +64,20 @@ export function clay(color: number, options: ClayOptions = {}): THREE.MeshStanda
     side: options.side ?? THREE.FrontSide,
     emissive: options.emissive ?? 0x000000,
     emissiveIntensity: options.emissiveIntensity ?? 0,
+    clearcoat: options.clearcoat ?? 0.2,
+    clearcoatRoughness: 0.55,
     envMapIntensity: 0.45,
   });
   materialCache.set(key, mat);
   return mat;
+}
+
+/** 顶点色网格共用的软胶材质：平滑法线 + 柔和高光 + 双面 */
+export function softVertexMaterial(side: THREE.Side = THREE.FrontSide): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors: true, flatShading: false, roughness: 0.45, metalness: 0,
+    clearcoat: 0.2, clearcoatRoughness: 0.55, side,
+  });
 }
 
 export function disposeClayMaterials(): void {

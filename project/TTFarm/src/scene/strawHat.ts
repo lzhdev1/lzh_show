@@ -54,8 +54,8 @@ export function createStrawHat(): THREE.Mesh {
   add(heart, 0xe69b41);
   const geometry = mergeGeometries(pieces)!;
   pieces.forEach(piece => piece.dispose());
-  const hat = new THREE.Mesh(geometry, new THREE.MeshToonMaterial({
-    vertexColors: true, side: THREE.DoubleSide,
+  const hat = new THREE.Mesh(geometry, new THREE.MeshPhysicalMaterial({
+    vertexColors: true, side: THREE.DoubleSide, roughness: 0.45, clearcoat: 0.2, clearcoatRoughness: 0.55,
   }));
   hat.name = "xiaosui-straw-hat";
   hat.castShadow = true;

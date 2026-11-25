@@ -271,7 +271,7 @@ export function createPlots(): Plots {
   // 外缘 = 最外列/行的地块边缘：x ±7.8、z ±6.5
   const RIM_STEP = 0.62;
   const rimGeo = lumpy(0.24, 1, 0.28);
-  const rimMat = clay(PALETTE.stone, { roughness: 0.95, flatShading: true });
+  const rimMat = clay(PALETTE.stone, { roughness: 0.95, flatShading: false });
   const edgeX = (PLOT_COLS / 2) * PLOT_SPACING;
   const edgeZ = (PLOT_ROWS / 2) * PLOT_SPACING;
   const perX = Math.round((edgeX * 2) / RIM_STEP);

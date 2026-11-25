@@ -11,7 +11,7 @@ export function createFieldAvatar(avatar: AvatarId = "xiaosui", outfit: OutfitId
   const visual = new THREE.Group();
   const body = new THREE.Group();
   visual.add(body);
-  const material = new THREE.MeshToonMaterial({ vertexColors: true });
+  const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.45, clearcoat: 0.2, clearcoatRoughness: 0.55 });
   const geometries: THREE.BufferGeometry[] = [];
   const male = avatar === "qinghe", rain = outfit === "raincoat", ranger = outfit === "ranger";
   const dress = !male && COUTURE.find(item => item.id === outfit);

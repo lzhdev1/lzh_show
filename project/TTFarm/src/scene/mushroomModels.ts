@@ -1,278 +1,237 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { MushroomShape, MushroomSpecies } from "../game/mushrooms";
 
 /**
- * 程序化菌类模型：所有物种共用一套“菌柄 + 菌褶 + 菌环 + 菌盖”骨架，
- * shape 决定菌盖轮廓，pattern 决定斑点、环纹、鳞片或发光。
- * 每个模型在原点脚底生成，最终由场景按宿主高度缩放。
+ * 软胶/乙烯基菌类模型（海岛乐园式柔和）：
+ * 平滑法线 + Catmull-Rom 样条圆剖面 + 柔和高光 Physical 材质 + 分层顶点色/AO。
+ * 所有物种共用“菌柄 + 菌褶/孔面 + 菌环 + 菌盖”骨架，shape 决定轮廓、pattern 决定细节。
+ * 每只合并成单一几何（1 draw call），在原点脚底生成，由场景按宿主缩放。
  */
 const BASE_RADIUS = 0.34;
+const WHITE = new THREE.Color(0xffffff);
+const BLACK = new THREE.Color(0x000000);
 
-const materialCache = new Map<string, THREE.MeshStandardMaterial>();
-function paint(color: string, opts: { roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number; opacity?: number; transparent?: boolean } = {}) {
-  const key = `${color}:${opts.roughness ?? 0.7}:${opts.metalness ?? 0}:${opts.emissive ?? ""}:${opts.emissiveIntensity ?? 0}:${opts.opacity ?? 1}`;
-  const cached = materialCache.get(key);
-  if (cached) return cached;
-  const material = new THREE.MeshStandardMaterial({
-    color,
-    roughness: opts.roughness ?? 0.7,
-    metalness: opts.metalness ?? 0,
-    emissive: opts.emissive ?? "#000000",
-    emissiveIntensity: opts.emissiveIntensity ?? 0,
-    transparent: opts.transparent ?? false,
-    opacity: opts.opacity ?? 1,
-    side: THREE.DoubleSide,
+function softMaterial(opts: { emissive?: string; emissiveIntensity?: number; transparent?: boolean; opacity?: number } = {}) {
+  // 每只独立材质：disposeActor 会逐只释放，不能共享缓存
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors: true, flatShading: false, roughness: 0.45, metalness: 0,
+    clearcoat: 0.2, clearcoatRoughness: 0.55, side: THREE.DoubleSide,
+    emissive: opts.emissive ?? "#000000", emissiveIntensity: opts.emissiveIntensity ?? 0,
+    transparent: opts.transparent ?? false, opacity: opts.opacity ?? 1,
   });
-  materialCache.set(key, material);
-  return material;
 }
 
-function lathe(points: Array<[number, number]>, segments = 18) {
-  return new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), segments);
+const C = (h: string) => new THREE.Color(h);
+const lighter = (c: THREE.Color, t: number) => c.clone().lerp(WHITE, t);
+const darker = (c: THREE.Color, t: number) => c.clone().lerp(BLACK, t);
+
+function lerpStops(stops: Array<[number, THREE.Color]>, t: number) {
+  const lo = stops[0][0], hi = stops[stops.length - 1][0];
+  t = Math.max(lo, Math.min(hi, t));
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [a, ca] = stops[i], [b, cb] = stops[i + 1];
+    if (t >= a && t <= b) return ca.clone().lerp(cb, (t - a) / (b - a || 1));
+  }
+  return stops[stops.length - 1][1].clone();
 }
 
-function addMesh(group: THREE.Group, geometry: THREE.BufferGeometry, material: THREE.Material, x = 0, y = 0, z = 0) {
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = false;
-  group.add(mesh);
-  return mesh;
+/** 逐面上色 + 轻微抖动：柔和的手绘色块过渡 */
+function paintFaces(geo: THREE.BufferGeometry, fn: (c: THREE.Vector3, f: number) => THREE.Color, jitter = 0.02) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const pos = g.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const cen = new THREE.Vector3(), v = new THREE.Vector3();
+  for (let f = 0; f < pos.count; f += 3) {
+    cen.set(0, 0, 0);
+    for (let k = 0; k < 3; k++) { v.fromBufferAttribute(pos, f + k); cen.add(v); }
+    cen.multiplyScalar(1 / 3);
+    const col = fn(cen, f / 3).multiplyScalar(1 + Math.sin(f * 12.9898) * 0.5 * jitter);
+    for (let k = 0; k < 3; k++) { colors[(f + k) * 3] = col.r; colors[(f + k) * 3 + 1] = col.g; colors[(f + k) * 3 + 2] = col.b; }
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  g.deleteAttribute("uv");
+  return g;
+}
+const solid = (geo: THREE.BufferGeometry, col: THREE.Color, j = 0.02) => paintFaces(geo, () => col.clone(), j);
+
+/** 样条平滑剖面 + 高段数：剪影圆润、法线连续 */
+function smoothProfile(pts: Array<[number, number]>, samples = 16) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(([x, y]) => new THREE.Vector3(x, y, 0)), false, "catmullrom", 0.5);
+  return curve.getPoints(samples).map(p => new THREE.Vector2(Math.max(0, p.x), p.y));
+}
+const lathe = (pts: Array<[number, number]>, seg = 24) => new THREE.LatheGeometry(smoothProfile(pts), seg);
+
+function radialStripes(geo: THREE.BufferGeometry, a: THREE.Color, b: THREE.Color, n: number) {
+  return paintFaces(geo, c => (Math.floor((Math.atan2(c.z, c.x) + Math.PI) / (Math.PI * 2 / n)) % 2 ? a.clone() : b.clone()), 0.02);
 }
 
-/** 菌褶：一圈从中心散到边缘的薄片，合并成一个几何，避免每个褶一片 draw call。 */
-function gillMesh(radius: number, material: THREE.Material) {
-  const pieces: THREE.BufferGeometry[] = [];
-  const count = 16;
+function gillUnder(R: number, H: number, gill: THREE.Color) {
+  const u = lathe([[0.04, -0.02], [R * 0.88, -0.045], [R * 0.76, -0.085]], 22);
+  const p = radialStripes(u, gill, darker(gill, 0.22), 22);
+  p.translate(0, H, 0);
+  return p;
+}
+function poreUnder(R: number, H: number, pore: THREE.Color) {
+  const u = lathe([[0.04, -0.02], [R * 0.9, -0.04], [R * 0.8, -0.07]], 16);
+  u.translate(0, H, 0);
+  return solid(u, pore, 0.02);
+}
+function stemPart(H: number, stem: THREE.Color) {
+  const g = lathe([[0.095, 0], [0.105, 0.05], [0.068, 0.16], [0.062, 0.26], [0.08, 0.34], [0.085, H]], 16);
+  return paintFaces(g, c => lerpStops([[0, darker(stem, 0.15)], [0.5, stem], [1, lighter(stem, 0.1)]], c.y / H));
+}
+function ringCollar(y: number, r: number, col: THREE.Color) {
+  return solid(lathe([[r * 0.8, y], [r * 1.15, y - 0.018], [r * 0.95, y - 0.036]], 12), col);
+}
+function volva(col: THREE.Color) {
+  const b = new THREE.IcosahedronGeometry(0.12, 1); b.scale(1, 0.82, 1); b.translate(0, 0.05, 0);
+  return solid(b, col, 0.03);
+}
+function warts(R: number, H: number, topY: number, col: THREE.Color, count: number, seed: number) {
+  const out: THREE.BufferGeometry[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = i / count * Math.PI * 2;
-    const box = new THREE.BoxGeometry(radius * 0.90, 0.012, 0.018);
-    box.translate(radius * 0.47, 0, 0);
-    box.rotateY(angle);
-    pieces.push(box);
+    const a = seed + i * 2.399, d = Math.sqrt((i + 0.5) / count) * R * 0.74, t = d / R;
+    const y = H + topY * (1 - t * t * 0.8) + 0.012;
+    const s = new THREE.IcosahedronGeometry(0.04, 1); s.scale(1, 0.38, 1);
+    s.translate(Math.cos(a) * d, y, Math.sin(a) * d);
+    out.push(solid(s, col, 0.02));
   }
-  const merged = merge(pieces);
-  const mesh = new THREE.Mesh(merged, material);
-  mesh.castShadow = false;
-  return mesh;
+  return out;
 }
 
-function merge(pieces: THREE.BufferGeometry[]) {
-  // BoxGeometry 等内置几何是带 index 的，直接拷 position 会让 36 个顶点当 24 个用，
-  // 三角形索引就错位。先摊平 index，再按顶点顺序拼成一份非索引几何。
-  const flat = pieces.map((piece) => piece.index ? piece.toNonIndexed() : piece);
-  const merged = new THREE.BufferGeometry();
-  let positions = 0;
-  let hasUv = true;
-  for (const piece of flat) {
-    positions += piece.getAttribute("position").count;
-    if (!piece.getAttribute("uv")) hasUv = false;
-  }
-  const array = new Float32Array(positions * 3);
-  const normals = new Float32Array(positions * 3);
-  const uvs = hasUv ? new Float32Array(positions * 2) : null;
-  let offset = 0;
-  for (const piece of flat) {
-    const position = piece.getAttribute("position");
-    const normal = piece.getAttribute("normal");
-    array.set(position.array as Float32Array, offset * 3);
-    normals.set(normal.array as Float32Array, offset * 3);
-    if (uvs) uvs.set(piece.getAttribute("uv").array as Float32Array, offset * 2);
-    offset += position.count;
-  }
-  merged.setAttribute("position", new THREE.BufferAttribute(array, 3));
-  merged.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-  if (uvs) merged.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-  merged.computeBoundingSphere();
-  for (const piece of flat) if (!pieces.includes(piece)) piece.dispose();
-  for (const piece of pieces) piece.dispose();
-  return merged;
-}
-
-function capDome(shape: MushroomShape) {
+function capProfile(shape: MushroomShape, R: number, top: number): Array<[number, number]> {
   switch (shape) {
-    case "bell":
-      return new THREE.SphereGeometry(BASE_RADIUS, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62);
-    case "flat":
-      return lathe([[0, 0.11], [0.15, 0.095], [0.34, 0.035], [0.42, -0.005], [0.39, -0.04]]);
-    case "cone":
-      return lathe([[0, 0.27], [0.10, 0.16], [0.22, 0.05], [0.35, -0.02], [0.31, -0.055]]);
-    case "morel":
-      return lathe([[0, 0.35], [0.11, 0.25], [0.18, 0.12], [0.25, 0.00], [0.31, -0.05]]);
-    case "wax":
-      return lathe([[0, 0.18], [0.11, 0.12], [0.23, 0.04], [0.33, -0.01], [0.30, -0.04]]);
+    case "flat": return [[0, top], [0.14, top * 0.9], [0.28, top * 0.55], [R * 0.98, 0.02], [R, -0.01], [R * 0.88, 0.01]];
+    case "bell": return [[0, top], [0.10, top * 0.9], [0.18, top * 0.62], [0.24, top * 0.25], [R * 0.8, -0.02], [R * 0.7, -0.05]];
+    case "cone": return [[0, top], [0.09, top * 0.78], [0.18, top * 0.42], [0.28, top * 0.1], [R * 0.9, -0.02], [R * 0.8, -0.04]];
+    case "wax": return [[0, top], [0.11, top * 0.86], [0.23, top * 0.5], [R * 0.95, 0.02], [R, -0.01], [R * 0.86, -0.03]];
     case "umbrella":
-    default:
-      return lathe([[0, 0.16], [0.12, 0.14], [0.25, 0.09], [0.34, 0.01], [0.41, -0.06], [0.38, -0.095]]);
+    default: return [[0, top], [0.11, top * 0.94], [0.21, top * 0.8], [0.30, top * 0.5], [R * 0.98, 0.05], [R, -0.01], [R * 0.86, -0.05]];
   }
 }
-
-function addWarts(group: THREE.Group, radius: number, baseY: number, capTop: number, material: THREE.Material, seed: number) {
-  const count = 5 + Math.floor(seed * 5);
-  const geo = new THREE.SphereGeometry(0.032, 6, 4);
-  for (let i = 0; i < count; i++) {
-    const a = seed * 9 + i * 2.399;
-    const d = Math.sqrt((i + 0.5) / count) * radius * 0.78;
-    const x = Math.cos(a) * d;
-    const z = Math.sin(a) * d;
-    const t = Math.min(1, d / radius);
-    const y = baseY + capTop * (1 - t * t * 0.82) + 0.015;
-    const wart = new THREE.Mesh(geo, material);
-    wart.position.set(x, y, z);
-    wart.scale.setScalar(0.55 + (i % 3) * 0.12);
-    wart.castShadow = true;
-    group.add(wart);
-  }
-}
-
-function addScales(group: THREE.Group, radius: number, baseY: number, capTop: number, material: THREE.Material) {
-  const geo = new THREE.ConeGeometry(0.022, 0.055, 5);
-  for (let i = 0; i < 9; i++) {
-    const a = i * 2.3;
-    const d = radius * (0.3 + (i % 4) * 0.15);
-    const cone = new THREE.Mesh(geo, material);
-    cone.position.set(Math.cos(a) * d, baseY + capTop * (1 - d / radius * 0.45), Math.sin(a) * d);
-    cone.rotation.z = Math.cos(a) * 0.7;
-    cone.rotation.x = -Math.sin(a) * 0.7;
-    group.add(cone);
-  }
-}
-
-function addRings(group: THREE.Group, radius: number, material: THREE.Material) {
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.40, 0.018, 5, 20), material);
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.26;
-  group.add(ring);
-}
-
-function capHeight(shape: MushroomShape) {
-  if (shape === "flat") return 0.11;
-  if (shape === "cone") return 0.27;
-  if (shape === "morel") return 0.35;
+function capTopFor(shape: MushroomShape) {
+  if (shape === "flat") return 0.13;
+  if (shape === "bell") return 0.34;
+  if (shape === "cone") return 0.36;
   if (shape === "wax") return 0.18;
-  if (shape === "bell") return 0.24;
-  return 0.16;
-}
-
-function mushroomCoral(stemMat: THREE.Material, accentMat: THREE.Material) {
-  const group = new THREE.Group();
-  const branchGeo = new THREE.CylinderGeometry(0.026, 0.042, 0.22, 6);
-  for (let i = 0; i < 7; i++) {
-    const branch = new THREE.Mesh(branchGeo, i % 2 ? accentMat : stemMat);
-    const a = i * 2.1;
-    branch.position.set(Math.cos(a) * 0.08, 0.09 + (i % 3) * 0.06, Math.sin(a) * 0.08);
-    branch.rotation.z = Math.cos(a) * 0.42;
-    branch.rotation.x = -Math.sin(a) * 0.42;
-    branch.castShadow = true;
-    group.add(branch);
-  }
-  const tip = new THREE.SphereGeometry(0.04, 6, 4);
-  for (let i = 0; i < 5; i++) {
-    const a = i * 1.7;
-    const ball = new THREE.Mesh(tip, accentMat);
-    ball.position.set(Math.cos(a) * 0.16, 0.30 + (i % 2) * 0.05, Math.sin(a) * 0.16);
-    group.add(ball);
-  }
-  return group;
+  return 0.32;
 }
 
 export function createMushroomModel(species: MushroomSpecies) {
-  const capMat = paint(species.cap, {
-    roughness: species.pattern === "glow" ? 0.36 : 0.62,
-    metalness: species.pattern === "glow" ? 0.2 : 0,
-    emissive: species.pattern === "glow" ? species.accent : undefined,
-    emissiveIntensity: species.pattern === "glow" ? 0.52 : 0,
-    transparent: species.shape === "jelly",
-    opacity: species.shape === "jelly" ? 0.52 : 1,
+  const cap = C(species.cap), stem = C(species.stem), gill = C(species.gill), accent = C(species.accent);
+  const glow = species.pattern === "glow";
+  const jelly = species.shape === "jelly";
+  const material = softMaterial({
+    emissive: glow ? species.accent : undefined,
+    emissiveIntensity: glow ? 0.5 : 0,
+    transparent: jelly, opacity: jelly ? 0.6 : 1,
   });
-  const stemMat = paint(species.stem, { roughness: 0.8 });
-  const gillMat = paint(species.gill, { roughness: 0.86 });
-  const accentMat = paint(species.accent, { roughness: 0.5, emissive: species.pattern === "glow" ? species.accent : undefined, emissiveIntensity: species.pattern === "glow" ? 0.7 : 0 });
-  const group = new THREE.Group();
   const seed = (species.name.length * 7 + parseInt(species.id.slice(1), 10) * 13) % 97 / 97;
+  const parts: THREE.BufferGeometry[] = [];
+  const H = 0.34 + seed * 0.06;
+  const R = BASE_RADIUS * (0.85 + seed * 0.2);
 
   if (species.shape === "coral") {
-    group.add(mushroomCoral(stemMat, accentMat));
+    const branch = new THREE.CylinderGeometry(0.024, 0.04, 0.22, 8);
+    for (let i = 0; i < 7; i++) {
+      const a = i * 2.1;
+      const b = branch.clone();
+      b.translate(Math.cos(a) * 0.08, 0.1 + (i % 3) * 0.06, Math.sin(a) * 0.08);
+      b.rotateZ(Math.cos(a) * 0.4); b.rotateX(-Math.sin(a) * 0.4);
+      parts.push(solid(b, i % 2 ? accent : stem, 0.03));
+    }
+    const tip = new THREE.IcosahedronGeometry(0.04, 1);
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.7; const t = tip.clone();
+      t.translate(Math.cos(a) * 0.16, 0.3 + (i % 2) * 0.05, Math.sin(a) * 0.16);
+      parts.push(solid(t, accent, 0.02));
+    }
   } else if (species.shape === "puff") {
-    const body = new THREE.Mesh(new THREE.SphereGeometry(BASE_RADIUS * 0.72, 14, 10), capMat);
-    body.scale.set(1, 0.82, 1);
-    body.position.y = 0.24;
-    body.castShadow = true;
-    group.add(body);
-    addMesh(group, new THREE.CylinderGeometry(0.06, 0.06, 0.025, 8), gillMat, 0, 0.44, 0);
-    addMesh(group, new THREE.CylinderGeometry(0.16, 0.20, 0.11, 10), stemMat, 0, 0.08, 0);
+    const b = new THREE.IcosahedronGeometry(BASE_RADIUS * 0.72, 2); b.scale(1, 0.9, 1); b.translate(0, 0.24, 0);
+    parts.push(solid(b, cap, 0.03));
+    for (let i = 0; i < 14; i++) {
+      const a = i * 2.399, ph = Math.acos(1 - 2 * ((i + 0.5) / 14));
+      const d = new THREE.Vector3(Math.sin(ph) * Math.cos(a), Math.cos(ph), Math.sin(ph) * Math.sin(a));
+      if (d.y < -0.2) continue;
+      const s = new THREE.ConeGeometry(0.018, 0.045, 6); s.translate(0, 0.022, 0);
+      s.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d));
+      s.translate(d.x * 0.23, 0.24 + d.y * 0.21, d.z * 0.23);
+      parts.push(solid(s, darker(cap, 0.12), 0.02));
+    }
+    const stub = new THREE.CylinderGeometry(0.08, 0.11, 0.1, 10); stub.translate(0, 0.05, 0);
+    parts.push(solid(stub, darker(stem, 0.1), 0.02));
+  } else if (species.shape === "fan") {
+    const fan = new THREE.CylinderGeometry(R, R * 0.9, 0.05, 20, 1, false, 0, Math.PI);
+    parts.push(paintFaces(fan, c => lerpStops([[0, darker(cap, 0.3)], [0.4, cap], [0.75, lighter(cap, 0.2)], [1, lighter(cap, 0.45)]], Math.hypot(c.x, c.z) / R), 0.02));
+    const under = new THREE.CylinderGeometry(R * 0.92, R * 0.84, 0.015, 20, 1, false, 0, Math.PI);
+    under.translate(0, -0.03, 0);
+    parts.push(solid(under, gill, 0.02));
+    const knob = new THREE.IcosahedronGeometry(0.07, 1); knob.translate(0, 0, -0.02);
+    parts.push(solid(knob, darker(cap, 0.3), 0.02));
+    for (const p of parts) p.translate(0, 0.24, 0);
+  } else if (species.shape === "cup") {
+    const bowl = lathe([[0.06, 0], [0.22, 0.05], [0.30, 0.15], [0.26, 0.21], [0.17, 0.16]], 20);
+    bowl.translate(0, H * 0.5, 0);
+    parts.push(solid(bowl, cap, 0.02));
+    const inner = lathe([[0.02, 0.03], [0.18, 0.08], [0.24, 0.14]], 20);
+    inner.translate(0, H * 0.5 + 0.004, 0);
+    parts.push(solid(inner, gill, 0.02));
+    const st = new THREE.CylinderGeometry(0.05, 0.07, H * 0.5, 10); st.translate(0, H * 0.25, 0);
+    parts.push(solid(st, stem, 0.02));
+  } else if (species.shape === "morel") {
+    parts.push(stemPart(H * 0.75, stem));
+    const top = 0.34;
+    const cp = lathe([[0, top], [0.09, top * 0.9], [0.15, top * 0.66], [0.19, top * 0.36], [R * 0.6, 0.02], [R * 0.55, 0]], 16);
+    const cpp = paintFaces(cp, () => darker(cap, 0.35), 0.03); cpp.translate(0, H * 0.75, 0);
+    parts.push(cpp);
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      const b = new THREE.BoxGeometry(0.018, top * 0.95, 0.018);
+      b.translate(R * 0.4, top * 0.5, 0); b.rotateY(a); b.translate(0, H * 0.75, 0);
+      parts.push(solid(b, cap, 0.02));
+    }
+    for (let k = 0; k < 3; k++) {
+      const t = new THREE.TorusGeometry(R * (0.5 - k * 0.13), 0.012, 6, 14);
+      t.rotateX(Math.PI / 2); t.translate(0, H * 0.75 + 0.06 + k * 0.1, 0);
+      parts.push(solid(t, cap, 0.02));
+    }
   } else {
-    const height = species.shape === "fan" ? 0.28 : 0.30 + seed * 0.08;
-    const radius = species.shape === "fan" ? 0.30 : BASE_RADIUS * (0.82 + seed * 0.22);
-    addMesh(group, new THREE.CylinderGeometry(0.055, 0.075, height, 8, 3), stemMat, 0, height / 2, 0);
-    const volva = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.07, 9), stemMat);
-    volva.position.y = 0.035;
-    volva.castShadow = true;
-    group.add(volva);
-    if (species.pattern === "ring") addRings(group, radius, accentMat);
-
-    const y = height + 0.01;
-    let cap: THREE.Mesh | null = null;
-    if (species.shape === "cup") {
-      const bowl = new THREE.Mesh(lathe([[0.06, 0], [0.22, 0.05], [0.30, 0.15], [0.26, 0.21], [0.17, 0.16]]), capMat);
-      bowl.position.y = y;
-      bowl.castShadow = true;
-      group.add(bowl);
-      const inner = new THREE.Mesh(lathe([[0.02, 0.03], [0.18, 0.08], [0.24, 0.14]]), gillMat);
-      inner.position.y = y + 0.004;
-      group.add(inner);
-    } else if (species.shape === "fan") {
-      const shelf = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 0.88, 0.055, 18, 1, false, 0, Math.PI), capMat);
-      shelf.position.set(radius * 0.34, y + 0.06, 0);
-      shelf.rotation.z = -0.08;
-      shelf.rotation.y = Math.PI * 0.22;
-      shelf.castShadow = true;
-      group.add(shelf);
-      const under = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.92, radius * 0.92, 0.012, 18, 1, false, 0, Math.PI), gillMat);
-      under.position.set(radius * 0.34, y + 0.028, 0);
-      under.rotation.y = shelf.rotation.y;
-      group.add(under);
-    } else {
-      cap = new THREE.Mesh(capDome(species.shape), capMat);
-      cap.position.y = y;
-      cap.rotation.z = (seed - 0.5) * 0.10;
-      cap.castShadow = true;
-      group.add(cap);
-      const gills = gillMesh(radius, gillMat);
-      gills.position.y = y - 0.016;
-      group.add(gills);
-      const h = capHeight(species.shape);
-      if (species.pattern === "spots") addWarts(group, radius, y, h, accentMat, seed);
-      if (species.pattern === "scales") addScales(group, radius, y, h, accentMat);
-      if (species.pattern === "striate") {
-        const band = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.80, 0.010, 4, 24), accentMat);
-        band.rotation.x = Math.PI / 2;
-        band.position.y = y + 0.012;
-        group.add(band);
-      }
-      if (species.shape === "tooth") {
-        const toothGeo = new THREE.ConeGeometry(0.012, 0.075, 5);
-        for (let i = 0; i < 12; i++) {
-          const a = i / 12 * Math.PI * 2;
-          const tooth = new THREE.Mesh(toothGeo, accentMat);
-          tooth.position.set(Math.cos(a) * radius * 0.66, y - 0.055, Math.sin(a) * radius * 0.66);
-          tooth.rotation.z = Math.PI;
-          group.add(tooth);
-        }
-      }
-      if (species.shape === "morel") {
-        for (let i = 0; i < 5; i++) {
-          const ring = new THREE.Mesh(new THREE.TorusGeometry(radius * (0.26 + i * 0.12), 0.012, 4, 16), gillMat);
-          ring.rotation.x = Math.PI / 2;
-          ring.position.y = y + 0.08 + i * 0.055;
-          group.add(ring);
-        }
+    // 伞菌类（umbrella/bell/flat/cone/wax/tooth/jelly）
+    parts.push(stemPart(H, stem));
+    parts.push(volva(darker(stem, 0.12)));
+    if (species.pattern === "ring") parts.push(ringCollar(0.24, 0.085, lighter(stem, 0.15)));
+    const top = capTopFor(species.shape);
+    const cp = lathe(capProfile(species.shape, R, top), 24);
+    const cpp = paintFaces(cp, c => lerpStops([[-0.2, gill], [0.12, darker(cap, 0.18)], [0.5, cap], [1, lighter(cap, 0.18)]], c.y / top), 0.025);
+    cpp.translate(0, H, 0);
+    parts.push(cpp);
+    parts.push(species.shape === "cone" ? poreUnder(R, H, lighter(gill, 0.1)) : gillUnder(R, H, gill));
+    if (species.pattern === "spots") parts.push(...warts(R, H, top, accent, 8, seed * 9));
+    if (species.pattern === "scales") parts.push(...warts(R, H, top, lighter(cap, 0.35), 10, seed * 5));
+    if (species.pattern === "striate") {
+      const band = new THREE.TorusGeometry(R * 0.8, 0.008, 6, 24);
+      band.rotateX(Math.PI / 2); band.translate(0, H + 0.012, 0);
+      parts.push(solid(band, accent, 0.02));
+    }
+    if (species.shape === "tooth") {
+      const tooth = new THREE.ConeGeometry(0.012, 0.07, 6);
+      for (let i = 0; i < 12; i++) {
+        const a = i / 12 * Math.PI * 2; const t = tooth.clone();
+        t.rotateX(Math.PI); t.translate(Math.cos(a) * R * 0.6, H - 0.05, Math.sin(a) * R * 0.6);
+        parts.push(solid(t, accent, 0.02));
       }
     }
   }
 
-  // 所有物种统一朝随机方向略微歪斜，避免一排菌像尺子量过。
+  const merged = mergeGeometries(parts, false);
+  const mesh = new THREE.Mesh(merged, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
+  const group = new THREE.Group();
+  group.add(mesh);
   group.rotation.y = seed * Math.PI * 2;
+  group.rotation.z = (seed - 0.5) * 0.08;
   group.scale.setScalar(species.size / BASE_RADIUS);
   group.userData.speciesId = species.id;
   return group;
@@ -280,8 +239,7 @@ export function createMushroomModel(species: MushroomSpecies) {
 
 export function createMushroomGlow(color: string, radius: number) {
   const canvas = document.createElement("canvas");
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 128; canvas.height = 128;
   const ctx = canvas.getContext("2d")!;
   const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
   g.addColorStop(0, color);

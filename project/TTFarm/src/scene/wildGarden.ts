@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {
-  MUSHROOM_HABITAT_LABEL, MUSHROOM_LIST,
+  MUSHROOM_HABITAT_LABEL, MUSHROOM_LIST, MUSHROOM_GROUND_CAP,
   complaintFor, mushroomMutationAt, mushroomSeasonAt, type MushroomHabitat, type MushroomMutation, type MushroomSpecies,
 } from "../game/mushrooms";
 import {
@@ -103,14 +103,14 @@ function addHostObstacle(host: Host, obstacles: WorldObstacles) {
 }
 
 function barkMaterial(color: string) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, flatShading: true });
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, flatShading: false });
 }
 
 function buildHost(kind: HostKind, seed: number) {
   const group = new THREE.Group();
   const bark = barkMaterial(kind === "log" ? "#6c4f36" : kind === "stump" ? "#73563d" : "#5f4934");
-  const cut = new THREE.MeshStandardMaterial({ color: "#cbb58e", roughness: 0.82, flatShading: true });
-  const moss = new THREE.MeshStandardMaterial({ color: "#62834e", roughness: 0.95, flatShading: true });
+  const cut = new THREE.MeshStandardMaterial({ color: "#cbb58e", roughness: 0.82, flatShading: false });
+  const moss = new THREE.MeshStandardMaterial({ color: "#62834e", roughness: 0.95, flatShading: false });
   const branchMat = barkMaterial("#76593c");
 
   if (kind === "log") {
@@ -211,7 +211,7 @@ function buildHost(kind: HostKind, seed: number) {
 const gardenMoundMaterial = new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.98,
-  flatShading: true,
+  flatShading: false,
   envMapIntensity: 0.25,
 });
 
@@ -640,11 +640,19 @@ export function createWildGarden(obstacles: WorldObstacles) {
     actors.clear();
     const rndM = randomSource(season.key ^ 0x7f2e1d3c);
     const seen = new Set<string>();
-    for (const host of hosts) {
+    // 宿主顺序按季节种子洗牌，再按 30 朵封顶；这样不会总是同一批近处的宿主长菌
+    const hostOrder = hosts.slice();
+    for (let i = hostOrder.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rndM() * (i + 1));
+      [hostOrder[i], hostOrder[j]] = [hostOrder[j], hostOrder[i]];
+    }
+    for (const host of hostOrder) {
+      if (actors.size >= MUSHROOM_GROUND_CAP) break;
       const habitat = host.kind === "shrub" ? "shrub" : host.kind === "ground" ? "ground" : host.kind;
       const pool = speciesByHabitat.get(habitat) ?? MUSHROOM_LIST;
       const count = 1 + Math.floor(rndM() * 3) + (host.kind === "log" ? 1 : 0);
       for (let i = 0; i < count; i++) {
+        if (actors.size >= MUSHROOM_GROUND_CAP) break;
         let species = pool[Math.floor(rndM() * pool.length)];
         if (seen.has(species.id)) species = pool[(pool.indexOf(species) + 1) % pool.length];
         seen.add(species.id);

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { PALETTE, clay } from "./materials";
 
 /** 固定种子随机：每次刷新场景细节一样，不会东一块西一块地跳 */
@@ -11,6 +11,14 @@ function rnd(): number {
 }
 function between(min: number, max: number): number {
   return min + rnd() * (max - min);
+}
+
+/** 焊接重合顶点后重算法线：把非索引低模的"面法线"变成连续平滑法线，
+ *  有机体（树冠/石头/土块）才有软胶的圆润过渡，而不是一片片硬棱面。 */
+function weldSmooth(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const welded = mergeVertices(geo, 1e-4);
+  welded.computeVertexNormals();
+  return welded;
 }
 
 /** 揉皱的球：顶点随机偏移，得到不规则但连续的有机外形，用在树冠、石头和土块上 */
@@ -24,8 +32,7 @@ export function lumpy(radius: number, detail: number, amount: number): THREE.Buf
     v.multiplyScalar(n);
     pos.setXYZ(i, v.x, v.y, v.z);
   }
-  geo.computeVertexNormals();
-  return geo;
+  return weldSmooth(geo);
 }
 
 function rounded(w: number, h: number, d: number, r: number): THREE.BufferGeometry {
@@ -421,7 +428,7 @@ export function buildMountain(radius: number, height: number, variant: number): 
   // 山脚一圈矮丘，把山体和草地的接缝盖住
   const foot = new THREE.Mesh(
     lumpy(radius * 0.46, 1, 0.22),
-    clay(PALETTE.mountainDark, { roughness: 0.96, flatShading: true })
+    clay(PALETTE.mountainDark, { roughness: 0.96, flatShading: false })
   );
   foot.scale.set(1.5, 0.3, 1.45);
   foot.position.y = 0.1;
@@ -452,7 +459,7 @@ export function buildTree(scale: number, variant: number): THREE.Group {
     for (let tier = 0; tier < 4; tier++) {
       const cone = addShadow(new THREE.Mesh(
         new THREE.ConeGeometry(0.90 - tier * 0.17, 1.4 - tier * 0.15, 9),
-        clay([0x386e61, 0x488875, 0x63a28b, 0x82b6a0][tier], { flatShading: true })
+        clay([0x386e61, 0x488875, 0x63a28b, 0x82b6a0][tier], { flatShading: false })
       ));
       cone.position.set(0.08, 1.30 + tier * 0.40, 0);
       cone.rotation.y = tier * 0.49;
@@ -492,7 +499,7 @@ export function buildTree(scale: number, variant: number): THREE.Group {
 const rockMat = new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.97,
-  flatShading: true,
+  flatShading: false,
   envMapIntensity: 0.35,
 });
 
@@ -502,12 +509,12 @@ const rockGeoCache = new Map<number, THREE.BufferGeometry>();
 const ROCK_SINK = 0.045;
 
 /** 硬边岩块：低模二十面体被“劈”出几组斜面，再按面刷上冷灰、暖灰和苔藓。
- * 关键不是面数，而是每个三角面都保留自己的法线，轮廓才有石头该有的棱角。 */
+ * 软胶统一后改为焊接平滑法线：保留揉皱轮廓但过渡圆润，不再是一片片硬棱面。 */
 export function rockGeometry(variant = 0): THREE.BufferGeometry {
   const cached = rockGeoCache.get(variant);
   if (cached) return cached;
 
-  const geo = new THREE.IcosahedronGeometry(1, 1).toNonIndexed();
+  let geo: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, 1).toNonIndexed();
   const pos = geo.attributes.position;
   const phase = 1.9 + variant * 3.7;
   const p = new THREE.Vector3();
@@ -523,7 +530,7 @@ export function rockGeometry(variant = 0): THREE.BufferGeometry {
     p.y = p.y < 0 ? p.y * 0.32 : p.y * (0.80 + (variant === 1 ? 0.22 : 0));
     pos.setXYZ(i, p.x, p.y, p.z);
   }
-  geo.computeVertexNormals();
+  geo = weldSmooth(geo);
 
   // 底部落到 y=0，整体收成大约 0.36m 半径、0.62m 高的路边石体量。
   geo.computeBoundingBox();

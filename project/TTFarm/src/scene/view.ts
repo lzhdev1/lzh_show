@@ -27,10 +27,11 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     canvas, antialias: !compact || window.devicePixelRatio <= 1.5, alpha: false, powerPreference: "high-performance",
   });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.04;
+  // 软胶柔和：ACES 让明暗过渡圆润，配合软阴影与较低主光对比
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
@@ -72,7 +73,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
   keyLight.shadow.camera.near = 1;
   keyLight.shadow.camera.far = 70;
   keyLight.shadow.bias = -0.0006;
-  keyLight.shadow.radius = 3;
+  keyLight.shadow.radius = 5;
   scene.add(keyLight);
   scene.add(keyLight.target);
 
@@ -107,8 +108,8 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     const flash = weather === "storm" && !reducedMotion.matches ? Math.exp(-stormPhase*3.8)*Math.min(1,stormPhase*14) : 0;
     sky.uniforms.lightning.value = flash;
     keyLight.color.lerpColors(sun, overcast, skyLight);
-    keyLight.intensity = 2.15 - skyLight * 1.40 + flash*.8;
-    hemi.intensity = 1.65 + skyLight * 0.18;
+    keyLight.intensity = 1.95 - skyLight * 1.20 + flash*.8;
+    hemi.intensity = 1.85 + skyLight * 0.18;
     rimLight.intensity = 0.84 - skyLight * 0.50;
     fog.color.lerpColors(clearFog, rainFog, skyLight).lerp(mistFog,haze);
     fog.near = THREE.MathUtils.lerp(48, 9, haze);
