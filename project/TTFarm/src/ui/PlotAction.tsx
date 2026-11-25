@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { useClock } from "../game/clock";
 import { CROPS, harvestYieldOf, produceName, producePrice, seedInfoOf } from "../game/crops";
 import { useFieldInteraction } from "../game/fieldInteraction";
-import { formatRemain, isReady, plotMutationRevealed, remainingMs, selfWaterGate, waterHint } from "../game/growth";
+import { formatCountdown, isReady, plotMutationRevealed, remainingMs, selfWaterGate, waterHint } from "../game/growth";
 import { useGame } from "../game/state";
 import { HarvestIcon, SowIcon, WateringCanIcon } from "./icons";
 
@@ -50,9 +50,9 @@ export function PlotAction() {
       detail = `${cropName} ×${count}`;
       description = `${detail}，售价 ${producePrice(crop, mutation)} 金币/份`;
     } else {
-      const remaining = secondsLeft === null ? "生长中" : formatRemain(secondsLeft * 1000).replace(/\s/g, "");
-      detail = `${cropName} · ${remaining}`;
-      description = `${cropName}，已浇水 ${plot.watered} 次（−${Math.min(100, plot.watered * 2)}%），${remaining}${waterNote ? `，${waterNote}` : ""}`;
+      const remaining = secondsLeft === null ? "生长中" : formatCountdown(secondsLeft * 1000);
+      detail = `${cropName} · 成熟倒计时 ${remaining}`;
+      description = `${cropName}，成熟倒计时 ${remaining}，已浇水 ${plot.watered} 次（−${Math.min(100, plot.watered * 2)}%）${waterNote ? `，${waterNote}` : ""}`;
     }
   }
 

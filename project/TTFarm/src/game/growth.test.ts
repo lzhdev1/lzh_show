@@ -4,6 +4,7 @@ import {
   applyGuestWater,
   applySelfWater,
   canShowWaterHint,
+  formatCountdown,
   GUEST_WATER_PER_WINDOW,
   growTotal,
   guestWaterGate,
@@ -51,6 +52,16 @@ describe("普通作物生长时间", () => {
     expect(growTotal("durian", 1)).toBeCloseTo(CROPS.durian.growMs * 0.98, 0);
     expect(growTotal("durian", MAX_WATER)).toBeCloseTo(CROPS.durian.growMs * MIN_GROW_RATIO, 0);
     expect(growTotal("durian", MAX_WATER + 10)).toBeCloseTo(CROPS.durian.growMs * MIN_GROW_RATIO, 0);
+  });
+});
+
+describe("作物成熟倒计时", () => {
+  it("统一显示时:分:秒，小时不封顶", () => {
+    expect(formatCountdown(0)).toBe("00:00:00");
+    expect(formatCountdown(1_000)).toBe("00:00:01");
+    expect(formatCountdown(3_600_000)).toBe("01:00:00");
+    expect(formatCountdown(36 * 3_600_000)).toBe("36:00:00");
+    expect(formatCountdown(-1_000)).toBe("00:00:00");
   });
 });
 

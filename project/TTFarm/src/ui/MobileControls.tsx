@@ -3,6 +3,7 @@ import { ACTIONS } from "../scene/actionMotion";
 import { requestAction, requestStopAction, useAction } from "../game/actionStore";
 import { BOOST_CARDS, BAITS, baitById } from "../game/items";
 import { isReady } from "../game/growth";
+import { useFieldInteraction } from "../game/fieldInteraction";
 import { useFishing } from "../game/fishing";
 import { helpAtFarm, useSocial } from "../game/social";
 import { useGame } from "../game/state";
@@ -41,7 +42,10 @@ export function MobileControls() {
   const materials = hostFishing ? hostFishing.materials : ownMaterials;
   const selectedBait = hostFishing ? hostFishing.selectedBait : ownSelectedBait;
   const selectedPlot = useGame(s => s.selectedPlot);
+  const standingPlot = useFieldInteraction(s => s.standingPlot);
   const plots = useGame(s => s.plots);
+  const selectedBoost = useGame(s => s.selectedBoost);
+  const selectBoost = useGame(s => s.selectBoost);
   const useBoostCard = useGame(s => s.useBoostCard);
   const notify = useGame(s => s.notify);
   const phase = useFishing(s => s.phase);
@@ -53,7 +57,6 @@ export function MobileControls() {
   const sprint = useSyncExternalStore(subscribeSprint, sprintEnabled, sprintEnabled);
   const [baitOpen, setBaitOpen] = useState(false);
   const [itemOpen, setItemOpen] = useState(false);
-  const [itemId, setItemId] = useState<string | null>(null);
   const longPress = useRef(false);
   const itemTimer = useRef<number | null>(null);
 
@@ -68,7 +71,9 @@ export function MobileControls() {
   const baitCount = bait ? materials[bait.id] ?? 0 : 0;
   const ownedCards = BOOST_CARDS.filter(card => (items[card.id] ?? 0) > 0)
     .sort((a, b) => (items[b.id] ?? 0) - (items[a.id] ?? 0) || a.minutes - b.minutes);
-  const pickedCard = itemId && (items[itemId] ?? 0) > 0 ? itemId : ownedCards[0]?.id ?? null;
+  const pickedCard = selectedBoost && (items[selectedBoost] ?? 0) > 0
+    ? selectedBoost
+    : ownedCards[0]?.id ?? null;
   const baitChoices = [...BAITS].sort((a, b) => (materials[b.id] ?? 0) - (materials[a.id] ?? 0));
   const selectBait = (id: string | null) => {
     if (hostFishing) {
@@ -86,9 +91,11 @@ export function MobileControls() {
     if (visit) { notify("串门时不能用加速卡，好友的作物请等房主自己照料", "warn"); return; }
     if (!pickedCard) { notify("背包里没有加速卡，先去商店「道具」页买一张", "warn"); return; }
     const now = Date.now();
-    const picked = selectedPlot !== null && plots[selectedPlot]?.crop && !isReady(plots[selectedPlot], now)
-      ? selectedPlot
-      : plots.find(plot => plot.crop && !isReady(plot, now))?.id;
+    const picked = standingPlot !== null && plots[standingPlot]?.crop && !isReady(plots[standingPlot], now)
+      ? standingPlot
+      : selectedPlot !== null && plots[selectedPlot]?.crop && !isReady(plots[selectedPlot], now)
+        ? selectedPlot
+        : plots.find(plot => plot.crop && !isReady(plot, now))?.id;
     if (picked === undefined) { notify("没有正在生长的地块，先种一茬再用加速卡", "warn"); return; }
     useBoostCard(pickedCard, picked);
   };
@@ -146,7 +153,7 @@ export function MobileControls() {
       </div>
       {ownedCards.length === 0 ? <p className="cluster-empty">背包里还没有加速卡</p> : ownedCards.map(card =>
         <button key={card.id} type="button" className={`cluster-option${pickedCard === card.id ? " active" : ""}`}
-          onClick={() => { setItemId(card.id); setItemOpen(false); }}>
+          onClick={() => { selectBoost(card.id); setItemOpen(false); }}>
           <span className="cluster-item-icon"><ItemIcon size={19}/></span>
           <span><b>{card.name}<i>×{items[card.id] ?? 0}</i></b><small>{card.blurb}</small></span>
         </button>)}

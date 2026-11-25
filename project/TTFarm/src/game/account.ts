@@ -89,6 +89,7 @@ function applyRemoteState(state: RemoteState): void {
       codexFromHoldings(state.seeds, state.harvest, ranch.animals.map((animal) => animal.species)),
     ),
     selectedSeed: state.selectedSeed,
+    selectedBoost: null,
   });
 }
 

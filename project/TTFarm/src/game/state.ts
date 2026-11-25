@@ -141,6 +141,8 @@ interface GameData {
   ranch: RanchState;
   forage: ForageState;
   selectedSeed: string;
+  /** 底部道具栏选中的加速卡；null 表示当前没有待使用的道具 */
+  selectedBoost: string | null;
 }
 
 interface GameActions extends RanchActions, ForageActions {
@@ -149,6 +151,8 @@ interface GameActions extends RanchActions, ForageActions {
   /** 结算地块的阶段变异（发芽 / 成长 / 成熟各判一次） */
   settleMutations: (now: number) => void;
   selectSeed: (seed: string) => void;
+  /** 选中一张加速卡；传 null 取消，之后站到正在生长的地块上会询问是否使用 */
+  selectBoost: (id: string | null) => void;
   selectPlot: (id: number | null) => void;
   buySeed: (crop: CropId, qty?: number) => void;
   plant: (plotId: number) => void;
@@ -249,6 +253,7 @@ export function initialData(): GameData {
     ranch: normalizeRanch(undefined),
     forage: normalizeForage(undefined),
     selectedSeed: "radish",
+    selectedBoost: null,
   };
 }
 
@@ -289,6 +294,15 @@ export const useGame = create<GameStore>()(
           return;
         }
         set({ selectedSeed: seed });
+      },
+
+      selectBoost: (id) => {
+        if (id === null) {
+          set({ selectedBoost: null });
+          return;
+        }
+        if (!boostCardById(id)) return;
+        set({ selectedBoost: id });
       },
 
       selectPlot: (id) => set({ selectedPlot: id }),
@@ -760,6 +774,7 @@ export const useGame = create<GameStore>()(
         if (items[id] <= 0) delete items[id];
         set({
           items,
+          selectedBoost: s.selectedBoost === id && (items[id] ?? 0) <= 0 ? null : s.selectedBoost,
           plots: s.plots.map((p) => (p.id === plotId ? { ...p, plantedAt: p.plantedAt - apply } : p)),
         });
         const minutes = Math.round(apply / 60_000);

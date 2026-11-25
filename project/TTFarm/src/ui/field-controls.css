@@ -127,6 +127,81 @@
 .plot-action:disabled { cursor: default; color: #656960; }
 .plot-action:disabled .plot-action-icon { filter: grayscale(.75); }
 
+/* 选中加速卡后，站在作物地块上出现的二次确认条 */
+.boost-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(160px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(460px, calc(100vw - 24px));
+  padding: 7px 8px 7px 9px;
+  border: 1px solid #c8b6dc;
+  border-radius: 15px;
+  background: rgba(255, 250, 241, 0.97);
+  box-shadow: 0 7px 20px #382d2440;
+  pointer-events: auto;
+}
+
+.boost-prompt-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #efe7f7;
+}
+
+.boost-prompt-copy {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.18;
+}
+
+.boost-prompt-copy strong {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.boost-prompt-copy small {
+  overflow: hidden;
+  color: #776b58;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boost-prompt-use,
+.boost-prompt-cancel {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.boost-prompt-use {
+  border: 1px solid #9b76d2;
+  background: #8e68c9;
+  color: #fffdf8;
+}
+
+.boost-prompt-use:active { background: #7b55b7; }
+
+.boost-prompt-cancel {
+  border: 1px solid #d5c4a5;
+  background: #fff8e9;
+  color: #776b58;
+}
+
 .login-layer { overflow-y: auto; overscroll-behavior: contain; }
 .login-card { margin: auto; }
 .login-field input { font-size: 16px; }
@@ -272,11 +347,13 @@
 /* 长名字的作物在窄屏上会跨过摇杆上缘，操作行整行放到摇杆之上。 */
 @media (max-width: 390px) and (orientation: portrait) {
   .hud[data-input="touch"] .plot-action { bottom: calc(272px + env(safe-area-inset-bottom)); }
+  .hud[data-input="touch"] .boost-prompt { bottom: calc(333px + env(safe-area-inset-bottom)); }
 }
 @media (any-pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
   .dock { width: min(55vw, 580px); }
   .hud[data-input='touch'] .touch-stick { bottom: calc(78px + env(safe-area-inset-bottom)); width: 88px; height: 88px; }
   .hud[data-input='touch'] .plot-action { bottom: calc(252px + env(safe-area-inset-bottom)); }
+  .hud[data-input='touch'] .boost-prompt { bottom: calc(313px + env(safe-area-inset-bottom)); }
   .sheet { bottom: calc(78px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 146px); }
   .modal { max-height: 100%; }
 }

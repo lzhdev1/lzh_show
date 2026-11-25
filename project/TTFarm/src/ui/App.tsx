@@ -5,9 +5,11 @@ import { observeHomeRevision, useAccount } from "../game/account";
 import { startSocialSync, useSocial } from "../game/social";
 import { startChatSync } from "../game/chat";
 import { LoginPage } from "./LoginPage";
-import { BagIcon, CropIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
+import { BOOST_CARDS } from "../game/items";
+import { BagIcon, CropIcon, ItemIcon, LandIcon, LockIcon, SeedIcon, ShopIcon } from "./icons";
 import { PlotSheet } from "./PlotSheet";
 import { PlotAction } from "./PlotAction";
+import { BoostPrompt } from "./BoostPrompt";
 import { ShopPanel } from "./ShopPanel";
 import { ProfilePanel } from "./ProfilePanel";
 import { farmInput, releaseTouchInput } from "../game/input";
@@ -32,6 +34,10 @@ import { BackpackPanel } from "./BackpackPanel";
 import { FishingDock } from "./FishingDock";
 import { MobileControls } from "./MobileControls";
 import "./social.css";
+
+/** 底部道具栏里把「120 分钟加速卡」缩成「2小时」，避免按钮太宽 */
+const boostShortName = (minutes: number) =>
+  minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}小时` : `${minutes}分钟`;
 
 export function App() {
   const token = useAccount(s => s.identityChecked && s.user?.nickname ? s.token : null);
@@ -60,6 +66,7 @@ export function App() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [carStoreOpen, setCarStoreOpen] = useState(false);
   const [backpackOpen, setBackpackOpen] = useState(false);
+  const [dockTab, setDockTab] = useState<"seed" | "item">("seed");
   const friendRoster = useFriendRoster(token, friendsOpen);
   useEffect(() => startSocialSync(observeHomeRevision), []);
   useEffect(() => startChatSync(), []);
@@ -83,6 +90,9 @@ export function App() {
   const seeds = useGame((s) => s.seeds);
   const selectedSeed = useGame((s) => s.selectedSeed);
   const selectSeed = useGame((s) => s.selectSeed);
+  const items = useGame((s) => s.items);
+  const selectedBoost = useGame((s) => s.selectedBoost);
+  const selectBoost = useGame((s) => s.selectBoost);
   const selectedPlot = useGame((s) => s.selectedPlot);
   const toasts = useGame((s) => s.toasts);
 
@@ -132,6 +142,15 @@ export function App() {
     .filter((row) => row.info)
     .sort((a, b) => a.info.def.unlockLevel - b.info.def.unlockLevel || a.key.localeCompare(b.key)),
   [seeds]);
+
+  // 道具栏只放加速卡：有库存的排前面，同库存按分钟数从小到大
+  const boostRows = useMemo(() => [...BOOST_CARDS].sort((a, b) => {
+    const countA = items[a.id] ?? 0;
+    const countB = items[b.id] ?? 0;
+    const ownedA = countA > 0 ? 0 : 1;
+    const ownedB = countB > 0 ? 0 : 1;
+    return ownedA - ownedB || countB - countA || a.minutes - b.minutes;
+  }), [items]);
 
   // 没登录就先只给登录页：3D 场景照样在背后转，登录完直接就是农场
   if (!token) return <LoginPage />;
@@ -216,6 +235,7 @@ export function App() {
         {!driving && <FishingDock />}
         {!driving && <MobileControls />}
         {!visit && <PlotAction />}
+        {!visit && <BoostPrompt />}
         {!visit && <RanchHUD onOpenRanch={() => setRanchOpen(true)} />}
         <ForageHUD />
         <MushroomHUD />
@@ -223,50 +243,76 @@ export function App() {
       </>}
 
       {!visit && <div className="dock">
-        <div className="dock-label">
-          <SeedIcon />
-          <span>种子</span>
+        <div className="dock-tabs" role="tablist" aria-label="底部快捷栏">
+          <button type="button" role="tab" aria-selected={dockTab === "seed"}
+            className={`dock-tab${dockTab === "seed" ? " active" : ""}`}
+            onClick={() => { setDockTab("seed"); selectBoost(null); }}>
+            <SeedIcon size={15} /><span>种子</span>
+          </button>
+          <button type="button" role="tab" aria-selected={dockTab === "item"}
+            className={`dock-tab${dockTab === "item" ? " active" : ""}`}
+            onClick={() => setDockTab("item")}>
+            <ItemIcon size={15} /><span>道具</span>
+          </button>
         </div>
-        <div className="seed-scroll">
-          {/* 野菜/草药种子只有捡到过才占格子，避免空位挤爆种子栏 */}
-          {seedRows.map((crop) => {
-            const locked = level < crop.unlockLevel;
-            return (
-              <button
-                key={crop.id}
-                className={`seed${selectedSeed === crop.id ? " active" : ""}${locked ? " locked" : ""}`}
-                onClick={() => selectSeed(crop.id)}
-              >
-                <span className="seed-icon">
-                  <CropIcon crop={crop.id} size={18} />
-                </span>
-                <span className="seed-text">
-                  <span className="seed-name">{crop.name}</span>
-                  <span className="seed-count">
-                    {locked ? `Lv${crop.unlockLevel}` : `×${seeds[crop.id]}`}
+        <div className="seed-scroll" role="tabpanel">
+          {dockTab === "seed" ? <>
+            {/* 野菜/草药种子只有捡到过才占格子，避免空位挤爆种子栏 */}
+            {seedRows.map((crop) => {
+              const locked = level < crop.unlockLevel;
+              return (
+                <button
+                  key={crop.id}
+                  className={`seed${selectedSeed === crop.id ? " active" : ""}${locked ? " locked" : ""}`}
+                  onClick={() => selectSeed(crop.id)}
+                >
+                  <span className="seed-icon">
+                    <CropIcon crop={crop.id} size={18} />
                   </span>
-                </span>
-                {locked && <LockIcon size={12} />}
-              </button>
-            );
-          })}
-          {mutationSeedRows.map((row) => {
-            const locked = level < row.info.def.unlockLevel;
+                  <span className="seed-text">
+                    <span className="seed-name">{crop.name}</span>
+                    <span className="seed-count">
+                      {locked ? `Lv${crop.unlockLevel}` : `×${seeds[crop.id]}`}
+                    </span>
+                  </span>
+                  {locked && <LockIcon size={12} />}
+                </button>
+              );
+            })}
+            {mutationSeedRows.map((row) => {
+              const locked = level < row.info.def.unlockLevel;
+              return (
+                <button
+                  key={row.key}
+                  className={`seed variant${selectedSeed === row.key ? " active" : ""}${locked ? " locked" : ""}`}
+                  onClick={() => selectSeed(row.key)}
+                  title={`${produceName(row.info.def, row.info.mutation)}种子`}
+                >
+                  <span className="seed-icon">
+                    <CropIcon crop={row.info.def.id} size={18} />
+                  </span>
+                  <span className="seed-text">
+                    <span className="seed-name">{produceName(row.info.def, row.info.mutation)}</span>
+                    <span className="seed-count">{locked ? `Lv${row.info.def.unlockLevel}` : `×${row.count}`}</span>
+                  </span>
+                  {locked && <LockIcon size={12} />}
+                </button>
+              );
+            })}
+          </> : boostRows.map((card) => {
+            const count = items[card.id] ?? 0;
+            const active = selectedBoost === card.id && count > 0;
             return (
-              <button
-                key={row.key}
-                className={`seed variant${selectedSeed === row.key ? " active" : ""}${locked ? " locked" : ""}`}
-                onClick={() => selectSeed(row.key)}
-                title={`${produceName(row.info.def, row.info.mutation)}种子`}
-              >
-                <span className="seed-icon">
-                  <CropIcon crop={row.info.def.id} size={18} />
-                </span>
+              <button key={card.id} type="button"
+                className={`seed item${active ? " active" : ""}${count <= 0 ? " empty" : ""}`}
+                disabled={count <= 0}
+                onClick={() => selectBoost(active ? null : card.id)}
+                title={`${card.name}${count > 0 ? ` · ${card.blurb}` : " · 未持有，去商店购买"}`}>
+                <span className="seed-icon"><ItemIcon size={18} /></span>
                 <span className="seed-text">
-                  <span className="seed-name">{produceName(row.info.def, row.info.mutation)}</span>
-                  <span className="seed-count">{locked ? `Lv${row.info.def.unlockLevel}` : `×${row.count}`}</span>
+                  <span className="seed-name">{boostShortName(card.minutes)}卡</span>
+                  <span className="seed-count">×{count}</span>
                 </span>
-                {locked && <LockIcon size={12} />}
               </button>
             );
           })}
