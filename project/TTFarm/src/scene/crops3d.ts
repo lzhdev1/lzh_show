@@ -949,7 +949,9 @@ export function createCropLibrary() {
   return {
     wind,
     model(crop: CropId, stage: number, mutation: Mutation | null) {
-      if (mutation && isSpirit(mutation)) {
+      const flower = isFlowerCrop(crop);
+      // 鲜花变异只加光效：不替换成仙/神/灵玩偶，保花形与花色
+      if (!flower && mutation && isSpirit(mutation)) {
         if (stage === 3) return dollFor(mutation);
         // Mutation is known at planting time. Prepare only the figurines the
         // farm will actually need, while the crop still has time to grow.
@@ -960,10 +962,11 @@ export function createCropLibrary() {
           }));
         }
       }
-      const key = stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
+      // 鲜花的形态不随变异变化：共用一份几何，避免每种变异各建一份大模型
+      const key = flower ? `${crop}/${stage}` : stage < 2 ? `${crop}/${stage}` : `${crop}/${mutation}/${stage}`;
       let geo = geometry.get(key);
       if (!geo) {
-        geo = growModel(crop, stage, stage < 2 ? null : mutation);
+        geo = growModel(crop, stage, (flower || stage < 2) ? null : mutation);
         geometry.set(key, geo);
       }
       return { geometry: geo, material };

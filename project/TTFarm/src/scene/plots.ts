@@ -353,7 +353,7 @@ export function updatePlots(
       }
       visual.cropMesh.geometry = geometry;
       visual.cropMesh.material = material;
-      const spirit = stage === 3 && mutation && isSpirit(mutation);
+      const spirit = stage === 3 && mutation && isSpirit(mutation) && !flower;
       // As on the playable avatars, keep the field's coarse moving shadow map off the painted face.
       visual.cropMesh.receiveShadow = !spirit;
       visual.cropMesh.count = spirit ? 1 : flower ? 2 : 4;

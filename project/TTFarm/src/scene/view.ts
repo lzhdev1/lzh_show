@@ -27,7 +27,7 @@ export function createView(canvas: HTMLCanvasElement): SceneView {
     canvas, antialias: !compact || window.devicePixelRatio <= 1.5, alpha: false, powerPreference: "high-performance",
   });
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
   // 软胶柔和：ACES 让明暗过渡圆润，配合软阴影与较低主光对比
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
