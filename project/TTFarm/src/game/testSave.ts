@@ -1,5 +1,4 @@
 import type { RemoteState } from "../api/client";
-import type { CropId } from "./crops";
 
 export function makeSave(overrides: Partial<RemoteState> = {}): RemoteState {
   const plots = Array.from({ length: 30 }, (_, id) => ({
@@ -16,7 +15,7 @@ export function makeSave(overrides: Partial<RemoteState> = {}): RemoteState {
     coins: 100,
     xp: 0,
     plots,
-    seeds: { radish: 3, cabbage: 2 } as Record<CropId, number>,
+    seeds: { radish: 3, cabbage: 2 } as Record<string, number>,
     harvest: {},
     meat: {},
     nickname: "测试农场",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CROPS, produceName, producePrice } from "../game/crops";
-import { FORAGE_SEED_CHANCE, HERB_SEED_CHANCE } from "../game/forage";
+import { forageMutationSeedChance, forageSeedChance } from "../game/forage";
 import { setNearbyPatch, useForageInteraction } from "../game/forageInteraction";
 import { helpAtFarm, useSocial } from "../game/social";
 import { useGame } from "../game/state";
@@ -21,7 +21,8 @@ export function ForageHUD() {
   const name = produceName(def, patch.mutation);
   const price = producePrice(def, patch.mutation);
   const herb = Boolean(def.herb);
-  const seedChance = herb ? HERB_SEED_CHANCE : FORAGE_SEED_CHANCE;
+  const seedChance = forageSeedChance();
+  const mutationSeedChance = forageMutationSeedChance(patch);
 
   const pick = async () => {
     if (busy) return;
@@ -43,7 +44,7 @@ export function ForageHUD() {
     <div className="wild-encounter-head">
       <span className="animal-portrait forage-portrait" aria-hidden="true"><CropIcon crop={patch.crop} size={22}/></span>
       <div><strong className={patch.mutation ? `variety-mark ${patch.mutation}` : ""}>{name}</strong><small>
-        {herb ? "野生草药" : "野生野菜"} · {price} 金币/份{patch.mutation ? ` · ${MUTATIONS[patch.mutation].label}` : ""}
+        {herb ? "野生草药" : "野生野菜"} · {price} 金币/份 · {herb ? "1 份" : "1–4 份"}{patch.mutation ? ` · ${MUTATIONS[patch.mutation].label}` : ""} · 普通种子 {Math.round(seedChance * 100)}%{mutationSeedChance ? ` · 变异种子 ${Math.round(mutationSeedChance * 100)}%` : ""}
         {guest ? " · 收获归好友仓库" : ""}
       </small></div>
     </div>

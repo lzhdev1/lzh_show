@@ -174,7 +174,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
               <span className="codex-icon"><CropIcon crop={entry.crop} size={22}/></span>
               <div className="codex-title">
                 <strong>{def.name}</strong>
-                <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.yields} 份 · 生长 {seconds(def.growMs)}{def.herb ? " · 种子仅野外草药丛掉落" : def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
+                <small>Lv{def.unlockLevel} · 售价 {def.sellPrice} × {def.herb ? "1 份" : def.wild ? "1–4 份" : "1–5 份（均 3）"} · 生长 {seconds(def.growMs)}{def.herb ? " · 种子仅野外草药丛掉落" : def.wild ? " · 种子仅野外掉落" : ` · 种子 ${def.seedPrice} 金`}</small>
               </div>
               {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
             </div>
@@ -281,7 +281,7 @@ export function CodexPanel({ onClose }: { onClose: () => void }) {
                 <div className="codex-head">
                   <div>
                     <strong>{species.name}</strong>
-                    <small>{MUSHROOM_RARITY_LABEL[species.rarity]} · {MUSHROOM_SHAPE_LABEL[species.shape]} · 生于{MUSHROOM_HABITAT_LABEL[species.habitat]} · {species.price} 金</small>
+                    <small>{MUSHROOM_RARITY_LABEL[species.rarity]} · {MUSHROOM_SHAPE_LABEL[species.shape]} · 生于{MUSHROOM_HABITAT_LABEL[species.habitat]} · {species.price} 金/份 · 1–3 份</small>
                   </div>
                   {collected ? <span className="codex-owned">已收集</span> : <span className="codex-owned muted">未收集</span>}
                 </div>

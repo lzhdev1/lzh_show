@@ -43,6 +43,13 @@ function applyRemoteState(state: RemoteState): void {
     plantedAt: plot.plantedAt,
     watered: plot.watered,
     mutation: plot.crop && isMutation(plot.mutation) && cropMutationValid(plot.crop as CropId, plot.mutation) ? plot.mutation : null,
+    selfWater: Array.isArray(plot.selfWater) ? plot.selfWater.filter((t) => Number.isFinite(t)).slice(-5) : [],
+    selfWaterTotal: Number.isFinite(plot.selfWaterTotal) ? Math.max(0, Math.trunc(plot.selfWaterTotal as number)) : 0,
+    guestWater: plot.guestWater && typeof plot.guestWater.by === "string" && Number.isFinite(plot.guestWater.t)
+      ? { by: plot.guestWater.by.slice(0, 64), t: plot.guestWater.t }
+      : null,
+    plantSeed: Number.isFinite(plot.plantSeed) ? Math.max(0, Math.trunc(plot.plantSeed as number)) >>> 0 : 0,
+    mutationChecked: Number.isFinite(plot.mutationChecked) ? Math.max(0, Math.min(3, Math.trunc(plot.mutationChecked as number))) : 0,
   }));
 
   const ranch = normalizeRanch(state.ranch);

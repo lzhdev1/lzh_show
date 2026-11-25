@@ -1,8 +1,8 @@
 import { useRef } from "react";
 import { useClock } from "../game/clock";
-import { CROPS, produceName, producePrice } from "../game/crops";
+import { CROPS, harvestYieldOf, produceName, producePrice, seedInfoOf } from "../game/crops";
 import { useFieldInteraction } from "../game/fieldInteraction";
-import { formatRemain, isReady, MAX_WATER, remainingMs } from "../game/growth";
+import { formatRemain, isReady, plotMutationRevealed, remainingMs, selfWaterGate, waterHint } from "../game/growth";
 import { useGame } from "../game/state";
 import { HarvestIcon, SowIcon, WateringCanIcon } from "./icons";
 
@@ -17,11 +17,16 @@ export function PlotAction() {
   const plot = useGame((s) => standingPlot === null ? undefined : s.plots[standingPlot]);
   const selectedSeed = useGame((s) => s.selectedSeed);
   const seedCount = useGame((s) => s.seeds[s.selectedSeed]);
+  const seedInfo = seedInfoOf(selectedSeed);
+  const revealMutation = useClock(({ now }) => (plot ? plotMutationRevealed(plot, now) : false));
   const secondsLeft = useClock(({ now }) => {
     const ms = plot && remainingMs(plot, now);
     return ms == null ? null : Math.ceil(ms / 1000);
   });
   const ready = secondsLeft === 0;
+  // 1.每株累计最多浇 25 次；2.播种后 3 次免费；3.之后每小时 2 次
+  const canWater = useClock(({ now }) => (plot?.crop && !isReady(plot, now) ? selfWaterGate(plot, now).ok : false));
+  const waterNote = useClock(({ now }) => (plot?.crop ? waterHint(plot, now) : ""));
   const pressedTarget = useRef<string | null>(null);
   if (!plot?.unlocked) return null;
 
@@ -30,30 +35,35 @@ export function PlotAction() {
   let description: string;
   if (!plot.crop) {
     action = "sow";
-    detail = seedCount > 0 ? `${CROPS[selectedSeed].name} ×${seedCount}` : `${CROPS[selectedSeed].name}已用完`;
+    const seedName = seedInfo
+      ? (seedInfo.mutation ? `${produceName(seedInfo.def, seedInfo.mutation)}种子` : `${seedInfo.def.name}种子`)
+      : "种子";
+    detail = seedCount > 0 ? `${seedName} ×${seedCount}` : `${seedName}已用完`;
     description = seedCount > 0 ? detail : `${detail}，请先到商店购买种子`;
   } else {
     action = ready ? "harvest" : "water";
     const crop = CROPS[plot.crop];
-    const cropName = produceName(crop, plot.mutation);
+    const mutation = revealMutation ? plot.mutation : null;
+    const cropName = produceName(crop, mutation);
     if (ready) {
-      detail = `${cropName} ×${crop.yields}`;
-      description = `${detail}，售价 ${producePrice(crop, plot.mutation)} 金币/份`;
+      const count = harvestYieldOf(crop, plot.id, plot.plantedAt);
+      detail = `${cropName} ×${count}`;
+      description = `${detail}，售价 ${producePrice(crop, mutation)} 金币/份`;
     } else {
       const remaining = secondsLeft === null ? "生长中" : formatRemain(secondsLeft * 1000).replace(/\s/g, "");
       detail = `${cropName} · ${remaining}`;
-      description = `${cropName}，已浇水 ${plot.watered}/${MAX_WATER}，${remaining}`;
+      description = `${cropName}，已浇水 ${plot.watered} 次（−${Math.min(100, plot.watered * 2)}%），${remaining}${waterNote ? `，${waterNote}` : ""}`;
     }
   }
 
   const { Icon } = actions[action];
-  const fullyWatered = action === "water" && plot.watered >= MAX_WATER;
-  const label = fullyWatered ? "已浇足" : actions[action].label;
+  const blocked = action === "water" && !canWater;
+  const label = blocked ? (waterNote.includes("上限") ? "已浇足" : "浇水冷却") : actions[action].label;
   const accessibleLabel = `第 ${plot.id + 1} 号地，${label}，${description}`;
   const target = `${plot.id}/${action}/${plot.crop ?? selectedSeed}/${plot.plantedAt}`;
 
   return (
-    <button type="button" className="plot-action" data-action={action} disabled={fullyWatered}
+    <button type="button" className="plot-action" data-action={action} disabled={blocked}
       title={accessibleLabel} aria-label={accessibleLabel}
       onPointerDown={() => { pressedTarget.current = target; }}
       onPointerCancel={() => { pressedTarget.current = null; }}

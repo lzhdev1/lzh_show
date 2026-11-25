@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CROP_LIST, harvestLots, type CropId } from "../game/crops";
+import { CROP_LIST, harvestLots, produceName, seedInfoOf, type CropId } from "../game/crops";
 import { FISHING_RODS, FISH_LIST, type FishingRod } from "../game/fish";
 import { isReady } from "../game/growth";
 import { BAITS, BOOST_CARDS } from "../game/items";
@@ -134,10 +134,21 @@ export function BackpackPanel({ onClose }: { onClose: () => void }) {
       );
     }
     if (tab === "seed") {
-      return CROP_LIST.flatMap((crop, index) => {
+      const normal = CROP_LIST.flatMap((crop, index) => {
         const count = seeds[crop.id] ?? 0;
         return splitStacks({ name: crop.name, crop: crop.id, mutation: null, sort: index }, count);
       });
+      const variants = Object.keys(seeds).flatMap((key, index) => {
+        const info = seedInfoOf(key);
+        if (!info || info.mutation === null || (seeds[key] ?? 0) <= 0) return [];
+        return splitStacks({
+          name: `${produceName(info.def, info.mutation)}种子`,
+          crop: info.def.id,
+          mutation: info.mutation,
+          sort: CROP_LIST.length + index,
+        }, seeds[key] ?? 0);
+      });
+      return [...normal, ...variants];
     }
     if (tab === "fish") {
       return FISH_LIST.flatMap((fish, index) => {

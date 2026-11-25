@@ -1,13 +1,28 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestLots, harvestValue, levelFromXp, produceName } from "./crops";
-import { MUTATIONS, isMutation, isRainy, rollHerbMutation, rollMutation, rollWildMutation, weatherAt, type Mutation } from "./weather";
-import { MAX_WATER, isReady, PLOT_COUNT, START_UNLOCKED, type PlotState } from "./growth";
+import {
+  CROPS, CROP_LIST, cropMutationValid, type CropId, harvestKey, harvestLots, harvestValue,
+  harvestYieldOf, levelFromXp, MUTATION_SEED_DROP_CHANCE, produceName, seedInfoOf, seedKey,
+} from "./crops";
+import { MUTATIONS, isMutation, isRainy, rollHerbMutation, rollWildMutation, weatherAt, type Mutation } from "./weather";
+import {
+  applySelfWater,
+  formatRemain,
+  isReady,
+  MAX_WATER,
+  PLOT_COUNT,
+  resetWater,
+  selfWaterGate,
+  settlePlotMutation,
+  START_UNLOCKED,
+  type GuestWater,
+  type PlotState,
+} from "./growth";
 import { normalizeAppearance, type AvatarId, type OutfitId } from "./appearance";
 import { DEFAULT_DECOR, normalizeDecor, type FarmDecor } from "./decor";
 import { normalizeRanch, type RanchState } from "./ranch";
 import { createRanchActions, type RanchActions } from "./ranchActions";
-import { normalizeForage, type ForageState } from "./forage";
+import { normalizeForage, advanceForage as stepForage, type ForageState } from "./forage";
 import { createForageActions, type ForageActions } from "./forageActions";
 import { meatLots, normalizeMeat } from "./market";
 import { CAR_MODELS, CAR_PAINTS, newPlate, normalizeGarage, type CarModelId, type GarageState } from "./garage";
@@ -31,18 +46,24 @@ import {
   normalizeCodexCollection,
   type CodexCollection,
 } from "./codexCollection";
-import { MUSHROOMS } from "./mushrooms";
+import { MUSHROOMS, MUSHROOM_PICK_XP, mushroomYieldOf } from "./mushrooms";
 import { announceSpecialCrop, isSpecialVarietyMutation } from "./specialNotice";
 import { fishById, normalizeFishingState, rodById, rodUnlocked } from "./fish";
 export { AVATARS, type AvatarId } from "./appearance";
 
 export { PLOT_COLS, PLOT_ROWS, PLOT_COUNT, START_UNLOCKED } from "./growth";
-/** 扩建价目：从第 7 块到最后一块，越往后越贵 */
+/** 扩建价目：从第 7 块到最后一块，首块 10,000，此后每块较前一块 +15% */
 export const LAND_PRICES = [
-  150, 220, 300, 420, 560, 720, 900, 1100, 1320, 1580, 1860, 2180, 2520, 2900,
-  3300, 3740, 4200, 4700, 5200, 5800, 6400, 7000, 7700, 8400,
+  10_000, 11_500, 13_225, 15_209, 17_490, 20_114, 23_131, 26_601,
+  30_591, 35_180, 40_457, 46_526, 53_505, 61_531, 70_761, 81_375,
+  93_581, 107_618, 123_761, 142_325, 163_674, 188_225, 216_459, 248_928,
 ];
-const SEED_KEYS = new Set<string>(CROP_LIST.map((crop) => crop.id));
+const SEED_KEYS = new Set<string>(CROP_LIST.flatMap((crop) => [
+  crop.id,
+  ...Object.keys(MUTATIONS)
+    .filter((mutation) => cropMutationValid(crop.id, mutation as Mutation))
+    .map((mutation) => seedKey(crop.id, mutation as Mutation)),
+]));
 const HARVEST_KEYS = new Set<string>(
   CROP_LIST.flatMap((crop) => [
     crop.id,
@@ -64,8 +85,18 @@ const cleanCounts = (raw: unknown, fallback: Record<string, number>, allowed: Se
   }
   return out;
 };
+/** 自己浇水时间戳：只留最近 5 个有限数字，脏数据一律丢掉 */
+const finiteTimes = (raw: unknown, limit: number): number[] =>
+  Array.isArray(raw) ? raw.filter((t): t is number => typeof t === "number" && Number.isFinite(t)).slice(-limit) : [];
+/** 朋友帮浇记录：必须有 id 和时间戳，否则当作没有 */
+const readGuestWater = (raw: unknown): GuestWater | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const src = raw as { by?: unknown; t?: unknown };
+  if (typeof src.by !== "string" || !src.by.trim() || !Number.isFinite(Number(src.t))) return null;
+  return { by: src.by.trim().slice(0, 64), t: Number(src.t) };
+};
 /** 测试期金币：先给一大笔，方便试扩建和买东西 */
-export const TEST_COINS = 99_999_999;
+export const TEST_COINS = 5000;
 
 /** 第 id 块地的扩建价（超出价目表后按最后一条算） */
 export function landPriceOf(id: number): number {
@@ -82,7 +113,7 @@ interface GameData {
   coins: number;
   xp: number;
   plots: PlotState[];
-  seeds: Record<CropId, number>;
+  seeds: Record<string, number>;
   harvest: Record<string, number>;
   meat: Record<string, number>;
   garage: GarageState;
@@ -108,11 +139,15 @@ interface GameData {
   decor: FarmDecor;
   ranch: RanchState;
   forage: ForageState;
-  selectedSeed: CropId;
+  selectedSeed: string;
 }
 
 interface GameActions extends RanchActions, ForageActions {
-  selectSeed: (crop: CropId) => void;
+  /** 把草药刷新结算到 now：每 5 分钟一株、地面最多 15 株 */
+  advanceForage: (now: number) => void;
+  /** 结算地块的阶段变异（发芽 / 成长 / 成熟各判一次） */
+  settleMutations: (now: number) => void;
+  selectSeed: (seed: string) => void;
   selectPlot: (id: number | null) => void;
   buySeed: (crop: CropId, qty?: number) => void;
   plant: (plotId: number) => void;
@@ -180,6 +215,9 @@ function makePlots(): PlotState[] {
     plantedAt: 0,
     watered: 0,
     mutation: null,
+    selfWater: [],
+    selfWaterTotal: 0,
+    guestWater: null,
   }));
 }
 
@@ -221,6 +259,11 @@ export const useGame = create<GameStore>()(
       ...initialData(),
       ...createRanchActions(set, get),
       ...createForageActions(set, get),
+      advanceForage: (now) => {
+        const current = get().forage;
+        const next = stepForage(current, now);
+        if (next !== current) set({ forage: next });
+      },
       selectedPlot: null,
       toasts: [],
 
@@ -236,13 +279,15 @@ export const useGame = create<GameStore>()(
 
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
-      selectSeed: (crop) => {
+      selectSeed: (seed) => {
+        const info = seedInfoOf(seed);
+        if (!info) return;
         const level = levelFromXp(get().xp);
-        if (level < CROPS[crop].unlockLevel) {
-          get().notify(`${CROPS[crop].name}需要 ${CROPS[crop].unlockLevel} 级解锁`, "warn");
+        if (level < info.def.unlockLevel) {
+          get().notify(`${info.def.name}需要 ${info.def.unlockLevel} 级解锁`, "warn");
           return;
         }
-        set({ selectedSeed: crop });
+        set({ selectedSeed: seed });
       },
 
       selectPlot: (id) => set({ selectedPlot: id }),
@@ -294,80 +339,117 @@ export const useGame = create<GameStore>()(
           get().notify("这块地已经种着东西了", "warn");
           return;
         }
-        const def = CROPS[selectedSeed];
-        if (seeds[selectedSeed] <= 0) {
+        const info = seedInfoOf(selectedSeed);
+        if (!info) return;
+        const { id: cropId, mutation: carried, def } = info;
+        if ((seeds[selectedSeed] ?? 0) <= 0) {
           get().notify(`${def.name}种子用完了，去商店买`, "warn");
           return;
         }
         const now = Date.now();
         const weather = weatherAt(now);
-        // 三类作物分开抽签：草药五行/仙品/神品，野菜阴阳/长生，普通作物按天气抽元素
-        const mutation = def.herb ? rollHerbMutation() : def.wild ? rollWildMutation() : rollMutation(weather);
+        // 普通种子播种时不判变异，等发芽/成长/成熟各判一次；变异种子播下就带固定变异，
+        // 但界面同样从发芽阶段才显示。野菜/草药仍按各自的野外抽签。
+        const mutation = carried
+          ? carried
+          : def.herb ? rollHerbMutation() : def.wild ? rollWildMutation() : null;
+        const plantSeed = (Math.floor(Math.random() * 0xffffffff) >>> 0) || 1;
         const watered = isRainy(weather) ? 1 : 0;
         set((s) => ({
           seeds: { ...s.seeds, [selectedSeed]: s.seeds[selectedSeed] - 1 },
           plots: s.plots.map((p) =>
             p.id === plotId
-              ? { ...p, crop: selectedSeed, plantedAt: now, watered, mutation }
+              ? {
+                ...resetWater({ ...p, crop: cropId, mutation }, now, watered > 0),
+                plantSeed,
+                mutationChecked: mutation ? 3 : 0,
+              }
               : p
           ),
         }));
         get().notify(`种下了${def.name}${watered ? "，雨水已浇灌" : ""}`);
-        if (isSpecialVarietyMutation(mutation)) announceSpecialCrop(produceName(def, mutation));
+      },
+
+      settleMutations: (now) => {
+        const plots = get().plots;
+        let changed = false;
+        const next = plots.map((plot) => {
+          const settled = settlePlotMutation(plot, now);
+          if (settled !== plot) changed = true;
+          return settled;
+        });
+        if (changed) set({ plots: next });
       },
 
       water: (plotId) => {
         const plot = get().plots[plotId];
-        if (!plot || !plot.crop) {
-          get().notify("这块地还是空的", "warn");
-          return;
-        }
-        if (isReady(plot, Date.now())) {
-          get().notify("已经熟了，先收了吧", "warn");
-          return;
-        }
-        if (plot.watered >= MAX_WATER) {
-          get().notify("今天的浇水次数用完了", "warn");
+        if (!plot) return;
+        const now = Date.now();
+        const gate = selfWaterGate(plot, now);
+        if (!gate.ok) {
+          if (gate.reason === "empty") get().notify("这块地还是空的", "warn");
+          else if (gate.reason === "ready") get().notify("已经熟了，先收了吧", "warn");
+          else if (gate.reason === "cap") get().notify(`这株已经浇到上限（${MAX_WATER} 次）`, "warn");
+          else if (gate.waitMs) get().notify(`${formatRemain(gate.waitMs)}后可再浇一次`, "warn");
           return;
         }
         set((s) => ({
-          plots: s.plots.map((p) => (p.id === plotId ? { ...p, watered: p.watered + 1 } : p)),
+          plots: s.plots.map((p) => (p.id === plotId ? applySelfWater(p, now) : p)),
         }));
-        get().notify("浇了水，长得快一点了");
+        get().notify("浇了水，成熟时间缩短 2%");
       },
 
       harvestPlot: (plotId) => {
-        const plot = get().plots[plotId];
-        if (!plot || !plot.crop) return;
-        if (!isReady(plot, Date.now())) {
+        const now = Date.now();
+        const current = get().plots[plotId];
+        if (!current || !current.crop) return;
+        // 成熟那一刻也要结算一次：精灵只可能在这一阶段出现
+        const plot = settlePlotMutation(current, now);
+        if (!plot.crop || !isReady(plot, now)) {
           get().notify("还没熟，再等等", "warn");
           return;
         }
         const def = CROPS[plot.crop];
         const key = harvestKey(def.id, plot.mutation);
+        const yieldCount = harvestYieldOf(def, plot.id, plot.plantedAt);
         const slots = backpackSlots(get().backpackLevel);
         const used = bagUsedSlots(get().harvest) + bagUsedSlots(get().materials);
-        const extra = bagAddSlotCost(get().harvest, key, def.yields);
+        const extra = bagAddSlotCost(get().harvest, key, yieldCount);
         if (used + extra > slots) {
           get().notify(`杂物背包已满（${used}/${slots} 格），先升级背包或卖掉一批`, "warn");
           return;
         }
+        // 变异收成有 30% 概率带回一颗同变异的种子，商店不卖这种种子
+        const dropSeed = Boolean(plot.mutation) && Math.random() < MUTATION_SEED_DROP_CHANCE;
+        const dropKey = plot.mutation ? seedKey(def.id, plot.mutation) : def.id;
+        const seedRoom = dropSeed
+          ? bagAddCheck(get().seeds, dropKey, 1, get().backpackLevel)
+          : { ok: true };
         const before = levelFromXp(get().xp);
         const after = levelFromXp(get().xp + def.xp);
         set((s) => ({
           xp: s.xp + def.xp,
-          harvest: { ...s.harvest, [key]: (s.harvest[key] ?? 0) + def.yields },
+          harvest: { ...s.harvest, [key]: (s.harvest[key] ?? 0) + yieldCount },
+          seeds: dropSeed && seedRoom.ok
+            ? { ...s.seeds, [dropKey]: (s.seeds[dropKey] ?? 0) + 1 }
+            : s.seeds,
           codexCollected: markCodexCollected(s.codexCollected, [
             codexPlantKey(def.id),
             ...(plot.mutation ? [codexMutationKey(plot.mutation)] : []),
           ]),
           plots: s.plots.map((p) =>
-            p.id === plotId ? { ...p, crop: null, plantedAt: 0, watered: 0, mutation: null } : p
+            p.id === plotId
+              ? {
+                ...p, crop: null, plantedAt: 0, watered: 0, mutation: null,
+                selfWater: [], selfWaterTotal: 0, guestWater: null, plantSeed: 0, mutationChecked: 0,
+              }
+              : p
           ),
         }));
-        get().notify(`收获${produceName(def, plot.mutation)} ×${def.yields}`);
+        get().notify(`收获${produceName(def, plot.mutation)} ×${yieldCount}${dropSeed && seedRoom.ok ? "，还捡到一颗变异种子" : ""}`);
+        if (isSpecialVarietyMutation(plot.mutation)) announceSpecialCrop(produceName(def, plot.mutation));
         if (after > before) {
-          get().notify(`升到 ${after} 级，解锁了新作物`);
+          get().notify(after <= 12 ? `升到 ${after} 级，解锁了新作物` : `升到 ${after} 级`);
         }
       },
 
@@ -485,7 +567,7 @@ export const useGame = create<GameStore>()(
           get().notify("所有地块都开垦完了", "warn");
           return;
         }
-        const price = LAND_PRICES[next.id - START_UNLOCKED] ?? 720;
+        const price = LAND_PRICES[next.id - START_UNLOCKED] ?? LAND_PRICES[LAND_PRICES.length - 1];
         if (get().coins < price) {
           get().notify(`还差 ${price - get().coins} 金币`, "warn");
           return;
@@ -701,12 +783,14 @@ export const useGame = create<GameStore>()(
         const species = MUSHROOMS[id];
         if (!species) return false;
         const s = get();
+        const count = mushroomYieldOf();
+        const total = species.price * count;
         set({
-          coins: s.coins + species.price,
-          xp: s.xp + 3,
+          coins: s.coins + total,
+          xp: s.xp + MUSHROOM_PICK_XP,
           codexCollected: markCodexCollected(s.codexCollected, [codexMushroomKey(id)]),
         });
-        s.notify(`采到${species.name}，+${species.price} 金币，已记入菌类图鉴`);
+        s.notify(`采到${species.name} ×${count}，+${total} 金币，已记入菌类图鉴`);
         return true;
       },
 
@@ -759,6 +843,11 @@ export const useGame = create<GameStore>()(
             plantedAt: crop ? finiteInt(old.plantedAt, 0, 9_999_999_999_999, 0) : 0,
             watered: crop ? finiteInt(old.watered, 0, MAX_WATER, 0) : 0,
             mutation: crop && isMutation(old.mutation) && cropMutationValid(crop, old.mutation) ? old.mutation : null,
+            selfWater: crop ? finiteTimes(old.selfWater, 5) : [],
+            selfWaterTotal: crop ? finiteInt(old.selfWaterTotal, 0, MAX_WATER, 0) : 0,
+            guestWater: crop ? readGuestWater(old.guestWater) : null,
+            plantSeed: crop ? finiteInt(old.plantSeed, 0, 4_294_967_295, 0) : 0,
+            mutationChecked: crop ? finiteInt(old.mutationChecked, 0, 3, 0) : 0,
           };
         });
         const seeds = cleanCounts(saved.seeds, base.seeds, SEED_KEYS);
@@ -801,7 +890,7 @@ export const useGame = create<GameStore>()(
           materials: extras.materials,
           ownedRods: extras.ownedRods,
           selectedBait: extras.selectedBait,
-          selectedSeed: typeof saved.selectedSeed === "string" && SEED_KEYS.has(saved.selectedSeed)
+          selectedSeed: typeof saved.selectedSeed === "string" && seedInfoOf(saved.selectedSeed)
             ? saved.selectedSeed
             : base.selectedSeed,
         };

@@ -1,5 +1,5 @@
-import { CROPS, harvestKey, produceName } from "./crops";
-import { FORAGE_SEED_CHANCE, FORAGE_XP, HERB_FORAGE_XP, HERB_SEED_CHANCE, forageRotationAt, wildPatchesAt, type ForageState } from "./forage";
+import { CROPS, forageYieldOf, harvestKey, produceName, seedKey } from "./crops";
+import { forageMutationSeedChance, forageRotationAt, forageSeedChance, wildPatchesAt, type ForageState } from "./forage";
 import { setNearbyPatch, useForageInteraction } from "./forageInteraction";
 import { bagAddCheck } from "./backpack";
 import { codexMutationKey, codexPlantKey, markCodexCollected, type CodexCollection } from "./codexCollection";
@@ -25,38 +25,54 @@ export function createForageActions(set: (value: Partial<ForageData>) => void, g
       const { forage, harvest, seeds, xp, backpackLevel, codexCollected, notify } = get();
       const now = Date.now();
       const rotation = forageRotationAt(now);
-      const patch = wildPatchesAt(now).find((item) => item.id === id);
+      // 野菜按轮次生成，草药是存档里的持久列表
+      const patch = wildPatchesAt(now).find((item) => item.id === id) ?? forage.herbs.find((item) => item.id === id);
       if (!patch || useForageInteraction.getState().nearbyPatch?.id !== id) {
         return notify("走近菜丛才能采摘", "warn");
       }
       const taken = forage.rotation === rotation ? forage.taken : [];
-      if (taken.includes(patch.slot)) return;
+      if (patch.source === "wild" && taken.includes(patch.slot)) {
+        return notify("这丛野菜已经被采走了", "warn");
+      }
       const def = CROPS[patch.crop];
       const key = harvestKey(def.id, patch.mutation);
-      const herb = Boolean(def.herb);
-      const seedDrop = Math.random() < (herb ? HERB_SEED_CHANCE : FORAGE_SEED_CHANCE);
-      const harvestRoom = bagAddCheck(harvest, key, 1, backpackLevel);
+      const count = forageYieldOf(def);
+      // 普通种子 30% 单独判定；带变异的植株再额外按 20% 掉变异种子
+      const seedDrop = Math.random() < forageSeedChance();
+      const mutationSeedDrop = Math.random() < forageMutationSeedChance(patch);
+      const normalSeedKey = def.id;
+      const mutatedSeedKey = patch.mutation ? seedKey(def.id, patch.mutation) : null;
+      const harvestRoom = bagAddCheck(harvest, key, count, backpackLevel);
       if (!harvestRoom.ok) {
         return notify(`杂物背包已满（${harvestRoom.used}/${harvestRoom.slots} 格），先升级背包或卖掉一批`, "warn");
       }
-      if (seedDrop) {
-        const seedRoom = bagAddCheck(seeds, def.id, 1, backpackLevel);
-        if (!seedRoom.ok) {
-          return notify(`种子背包已满（${seedRoom.used}/${seedRoom.slots} 格），先升级背包`, "warn");
-        }
+      if (seedDrop && !bagAddCheck(seeds, normalSeedKey, 1, backpackLevel).ok) {
+        return notify(`种子背包已满（${backpackLevel} 级），先升级背包`, "warn");
       }
+      if (mutationSeedDrop && mutatedSeedKey && !bagAddCheck(seeds, mutatedSeedKey, 1, backpackLevel).ok) {
+        return notify(`种子背包已满（${backpackLevel} 级），先升级背包`, "warn");
+      }
+      const nextSeeds = { ...seeds };
+      if (seedDrop) nextSeeds[normalSeedKey] = (nextSeeds[normalSeedKey] ?? 0) + 1;
+      if (mutationSeedDrop && mutatedSeedKey) nextSeeds[mutatedSeedKey] = (nextSeeds[mutatedSeedKey] ?? 0) + 1;
       set({
-        xp: xp + (herb ? HERB_FORAGE_XP : FORAGE_XP),
-        harvest: { ...harvest, [key]: (harvest[key] ?? 0) + 1 },
-        seeds: seedDrop ? { ...seeds, [def.id]: (seeds[def.id] ?? 0) + 1 } : seeds,
+        xp: xp + def.xp,
+        harvest: { ...harvest, [key]: (harvest[key] ?? 0) + count },
+        seeds: nextSeeds,
         codexCollected: markCodexCollected(codexCollected, [
           codexPlantKey(def.id),
           ...(patch.mutation ? [codexMutationKey(patch.mutation)] : []),
         ]),
-        forage: { rotation, taken: [...taken, patch.slot] },
+        forage: patch.source === "herb"
+          ? { ...forage, herbs: forage.herbs.filter((item) => item.id !== patch.id) }
+          : { ...forage, rotation, taken: [...taken, patch.slot] },
       });
       setNearbyPatch(null);
-      notify(`采到${produceName(def, patch.mutation)} ×1${seedDrop ? `，还捡到${def.name}种子 ×1` : ""}`);
+      const drops = [
+        seedDrop ? "普通种子 ×1" : "",
+        mutationSeedDrop ? "变异种子 ×1" : "",
+      ].filter(Boolean).join("、");
+      notify(`采到${produceName(def, patch.mutation)} ×${count}${drops ? `，还捡到${drops}` : ""}`);
     },
   };
 }

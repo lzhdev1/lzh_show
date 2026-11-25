@@ -32,6 +32,15 @@ export interface RemotePlot {
   plantedAt: number;
   watered: number;
   mutation?: string | null;
+  /** 自己浇水时间戳（最近 5 次），按小时配额判定用 */
+  selfWater?: number[];
+  /** 自己累计浇水次数，判断播种后 3 次免费额度 */
+  selfWaterTotal?: number;
+  /** 最近一次朋友帮浇，60 分钟内其他朋友不能再浇 */
+  guestWater?: { by: string; t: number } | null;
+  /** 本茬的变异随机种子与已判定阶段 */
+  plantSeed?: number;
+  mutationChecked?: number;
 }
 
 export interface RemoteState {
@@ -40,13 +49,13 @@ export interface RemoteState {
   coins: number;
   xp: number;
   plots: RemotePlot[];
-  seeds: Record<CropId, number>;
+  seeds: Record<string, number>;
   harvest: Record<string, number>;
   /** 肉品库存，键为「物种」或「物种:元素」 */
   meat?: Record<string, number>;
   nickname: string;
   avatarId: string;
-  selectedSeed: CropId;
+  selectedSeed: string;
   outfitId?: string;
   bottomId?: string;
   decor?: FarmDecor;

@@ -570,6 +570,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (wallTime - growthTime >= 500 || wallTime < growthTime) {
       growthTime = wallTime;
       tickClock(growthTime);
+      // 草药每 5 分钟结算一次，离线回来会一次性补到当前刻度
+      state.advanceForage(growthTime);
+      // 发芽 / 成长 / 成熟各判一次变异，成熟阶段才可能出精灵
+      state.settleMutations(growthTime);
     }
     updatePlots(plots, sceneState.plots, standingPlot ?? inspectedPlot, growthTime, elapsed);
 

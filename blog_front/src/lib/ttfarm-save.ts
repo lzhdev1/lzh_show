@@ -1,5 +1,5 @@
 import type { Queryable } from "./ttfarm-auth";
-import { CROPS, cropMutationValid } from "@farm-rules/crops";
+import { CROPS, cropMutationValid, seedKey } from "@farm-rules/crops";
 import { MAX_WATER, PLOT_COUNT, START_UNLOCKED } from "@farm-rules/growth";
 import { normalizeRanch as readRanch } from "@farm-rules/ranch";
 import { normalizeForage as readForage } from "@farm-rules/forage";
@@ -14,12 +14,17 @@ import {
   normalizeCodexCollection,
   type CodexCollection,
 } from "@farm-rules/codexCollection";
-import { MUTATIONS as CROP_MUTATIONS, isMutation } from "@farm-rules/weather";
+import { MUTATIONS as CROP_MUTATIONS, isMutation, type Mutation } from "@farm-rules/weather";
 
-/** 测试期金币：新号直接给一大笔，方便试扩建 */
-export const START_COINS = 99_999_999;
+/** 开局金币：5000，够买 6 块地的第一批种子和一次小扩建 */
+export const START_COINS = 5000;
 const CROP_IDS = Object.keys(CROPS);
 const MUTATIONS = Object.keys(CROP_MUTATIONS);
+/** 普通种子 + 变异种子（「作物:变异」）都算合法键 */
+const SEED_KEYS = CROP_IDS.flatMap((id) => [
+  id,
+  ...MUTATIONS.filter((mutation) => cropMutationValid(id as keyof typeof CROPS, mutation as Mutation)).map((mutation) => seedKey(id as keyof typeof CROPS, mutation as Mutation)),
+]);
 const HARVEST_KEYS = CROP_IDS.flatMap((crop) => [crop, ...MUTATIONS.map((m) => `${crop}:${m}`)]);
 const isBasicOutfit = (value: unknown): value is "field" | "raincoat" | "ranger" =>
   value === "field" || value === "raincoat" || value === "ranger";
@@ -51,6 +56,15 @@ export interface PlotState {
   plantedAt: number;
   watered: number;
   mutation: string | null;
+  /** 自己浇水时间戳（最近 5 次），按小时配额判定用 */
+  selfWater?: number[];
+  /** 自己累计浇水次数，判断播种后 3 次免费额度 */
+  selfWaterTotal?: number;
+  /** 最近一次朋友帮浇，60 分钟内其他朋友不能再浇 */
+  guestWater?: { by: string; t: number } | null;
+  /** 本茬的变异随机种子与已判定阶段 */
+  plantSeed?: number;
+  mutationChecked?: number;
 }
 
 export interface FarmSave {
@@ -87,6 +101,9 @@ export function initialSave(nickname = "农场主"): FarmSave {
     plantedAt: 0,
     watered: 0,
     mutation: null,
+    selfWater: [],
+    selfWaterTotal: 0,
+    guestWater: null,
   }));
   const zero: Record<string, number> = {};
   CROP_IDS.forEach((crop) => {
@@ -151,6 +168,14 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
     const mutation = crop && typeof old?.mutation === "string" && MUTATIONS.includes(old.mutation)
       && isMutation(old.mutation) && cropMutationValid(crop as keyof typeof CROPS, old.mutation)
       ? old.mutation : null;
+    // 浇水记录同样走白名单：时间戳只留有限数字，朋友 id 只留短字符串
+    const selfWater = Array.isArray(old?.selfWater)
+      ? old.selfWater.filter((t): t is number => typeof t === "number" && Number.isFinite(t)).slice(-5)
+      : [];
+    const guestRaw = old?.guestWater as { by?: unknown; t?: unknown } | null | undefined;
+    const guestWater = guestRaw && typeof guestRaw.by === "string" && guestRaw.by.trim() && Number.isFinite(Number(guestRaw.t))
+      ? { by: guestRaw.by.trim().slice(0, 64), t: Number(guestRaw.t) }
+      : null;
     plots.push({
       id,
       unlocked: Boolean(old?.unlocked),
@@ -158,6 +183,11 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
       plantedAt: crop ? int(old?.plantedAt, 0, 9_999_999_999_999, 0) : 0,
       watered: crop ? int(old?.watered, 0, MAX_WATER, 0) : 0,
       mutation,
+      selfWater: crop ? selfWater : [],
+      selfWaterTotal: crop ? int(old?.selfWaterTotal, 0, MAX_WATER, 0) : 0,
+      guestWater: crop ? guestWater : null,
+      plantSeed: crop ? int(old?.plantSeed, 0, 4_294_967_295, 0) : 0,
+      mutationChecked: crop ? int(old?.mutationChecked, 0, 3, 0) : 0,
     });
   }
 
@@ -166,7 +196,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
   const selected = src.outfitId;
   const stageSet = avatarId === "xiaosui" && typeof selected === "string" && COUTURE_IDS.has(selected);
   const outfitId = stageSet || isBasicOutfit(selected) ? selected : base.outfitId;
-  const seeds = record(src.seeds, base.seeds, CROP_IDS);
+  const seeds = record(src.seeds, base.seeds, SEED_KEYS);
   const harvest = record(src.harvest, base.harvest, HARVEST_KEYS);
   const meat = normalizeMeat(src.meat);
   const ranch = readRanch(src.ranch);
@@ -202,7 +232,7 @@ export function normalizeSave(raw: unknown, nickname: string): FarmSave | null {
     materials: extras.materials,
     ownedRods: extras.ownedRods,
     selectedBait: extras.selectedBait,
-    selectedSeed: typeof src.selectedSeed === "string" && CROP_IDS.includes(src.selectedSeed)
+    selectedSeed: typeof src.selectedSeed === "string" && SEED_KEYS.includes(src.selectedSeed)
       ? src.selectedSeed
       : "radish",
   };

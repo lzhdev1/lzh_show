@@ -132,8 +132,11 @@ export function wildMutationFamily(value: WildMutation): "yinyang" | "longlife" 
   return value.startsWith("yinyang") ? "yinyang" : "longlife";
 }
 
-/** 野菜播种抽签：14% 变异，阴阳/长生各半；级别 68% / 25% / 7%。 */
-export const WILD_MUTATION_CHANCE = 0.14;
+/**
+ * 野菜播种抽签：10% 变异（与普通作物的精灵变异概率对齐），阴阳/长生各半；
+ * 级别 68% / 25% / 7%。野菜没有五行变异，这 10% 就是它的全部变异概率。
+ */
+export const WILD_MUTATION_CHANCE = 0.10;
 /** 必中抽签：只决定家族与级别，供野外菜丛生成复用 */
 export function pickWildMutation(random = Math.random): WildMutation {
   const family = random() < 0.5 ? "yinyang" : "longlife";
@@ -150,15 +153,20 @@ export function isHerbMutation(value: Mutation): value is HerbMutation {
   return (HERB_MUTATIONS as readonly Mutation[]).includes(value);
 }
 
-/** 草药播种抽签：12% 变异；其中仙品 0.8%、神品 0.2%，余下五行平分 */
-export const HERB_MUTATION_CHANCE = 0.12;
-export const HERB_XIANPIN_SHARE = 0.008;
-export const HERB_SHENPIN_SHARE = 0.002;
+/**
+ * 草药播种抽签：五行 20%（相当于普通作物的普通变异），
+ * 仙品 / 神品合计 10%，与普通作物的精灵变异概率对齐，二者各半。
+ */
+export const HERB_MUTATION_CHANCE = 0.20;
+export const HERB_SPECIAL_CHANCE = 0.10;
 export function rollHerbMutation(random = Math.random): HerbMutation | null {
-  if (random() >= HERB_MUTATION_CHANCE) return null;
-  const special = random();
-  if (special < HERB_XIANPIN_SHARE) return "xianpin";
-  if (special < HERB_XIANPIN_SHARE + HERB_SHENPIN_SHARE) return "shenpin";
-  const draw = Math.min(0.9999, Math.max(0, random()));
-  return HERB_ELEMENTS[Math.floor(draw * HERB_ELEMENTS.length)];
+  const roll = random();
+  if (roll < HERB_MUTATION_CHANCE) {
+    const draw = Math.min(0.9999, Math.max(0, random()));
+    return HERB_ELEMENTS[Math.floor(draw * HERB_ELEMENTS.length)];
+  }
+  if (roll < HERB_MUTATION_CHANCE + HERB_SPECIAL_CHANCE) {
+    return random() < 0.5 ? "xianpin" : "shenpin";
+  }
+  return null;
 }

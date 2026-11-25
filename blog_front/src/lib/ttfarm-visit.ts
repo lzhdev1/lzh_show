@@ -1,13 +1,13 @@
 import { bagAddCheck } from "@farm-rules/backpack";
 import { markCodexCollected, codexFishKey, codexMushroomKey, codexMutationKey, codexPlantKey } from "@farm-rules/codexCollection";
-import { CROPS, harvestKey, harvestLots, type CropId } from "@farm-rules/crops";
+import { CROPS, MUTATION_SEED_DROP_CHANCE, forageYieldOf, harvestKey, harvestLots, harvestYieldOf, seedInfoOf, seedKey, type CropId } from "@farm-rules/crops";
 import { fishById } from "@farm-rules/fish";
-import { FORAGE_PATCH_COUNT, FORAGE_SEED_CHANCE, FORAGE_XP, HERB_SEED_CHANCE, HERB_FORAGE_XP, forageRotationAt, wildPatchesAt } from "@farm-rules/forage";
-import { isReady, MAX_WATER, plotIdAt, type PlotState } from "@farm-rules/growth";
+import { FORAGE_SEED_CHANCE, advanceForage, forageMutationSeedChance, forageRotationAt, wildPatchesAt } from "@farm-rules/forage";
+import { applyGuestWater, guestWaterGate, isReady, plotIdAt, resetWater, settlePlotMutation, type PlotState } from "@farm-rules/growth";
 import { baitById } from "@farm-rules/items";
-import { MUSHROOMS } from "@farm-rules/mushrooms";
+import { MUSHROOMS, MUSHROOM_PICK_XP, mushroomYieldOf } from "@farm-rules/mushrooms";
 import { baitCount, ranchCapacity, wildAnimalsAt, WILD_CLEARINGS } from "@farm-rules/ranch";
-import { isRainy, rollMutation, weatherAt } from "@farm-rules/weather";
+import { isRainy, weatherAt } from "@farm-rules/weather";
 import type { Queryable } from "./ttfarm-auth";
 import { FarmError } from "./ttfarm-http";
 import { peersIn } from "./ttfarm-presence";
@@ -58,7 +58,7 @@ function guestState(data: FarmSave, canHelp: boolean) {
     ranch: data.ranch,
     seeds: data.seeds,
     harvest: data.harvest,
-    forage: data.forage,
+    forage: advanceForage(data.forage, Date.now()),
     fishing: {
       rod: data.fishingRod,
       selectedBait: data.selectedBait,
@@ -108,32 +108,46 @@ export async function helpFarm(client: Queryable, self: number, owner: number, b
     data.ranch.animals.push({id:animal.id,species:animal.species,element:animal.element});
   } else if (action === "forage") {
     if (position.mount || position.swimming || position.jumping) throw new FarmError(400,"请步行靠近野菜丛");
-    const patch = wildPatchesAt(now).find(item => item.id === body.patchId);
-    if (!patch) throw new FarmError(409,"这批野菜已经换季了，再看看脚下");
+    // 草药是时间累积出来的，先把房主存档补到当前时刻，再确认这株还在
+    data.forage = advanceForage(data.forage, now);
+    // 野菜按轮次生成，草药是房主存档里的持久列表
+    const patch = wildPatchesAt(now).find(item => item.id === body.patchId)
+      ?? data.forage.herbs.find(item => item.id === body.patchId);
+    if (!patch) throw new FarmError(409,"这丛已经不在了，再看看脚下");
     const rotation = forageRotationAt(now);
-    if (data.forage.rotation !== rotation) data.forage = {rotation,taken:[]};
-    if (data.forage.taken.includes(patch.slot)) throw new FarmError(409,"这丛野菜已经被采走了");
+    if (data.forage.rotation !== rotation) data.forage = { ...data.forage, rotation, taken: [] };
+    if (patch.source === "wild" && data.forage.taken.includes(patch.slot)) throw new FarmError(409,"这丛野菜已经被采走了");
     const def = CROPS[patch.crop];
     const key = harvestKey(def.id,patch.mutation);
-    const herb = Boolean(def.herb);
-    const seedDrop = Math.random() < (herb ? HERB_SEED_CHANCE : FORAGE_SEED_CHANCE);
-    const harvestRoom = bagAddCheck(data.harvest,key,1,data.backpackLevel);
+    const count = forageYieldOf(def);
+    // 普通种子 30% 独立判定；带变异的植株再额外按 20% 掉变异种子
+    const seedDrop = Math.random() < FORAGE_SEED_CHANCE;
+    const mutationSeedDrop = Math.random() < forageMutationSeedChance(patch);
+    const normalSeedKey = def.id;
+    const mutatedSeedKey = patch.mutation ? seedKey(def.id, patch.mutation) : null;
+    const harvestRoom = bagAddCheck(data.harvest,key,count,data.backpackLevel);
     if (!harvestRoom.ok) throw new FarmError(409,`好友的杂物背包已满（${harvestRoom.used}/${harvestRoom.slots} 格）`);
-    if (seedDrop && !bagAddCheck(data.seeds,def.id,1,data.backpackLevel).ok) {
+    if (seedDrop && !bagAddCheck(data.seeds,normalSeedKey,1,data.backpackLevel).ok) {
       throw new FarmError(409,`好友的种子背包已满（${data.backpackLevel} 级）`);
     }
-    data.harvest[key] = Math.min(1_000_000,(data.harvest[key] ?? 0)+1);
-    if (seedDrop) data.seeds[def.id] = (data.seeds[def.id] ?? 0)+1;
-    data.xp = Math.min(99_999_999,data.xp+(herb ? HERB_FORAGE_XP : FORAGE_XP));
-    data.forage.taken = [...data.forage.taken,patch.slot].slice(0,FORAGE_PATCH_COUNT);
+    if (mutationSeedDrop && mutatedSeedKey && !bagAddCheck(data.seeds,mutatedSeedKey,1,data.backpackLevel).ok) {
+      throw new FarmError(409,`好友的种子背包已满（${data.backpackLevel} 级）`);
+    }
+    data.harvest[key] = Math.min(1_000_000,(data.harvest[key] ?? 0)+count);
+    if (seedDrop) data.seeds[normalSeedKey] = (data.seeds[normalSeedKey] ?? 0)+1;
+    if (mutationSeedDrop && mutatedSeedKey) data.seeds[mutatedSeedKey] = (data.seeds[mutatedSeedKey] ?? 0)+1;
+    data.xp = Math.min(99_999_999,data.xp+def.xp);
+    if (patch.source === "herb") data.forage.herbs = data.forage.herbs.filter(item => item.id !== patch.id);
+    else data.forage.taken = [...data.forage.taken,patch.slot];
     data.codexCollected = markCodexCollected(data.codexCollected,[codexPlantKey(def.id),
       ...(patch.mutation ? [codexMutationKey(patch.mutation)] : [])]);
   } else if (action === "mushroom") {
     if (position.mount || position.swimming || position.jumping) throw new FarmError(400,"请步行靠近菌子");
     const species = MUSHROOMS[String(body.mushroomId)];
     if (!species) throw new FarmError(400,"没有这种菌子");
-    data.coins = Math.min(9_999_999_999,data.coins+species.price);
-    data.xp = Math.min(99_999_999,data.xp+3);
+    const count = mushroomYieldOf();
+    data.coins = Math.min(9_999_999_999,data.coins+species.price*count);
+    data.xp = Math.min(99_999_999,data.xp+MUSHROOM_PICK_XP);
     data.codexCollected = markCodexCollected(data.codexCollected,[codexMushroomKey(species.id)]);
   } else if (action === "bait") {
     const baitId = body.baitId === null ? null : String(body.baitId);
@@ -161,22 +175,45 @@ export async function helpFarm(client: Queryable, self: number, owner: number, b
     if (position.mount || position.swimming || position.jumping || plotIdAt(position.x,position.z)!==plot.id)
       throw new FarmError(400,"请步行站到这块菜地上");
     if (action === "plant") {
-      const crop = body.crop as CropId;
-      if (typeof crop !== "string" || !Object.hasOwn(CROPS,crop)) throw new FarmError(400,"请选择种子");
-      if (plot.crop || !data.seeds[crop]) throw new FarmError(409,"菜地已播种或没有种子");
+      const seed = String(body.crop);
+      const info = seedInfoOf(seed);
+      if (!info) throw new FarmError(400,"请选择种子");
+      if (plot.crop || !data.seeds[seed]) throw new FarmError(409,"菜地已播种或没有种子");
       const weather = weatherAt(now);
-      Object.assign(plot,{crop,plantedAt:now,watered:isRainy(weather) ? 1 : 0,mutation:rollMutation(weather)});
-      data.seeds[crop]--;
+      // 普通种子播种时不判定变异，从发芽阶段开始逐阶段判定；变异种子带着确定的变异下地
+      const withSeed = {
+        ...plot,
+        crop: info.id,
+        mutation: info.mutation,
+        plantSeed: Math.floor(Math.random() * 0xffff_ffff),
+        mutationChecked: info.mutation ? 3 : 0,
+      };
+      Object.assign(plot, resetWater(withSeed, now, isRainy(weather)));
+      data.seeds[seed]--;
+      if (data.seeds[seed] <= 0) delete data.seeds[seed];
     } else if (action === "water") {
-      if (!plot.crop || isReady(plot,now) || plot.watered>=MAX_WATER) throw new FarmError(409,"这块地目前无需浇水");
-      plot.watered++;
+      // 朋友每个小时窗口合计只能帮浇一次，被谁浇过就锁到下一个小时
+      const gate = guestWaterGate(plot,now);
+      if (!gate.ok) throw new FarmError(409, gate.reason === "quota"
+        ? `这株刚被朋友浇过，${Math.ceil((gate.waitMs ?? 0)/60_000)} 分钟后再来`
+        : "这块地目前无需浇水");
+      Object.assign(plot, applyGuestWater(plot, now, String(self)));
     } else {
       if (!plot.crop || !isReady(plot,now)) throw new FarmError(409,"作物尚未成熟");
+      // 成熟阶段也可能刚刚抽出变异，先结算再按最终状态收获
+      Object.assign(plot, settlePlotMutation(plot, now));
       const crop = CROPS[plot.crop];
-      const key = harvestKey(crop.id,plot.mutation);
-      data.harvest[key] = Math.min(1_000_000,(data.harvest[key] ?? 0)+crop.yields);
+      const mutation = plot.mutation;
+      const count = harvestYieldOf(crop, plot.id, plot.plantedAt);
+      const key = harvestKey(crop.id,mutation);
+      data.harvest[key] = Math.min(1_000_000,(data.harvest[key] ?? 0)+count);
       data.xp = Math.min(99_999_999,data.xp+crop.xp);
-      Object.assign(plot,{crop:null,plantedAt:0,watered:0,mutation:null});
+      if (mutation && Math.random() < MUTATION_SEED_DROP_CHANCE) {
+        const seed = seedKey(crop.id, mutation);
+        const room = bagAddCheck(data.seeds,seed,1,data.backpackLevel);
+        if (room.ok) data.seeds[seed] = Math.min(1_000_000,(data.seeds[seed] ?? 0)+1);
+      }
+      Object.assign(plot,{crop:null,plantedAt:0,watered:0,mutation:null,plantSeed:0,mutationChecked:0,selfWater:[],selfWaterTotal:0,guestWater:null});
     }
   }
   await writeFarm(client,owner,data);

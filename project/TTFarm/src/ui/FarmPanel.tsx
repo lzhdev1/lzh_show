@@ -4,7 +4,7 @@ import { CloseIcon, CoinIcon, LandIcon } from "./icons";
 import { useClock } from "../game/clock";
 import { ELEMENTS, HERB_MUTATIONS, MUTATIONS, SPIRITS, SPIRIT_SHARE, WEATHER, WILD_MUTATION_CHANCE, WILD_MUTATIONS, isRainy, weatherAt, weatherEndsAt } from "../game/weather";
 import { formatRemain } from "../game/growth";
-import { FORAGE_PATCH_COUNT, FORAGE_SEED_CHANCE, HERB_PATCH_SHARE, HERB_SEED_CHANCE, forageEndsAt } from "../game/forage";
+import { FORAGE_BATCH_COUNT, HERB_GROUND_CAP, HERB_MUTATION_CHANCE, HERB_SPECIAL_CHANCE, HERB_SPAWN_MS, FORAGE_MUTATION_CHANCE, forageEndsAt, herbNextAt } from "../game/forage";
 import { FarmDecorPanel } from "./FarmDecorPanel";
 
 const money = (value: number) => value.toLocaleString("zh-CN");
@@ -14,6 +14,7 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<"field" | "decor">("field");
   const coins = useGame((s) => s.coins);
   const plots = useGame((s) => s.plots);
+  const forage = useGame((s) => s.forage);
   const expandBy = useGame((s) => s.expandBy);
   const now = useClock((s) => s.now);
   const weatherKind = weatherAt(now);
@@ -74,23 +75,22 @@ export function FarmPanel({ onClose }: { onClose: () => void }) {
         <h3 className="section-title">野外野菜与草药</h3>
         <div className="row">
           <div className="row-main">
-            <strong>下一批菜丛 · {formatRemain(forageEndsAt(now) - now)}后刷新</strong>
+            <strong>下一批野菜 · {formatRemain(forageEndsAt(now) - now)}后刷新</strong>
             <span className="muted small">
-              野外每 10 分钟长出 {FORAGE_PATCH_COUNT} 丛菜与草药，其中约 {Math.round(HERB_PATCH_SHARE * 100)}% 是草药。
-              走近即可采摘；野菜有 {Math.round(FORAGE_SEED_CHANCE * 100)}%、草药有 {Math.round(HERB_SEED_CHANCE * 100)}% 几率捡到种子。
-              约一成野菜丛自带阴阳或长生变异。
+              野菜每 10 分钟整批换新，一批 {FORAGE_BATCH_COUNT} 株、种类随机，约 {Math.round(FORAGE_MUTATION_CHANCE * 100)}% 自带阴阳或长生；普通种子 30%，带变异的植株再额外掉变异种子 20%。上一批没摘完的会直接作废。
+              草药每 {HERB_SPAWN_MS / 60_000} 分钟长出一株（{formatRemain(Math.max(0, herbNextAt(forage) - now))}后下一株），地里最多 {HERB_GROUND_CAP} 株，不摘就一直留着；常见 70% / 中档 20% / 珍稀 10%，普通种子 30%，五行变异 20%、仙品或神品 10%，带变异的草药再额外掉变异种子 20%。
             </span>
           </div>
           <button className="btn mini" onClick={() => { window.dispatchEvent(new Event("ttfarm:find-forage")); onClose(); }}>去寻找</button>
         </div>
         <details className="crop-almanac">
           <summary>野菜变异图鉴</summary>
-          <p>野菜只会发生两种变异：阴阳（半黑半白、星辰环绕）与长生（玉质云雾、金龙环绕）。种下野菜种子有 {Math.round(WILD_MUTATION_CHANCE * 100)}% 概率变异，级别越高越稀有。</p>
+          <p>野菜只会发生两种变异：阴阳（半黑半白、星辰环绕）与长生（玉质云雾、金龙环绕）。种下野菜种子有 {Math.round(WILD_MUTATION_CHANCE * 100)}% 概率变异（对齐普通作物精灵变异的概率），级别越高越稀有。</p>
           <ul>{WILD_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
         </details>
         <details className="crop-almanac">
           <summary>草药变异图鉴</summary>
-          <p>草药种子不卖，只能从野外草药丛采到。野外草药丛每轮有一成左右自带金木水火土，极少数是仙品或神品，采下来就是带变异的药材；种下后也会重新抽签。仙品云雾缭绕、植株闪光，神品闪电缠身、整株发黄，都是万中无一的收成。</p>
+          <p>草药种子不卖，只能从野外草药丛采到。野外的草药每株有 {Math.round(HERB_MUTATION_CHANCE * 100)}% 自带金木水火土（五行随机）、{Math.round(HERB_SPECIAL_CHANCE * 100)}% 是仙品或神品，采下来就是带变异的药材；种下后重新抽签，五行 20%、仙品或神品合计 10%（各半，对齐精灵变异概率）。仙品云雾缭绕、植株闪光，神品闪电缠身、整株发黄，都是万中无一的收成。</p>
           <ul>{HERB_MUTATIONS.map(id => <li key={id}><span>{MUTATIONS[id].label}</span><b>×{MUTATIONS[id].multiplier}</b></li>)}</ul>
         </details>
         <h3 className="section-title">扩建</h3>

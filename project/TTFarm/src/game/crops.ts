@@ -94,10 +94,10 @@ export const CROPS: Record<CropId, CropDef> = {
   radish: {
     id: "radish",
     name: "萝卜",
-    seedPrice: 12,
-    sellPrice: 9,
+    seedPrice: 36,
+    sellPrice: 60,
     yields: 2,
-    growMs: 40_000,
+    growMs: 180_000,
     unlockLevel: 1,
     xp: 3,
     body: 0xe2557b,
@@ -106,10 +106,10 @@ export const CROPS: Record<CropId, CropDef> = {
   cabbage: {
     id: "cabbage",
     name: "白菜",
-    seedPrice: 20,
-    sellPrice: 14,
+    seedPrice: 36,
+    sellPrice: 60,
     yields: 2,
-    growMs: 60_000,
+    growMs: 360_000,
     unlockLevel: 1,
     xp: 5,
     body: 0xa8d67f,
@@ -118,10 +118,10 @@ export const CROPS: Record<CropId, CropDef> = {
   tomato: {
     id: "tomato",
     name: "番茄",
-    seedPrice: 35,
-    sellPrice: 16,
+    seedPrice: 47,
+    sellPrice: 78,
     yields: 3,
-    growMs: 80_000,
+    growMs: 900_000,
     unlockLevel: 2,
     xp: 7,
     body: 0xe04b34,
@@ -130,10 +130,10 @@ export const CROPS: Record<CropId, CropDef> = {
   corn: {
     id: "corn",
     name: "玉米",
-    seedPrice: 50,
-    sellPrice: 20,
+    seedPrice: 59,
+    sellPrice: 98,
     yields: 3,
-    growMs: 110_000,
+    growMs: 1_800_000,
     unlockLevel: 3,
     xp: 9,
     body: 0xf2c94c,
@@ -142,10 +142,10 @@ export const CROPS: Record<CropId, CropDef> = {
   strawberry: {
     id: "strawberry",
     name: "草莓",
-    seedPrice: 70,
-    sellPrice: 26,
+    seedPrice: 76,
+    sellPrice: 126,
     yields: 3,
-    growMs: 140_000,
+    growMs: 3_300_000,
     unlockLevel: 4,
     xp: 12,
     body: 0xe03b3b,
@@ -154,10 +154,10 @@ export const CROPS: Record<CropId, CropDef> = {
   pumpkin: {
     id: "pumpkin",
     name: "南瓜",
-    seedPrice: 90,
-    sellPrice: 55,
+    seedPrice: 96,
+    sellPrice: 160,
     yields: 2,
-    growMs: 180_000,
+    growMs: 6_000_000,
     unlockLevel: 5,
     xp: 18,
     body: 0xef8b2c,
@@ -166,10 +166,10 @@ export const CROPS: Record<CropId, CropDef> = {
   eggplant: {
     id: "eggplant",
     name: "茄子",
-    seedPrice: 28,
-    sellPrice: 13,
+    seedPrice: 47,
+    sellPrice: 78,
     yields: 3,
-    growMs: 70_000,
+    growMs: 600_000,
     unlockLevel: 2,
     xp: 6,
     body: 0x6a3d8f,
@@ -178,10 +178,10 @@ export const CROPS: Record<CropId, CropDef> = {
   bean: {
     id: "bean",
     name: "豆角",
-    seedPrice: 42,
-    sellPrice: 15,
+    seedPrice: 59,
+    sellPrice: 98,
     yields: 4,
-    growMs: 95_000,
+    growMs: 1_320_000,
     unlockLevel: 3,
     xp: 8,
     body: 0x7fb54a,
@@ -190,10 +190,10 @@ export const CROPS: Record<CropId, CropDef> = {
   chili: {
     id: "chili",
     name: "辣椒",
-    seedPrice: 60,
-    sellPrice: 22,
+    seedPrice: 76,
+    sellPrice: 126,
     yields: 3,
-    growMs: 120_000,
+    growMs: 2_400_000,
     unlockLevel: 4,
     xp: 10,
     body: 0xd93a26,
@@ -202,10 +202,10 @@ export const CROPS: Record<CropId, CropDef> = {
   watermelon: {
     id: "watermelon",
     name: "西瓜",
-    seedPrice: 85,
-    sellPrice: 48,
+    seedPrice: 96,
+    sellPrice: 160,
     yields: 2,
-    growMs: 165_000,
+    growMs: 4_500_000,
     unlockLevel: 5,
     xp: 15,
     body: 0x3f9149,
@@ -214,10 +214,10 @@ export const CROPS: Record<CropId, CropDef> = {
   peach: {
     id: "peach",
     name: "桃子",
-    seedPrice: 110,
-    sellPrice: 40,
+    seedPrice: 123,
+    sellPrice: 205,
     yields: 3,
-    growMs: 200_000,
+    growMs: 8_100_000,
     unlockLevel: 6,
     xp: 18,
     body: 0xf2a0a0,
@@ -226,10 +226,10 @@ export const CROPS: Record<CropId, CropDef> = {
   pear: {
     id: "pear",
     name: "梨",
-    seedPrice: 115,
-    sellPrice: 42,
+    seedPrice: 123,
+    sellPrice: 205,
     yields: 3,
-    growMs: 210_000,
+    growMs: 10_200_000,
     unlockLevel: 6,
     xp: 18,
     body: 0xd8e08a,
@@ -238,10 +238,10 @@ export const CROPS: Record<CropId, CropDef> = {
   apricot: {
     id: "apricot",
     name: "杏",
-    seedPrice: 135,
-    sellPrice: 46,
+    seedPrice: 157,
+    sellPrice: 262,
     yields: 3,
-    growMs: 230_000,
+    growMs: 12_600_000,
     unlockLevel: 7,
     xp: 20,
     body: 0xf2b04c,
@@ -250,10 +250,10 @@ export const CROPS: Record<CropId, CropDef> = {
   jujube: {
     id: "jujube",
     name: "枣",
-    seedPrice: 140,
-    sellPrice: 48,
+    seedPrice: 157,
+    sellPrice: 262,
     yields: 3,
-    growMs: 240_000,
+    growMs: 15_300_000,
     unlockLevel: 7,
     xp: 20,
     body: 0xa83c2a,
@@ -262,10 +262,10 @@ export const CROPS: Record<CropId, CropDef> = {
   tulip: {
     id: "tulip",
     name: "郁金香",
-    seedPrice: 160,
-    sellPrice: 60,
+    seedPrice: 201,
+    sellPrice: 335,
     yields: 3,
-    growMs: 260_000,
+    growMs: 18_000_000,
     unlockLevel: 8,
     xp: 24,
     body: 0xe05a4e,
@@ -274,10 +274,10 @@ export const CROPS: Record<CropId, CropDef> = {
   lily: {
     id: "lily",
     name: "百合",
-    seedPrice: 170,
-    sellPrice: 64,
+    seedPrice: 201,
+    sellPrice: 335,
     yields: 3,
-    growMs: 270_000,
+    growMs: 21_600_000,
     unlockLevel: 8,
     xp: 24,
     body: 0xf5f0e6,
@@ -286,10 +286,10 @@ export const CROPS: Record<CropId, CropDef> = {
   roseRed: {
     id: "roseRed",
     name: "红玫瑰",
-    seedPrice: 190,
-    sellPrice: 72,
+    seedPrice: 258,
+    sellPrice: 430,
     yields: 3,
-    growMs: 280_000,
+    growMs: 25_200_000,
     unlockLevel: 9,
     xp: 26,
     body: 0xc42b45,
@@ -298,10 +298,10 @@ export const CROPS: Record<CropId, CropDef> = {
   rosePink: {
     id: "rosePink",
     name: "粉玫瑰",
-    seedPrice: 190,
-    sellPrice: 72,
+    seedPrice: 258,
+    sellPrice: 430,
     yields: 3,
-    growMs: 280_000,
+    growMs: 25_200_000,
     unlockLevel: 9,
     xp: 26,
     body: 0xef8ba8,
@@ -310,10 +310,10 @@ export const CROPS: Record<CropId, CropDef> = {
   roseWhite: {
     id: "roseWhite",
     name: "白玫瑰",
-    seedPrice: 205,
-    sellPrice: 78,
+    seedPrice: 330,
+    sellPrice: 550,
     yields: 3,
-    growMs: 290_000,
+    growMs: 28_800_000,
     unlockLevel: 10,
     xp: 27,
     body: 0xf6f1e4,
@@ -322,10 +322,10 @@ export const CROPS: Record<CropId, CropDef> = {
   roseYellow: {
     id: "roseYellow",
     name: "黄玫瑰",
-    seedPrice: 205,
-    sellPrice: 78,
+    seedPrice: 330,
+    sellPrice: 550,
     yields: 3,
-    growMs: 290_000,
+    growMs: 28_800_000,
     unlockLevel: 10,
     xp: 27,
     body: 0xf2c14c,
@@ -334,10 +334,10 @@ export const CROPS: Record<CropId, CropDef> = {
   roseBlue: {
     id: "roseBlue",
     name: "蓝玫瑰",
-    seedPrice: 220,
-    sellPrice: 85,
+    seedPrice: 330,
+    sellPrice: 550,
     yields: 3,
-    growMs: 300_000,
+    growMs: 32_400_000,
     unlockLevel: 10,
     xp: 28,
     body: 0x5a7fd6,
@@ -346,10 +346,10 @@ export const CROPS: Record<CropId, CropDef> = {
   rosePurple: {
     id: "rosePurple",
     name: "紫玫瑰",
-    seedPrice: 220,
-    sellPrice: 85,
+    seedPrice: 330,
+    sellPrice: 550,
     yields: 3,
-    growMs: 300_000,
+    growMs: 32_400_000,
     unlockLevel: 10,
     xp: 28,
     body: 0x8a55b8,
@@ -358,10 +358,10 @@ export const CROPS: Record<CropId, CropDef> = {
   pineapple: {
     id: "pineapple",
     name: "菠萝",
-    seedPrice: 260,
-    sellPrice: 105,
+    seedPrice: 420,
+    sellPrice: 700,
     yields: 2,
-    growMs: 330_000,
+    growMs: 43_200_000,
     unlockLevel: 11,
     xp: 32,
     body: 0xe8b23c,
@@ -370,10 +370,10 @@ export const CROPS: Record<CropId, CropDef> = {
   durian: {
     id: "durian",
     name: "榴莲",
-    seedPrice: 320,
-    sellPrice: 150,
+    seedPrice: 540,
+    sellPrice: 900,
     yields: 2,
-    growMs: 380_000,
+    growMs: 64_800_000,
     unlockLevel: 12,
     xp: 40,
     body: 0xb9a24a,
@@ -456,6 +456,29 @@ export const CROPS: Record<CropId, CropDef> = {
   xuelian:     { id: "xuelian",     name: "雪莲",     seedPrice: 0, sellPrice: 200, yields: 1, growMs: 300_000, unlockLevel: 1, xp: 30, body: 0xf2eee0, leaf: 0x9ab0a0, herb: true },
 };
 
+/**
+ * 草药三档：只服务于野外刷新概率与种子掉率，与售价、时长无关。
+ * 常见 20 / 中档 19 / 珍稀 11，新增草药时请一并补到这里。
+ */
+export type HerbTier = "common" | "mid" | "rare";
+export const HERB_TIER: Record<HerbId, HerbTier> = {
+  // —— 常见档 ——
+  gouqi: "common", longnaobohe: "common", suye: "common", qiai: "common", jinyinhua: "common",
+  juhua: "common", honghua: "common", huoxiang: "common", peilan: "common", xiangru: "common",
+  jingjie: "common", chenpi: "common", banxia: "common", jiegeng: "common", banlangen: "common",
+  daqingye: "common", xiakucao: "common", yimucao: "common", juemingzi: "common", nvzhenzi: "common",
+  // —— 中档 ——
+  danggui: "mid", huangqi: "mid", gancao: "mid", danshen: "mid", chuanxiong: "mid",
+  baishao: "mid", huanglian: "mid", huangqin: "mid", chaihu: "mid", fangfeng: "mid",
+  duhuo: "mid", qianghuo: "mid", baizhi: "mid", baizhu: "mid", cangzhu: "mid",
+  sharen: "mid", lianqiao: "mid", houpo: "mid", shihu: "mid",
+  // —— 珍稀档 ——
+  renshen: "rare", lingzhi: "rare", sanqi: "rare", heshouwu: "rare", wuweizi: "rare",
+  tianma: "rare", duzhong: "rare", rougui: "rare", fuling: "rare", shanzhuyu: "rare", xuelian: "rare",
+};
+export const HERB_POOL: Record<HerbTier, HerbId[]> = { common: [], mid: [], rare: [] };
+for (const [id, tier] of Object.entries(HERB_TIER) as [HerbId, HerbTier][]) HERB_POOL[tier].push(id);
+
 export const CROP_LIST = Object.values(CROPS);
 /** 商店里能买到种子的作物（野菜与草药都不卖种子） */
 export const SHOP_CROPS = CROP_LIST.filter((crop) => !crop.wild && !crop.herb);
@@ -463,6 +486,71 @@ export const SHOP_CROPS = CROP_LIST.filter((crop) => !crop.wild && !crop.herb);
 export const WILD_GREENS = CROP_LIST.filter((crop) => crop.wild);
 /** 全部草药 */
 export const HERB_LIST = CROP_LIST.filter((crop) => crop.herb);
+
+/** 野菜 20 档收购价：60 → 500，按品质从低到高递进 */
+const WILD_PRICE_LADDER = [
+  60, 75, 90, 105, 120, 140, 160, 180, 200, 225,
+  250, 275, 300, 325, 350, 375, 400, 425, 450, 500,
+];
+/** 野菜生长：3 分钟 → 60 分钟，每档 +3 分钟 */
+const WILD_GROW_STEP_MS = 3 * 60_000;
+
+/** 草药三档的单价区间，档内按原来的售价排序递进 */
+const HERB_PRICE_BANDS: Record<HerbTier, [number, number, number]> = {
+  common: [600, 70, 20],   // 600 → 1,930，20 种
+  mid: [2_200, 330, 19],   // 2,200 → 8,140，19 种
+  rare: [9_000, 1_680, 11], // 9,000 → 25,800，11 种
+};
+/** 草药种植：1 小时 → 36 小时，按全表品质均匀递进 */
+const HERB_GROW_MIN_MS = 60 * 60_000;
+const HERB_GROW_MAX_MS = 36 * 60 * 60_000;
+
+/**
+ * 野菜 / 草药的历史售价只用来排序品质，不直接当最终定价：
+ * 这里按品质重排一次，再覆盖单价与生长时长，保证三张表（图鉴、采摘卡、市场）一致。
+ */
+function applyWildAndHerbEconomy() {
+  const wilds = CROP_LIST.filter((crop) => crop.wild).sort((a, b) =>
+    a.sellPrice - b.sellPrice || a.id.localeCompare(b.id));
+  wilds.forEach((crop, rank) => {
+    crop.sellPrice = WILD_PRICE_LADDER[rank] ?? WILD_PRICE_LADDER[WILD_PRICE_LADDER.length - 1];
+    crop.growMs = WILD_GROW_STEP_MS * (rank + 1);
+  });
+
+  const herbs = CROP_LIST.filter((crop) => crop.herb);
+  const tierOrder: HerbTier[] = ["common", "mid", "rare"];
+  const tierRanks = new Map<HerbId, { tier: HerbTier; index: number }>();
+  const ranked: CropDef[] = [];
+  for (const tier of tierOrder) {
+    const sorted = herbs.filter((crop) => HERB_TIER[crop.id as HerbId] === tier)
+      .sort((a, b) => a.sellPrice - b.sellPrice || a.id.localeCompare(b.id));
+    sorted.forEach((crop, index) => tierRanks.set(crop.id as HerbId, { tier, index }));
+    ranked.push(...sorted);
+  }
+  ranked.forEach((crop, rank) => {
+    const info = tierRanks.get(crop.id as HerbId)!;
+    const [base, step, count] = HERB_PRICE_BANDS[info.tier];
+    crop.sellPrice = base + step * Math.max(0, Math.min(count - 1, info.index));
+    const ratio = ranked.length > 1 ? rank / (ranked.length - 1) : 0;
+    crop.growMs = Math.round((HERB_GROW_MIN_MS + ratio * (HERB_GROW_MAX_MS - HERB_GROW_MIN_MS)) / 60_000) * 60_000;
+  });
+}
+applyWildAndHerbEconomy();
+
+/**
+ * 经验按成熟时长折算：以榴莲 18 小时 = 600 经验为锚点，
+ * 每分钟 = 600/1080 ≈ 0.5556；野菜同系数，草药系数减半。
+ */
+export const CROP_XP_PER_MIN = 600 / 1080;
+export const HERB_XP_PER_MIN = CROP_XP_PER_MIN * 0.5;
+
+function applyCropExperience() {
+  for (const crop of CROP_LIST) {
+    const rate = crop.herb ? HERB_XP_PER_MIN : CROP_XP_PER_MIN;
+    crop.xp = Math.round((crop.growMs / 60_000) * rate);
+  }
+}
+applyCropExperience();
 
 export function harvestKey(id: CropId, mutation: Mutation | null): string {
   return mutation ? `${id}:${mutation}` : id;
@@ -504,8 +592,76 @@ export function harvestValue(harvest: Record<string, number>): number {
   return harvestLots(harvest).reduce((sum, item) => sum + item.price * item.count, 0);
 }
 
-/** 等级阈值：index 即等级 - 1 */
-export const LEVEL_XP = [0, 30, 80, 150, 250, 400, 600, 850, 1150, 1550, 2050, 2700];
+/** 普通作物一茬的份数区间：1–5 份，均 3 份 */
+export const HARVEST_MIN = 1;
+export const HARVEST_MAX = 5;
+
+function harvestRoll(plotId: number, plantedAt: number): number {
+  let n = Math.imul(plotId + 0x9e3779b9, 0x85ebca6b) >>> 0;
+  n ^= Math.imul(plantedAt & 0xffffffff, 0xc2b2ae35) >>> 0;
+  n ^= n >>> 13;
+  n = Math.imul(n, 0x27d4eb2f) >>> 0;
+  n ^= n >>> 15;
+  return (n >>> 0) / 4294967296;
+}
+
+/** 野菜一丛的份数区间：1–4 份；草药一次只采 1 份 */
+export const WILD_YIELD_MIN = 1;
+export const WILD_YIELD_MAX = 4;
+
+/**
+ * 一块地的收获份数。普通作物 1–5 份、野菜 1–4 份，由「地块 + 播种时间」确定性决定：
+ * 刷新重进不会重摇，好友代收与房主本地也算出同一个数。草药固定 1 份。
+ */
+export function harvestYieldOf(crop: CropDef, plotId: number, plantedAt: number): number {
+  if (crop.herb) return 1;
+  if (crop.wild) {
+    return WILD_YIELD_MIN + Math.floor(harvestRoll(plotId, plantedAt) * (WILD_YIELD_MAX - WILD_YIELD_MIN + 1));
+  }
+  return HARVEST_MIN + Math.floor(harvestRoll(plotId, plantedAt) * (HARVEST_MAX - HARVEST_MIN + 1));
+}
+
+/** 野外采摘用：野菜 1–4 份，草药 1 份（每次现摇，不走地块哈希） */
+export function forageYieldOf(crop: CropDef, random = Math.random): number {
+  if (crop.herb) return 1;
+  return WILD_YIELD_MIN + Math.floor(random() * (WILD_YIELD_MAX - WILD_YIELD_MIN + 1));
+}
+
+/** 收成变异作物时掉「变异种子」的概率 */
+export const MUTATION_SEED_DROP_CHANCE = 0.30;
+
+/** 普通种子键就是作物 id，变异种子键是「作物:变异」，与收成键同一套写法 */
+export function seedKey(id: CropId, mutation: Mutation | null): string {
+  return mutation ? `${id}:${mutation}` : id;
+}
+
+export function parseSeedKey(key: unknown): { id: CropId; mutation: Mutation | null } | null {
+  if (typeof key !== "string" || !key) return null;
+  const [id, mutation] = key.split(":");
+  if (!Object.prototype.hasOwnProperty.call(CROPS, id)) return null;
+  if (mutation === undefined) return { id: id as CropId, mutation: null };
+  if (!isMutation(mutation) || !cropMutationValid(id as CropId, mutation)) return null;
+  return { id: id as CropId, mutation };
+}
+
+function isMutation(value: string): value is Mutation {
+  return Object.prototype.hasOwnProperty.call(MUTATIONS, value);
+}
+
+/** 种子键对应的作物与携带的变异；商店只卖普通种子 */
+export function seedInfoOf(key: unknown) {
+  const parsed = parseSeedKey(key);
+  if (!parsed) return null;
+  return { ...parsed, def: CROPS[parsed.id], shopSellable: parsed.mutation === null };
+}
+
+/** 等级阈值：index 即等级 - 1，30 级封顶；12 级解锁全部作物 */
+export const LEVEL_XP = [
+  0, 100, 230, 390, 600, 860, 1_200, 1_630, 2_180, 2_880,
+  3_770, 4_910, 6_360, 8_210, 10_560, 13_560, 17_380, 22_260, 28_480, 36_410,
+  46_520, 59_410, 75_840, 96_790, 123_500, 157_560, 200_980, 256_340, 326_930, 416_930,
+];
+export const MAX_LEVEL = LEVEL_XP.length;
 
 export function levelFromXp(xp: number): number {
   let level = 1;

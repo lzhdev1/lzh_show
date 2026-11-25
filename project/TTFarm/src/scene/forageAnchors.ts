@@ -1,8 +1,9 @@
-import { FORAGE_PATCH_COUNT } from "../game/forage";
+import { FORAGE_ANCHOR_COUNT } from "../game/forage";
 import { WILD_CLEARINGS } from "../game/ranch";
 import { FENCE_X, FENCE_Z, RIVER_BED, ROAD_HALF_WIDTH, WORLD_HALF, onBridge, riverInfo, roadInfo } from "./layout";
 import { onRanchReserve } from "./ranchLayout";
 import { inHallParkingGround } from "./salesHallLayout";
+import { inTown } from "./town/townLayout";
 
 /**
  * 野菜菜丛的锚点表：只有一处事实源，forageScene 与调试脚本共用。
@@ -36,9 +37,10 @@ function anchorSeed(i: number) {
   return (Math.imul(n, 0xc2b2ae35) >>> 0) / 4294967296;
 }
 
-/** 严格条件：不进院子、不下河谷、不压路、不挤牧场与兽群空地 */
+/** 严格条件：不进城镇、不进院子、不下河谷、不压路、不挤牧场与兽群空地 */
 function anchorSpotOk(x: number, z: number) {
   if (Math.abs(x) > WORLD_HALF - 12 || Math.abs(z) > WORLD_HALF - 12) return false;
+  if (inTown(x, z)) return false;
   if (Math.abs(x) < FENCE_X + 3 && Math.abs(z) < FENCE_Z + 3) return false;
   if (onRanchReserve(x, z, 3)) return false;
   if (riverInfo(x, z).dist < RIVER_BED.shoulder + 3.2) return false;
@@ -49,9 +51,11 @@ function anchorSpotOk(x: number, z: number) {
   return true;
 }
 
-/** 放宽条件：候选被河谷与牧场砍太多时兜底用，只保证不下水、不进院子 */
+/** 放宽条件：候选被河谷与牧场砍太多时兜底用，只保证不进城镇、不下水、不进院子 */
 function looseOk([x, z]: [number, number]) {
   return Math.abs(x) < WORLD_HALF - 10 && Math.abs(z) < WORLD_HALF - 10 &&
+    !inTown(x, z) &&
+    !inHallParkingGround(x, z) &&
     !(Math.abs(x) < FENCE_X + 2 && Math.abs(z) < FENCE_Z + 2) &&
     !onRanchReserve(x, z, 2) &&
     riverInfo(x, z).dist > RIVER_BED.shoulder + 2.5;
@@ -102,12 +106,12 @@ export const FORAGE_ANCHORS: readonly (readonly [number, number])[] = (() => {
   // 名额没凑满时，从所有剩余合格点里按最疏的方式补齐
   const extra = seeds.filter(([x, z]) => anchorSpotOk(x, z) && !occupied([x, z]));
   for (const gap of [7, 5, 3]) {
-    while (chosen.length < FORAGE_PATCH_COUNT && pushSpaced(extra, gap)) { /* 继续补 */ }
+    while (chosen.length < FORAGE_ANCHOR_COUNT && pushSpaced(extra, gap)) { /* 继续补 */ }
   }
-  // 河谷与牧场占掉太多候选时退一档，保证锚点表长度恒等于菜丛数量
-  if (chosen.length < FORAGE_PATCH_COUNT) {
+  // 河谷、城镇与牧场占掉太多候选时退一档，保证锚点表长度恒定等于锚点数量
+  if (chosen.length < FORAGE_ANCHOR_COUNT) {
     const spare = seeds.filter((point) => looseOk(point) && !occupied(point));
-    while (chosen.length < FORAGE_PATCH_COUNT && spare.length) chosen.push(spare.shift()!);
+    while (chosen.length < FORAGE_ANCHOR_COUNT && spare.length) chosen.push(spare.shift()!);
   }
   return chosen.map(([x, z]) => [Math.round(x * 10) / 10, Math.round(z * 10) / 10] as const);
 })();

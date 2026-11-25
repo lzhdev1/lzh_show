@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useClock } from "../game/clock";
 import { CROP_LIST, harvestLots, produceName, CROPS, type CropId } from "../game/crops";
 import { useFieldInteraction } from "../game/fieldInteraction";
-import { formatRemain, isReady, MAX_WATER, remainingMs } from "../game/growth";
+import { formatRemain, guestWaterGate, isReady, plotMutationRevealed } from "../game/growth";
 import { animalName, baitCount, isMountAnimal, ranchCapacity, type AnimalSpecies } from "../game/ranch";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { helpAtFarm, leaveVisit, useSocial, type Visit } from "../game/social";
@@ -165,13 +165,18 @@ export function GuestAction({ visit }: { visit: Visit }) {
     </div>;
   }
   const ready = isReady(plot, now);
-  const exhausted = plot.watered >= MAX_WATER;
+  // 朋友每小时合计只能帮浇一次：被任何一位浇过后，这一小时其余人都不能再浇
+  const gate = plot.crop && !ready ? guestWaterGate(plot, now) : null;
+  const locked = Boolean(gate && !gate.ok);
+  const lockedLabel = gate?.reason === "quota" && gate.waitMs
+    ? `${formatRemain(gate.waitMs)}后可帮浇`
+    : gate?.reason === "cap" ? "已浇足" : "浇水";
   return <div className="guest-action" role="group" aria-label="协作照料作物">
-    <b>{produceName(CROPS[plot.crop], plot.mutation)}</b>
-    <button className="btn primary" disabled={busy || !present || (!ready && exhausted)}
+    <b>{produceName(CROPS[plot.crop], plotMutationRevealed(plot, now) ? plot.mutation : null)}</b>
+    <button className="btn primary" disabled={busy || !present || (!ready && locked)}
       onClick={() => void run({ action: ready ? "harvest" : "water", plotId: plot.id }, ready ? "作物已收入好友的仓库" : "已为好友浇水")}>
       {ready ? <HarvestIcon size={22}/> : <WateringCanIcon size={22}/>}
-      {ready ? "收获" : exhausted ? formatRemain(remainingMs(plot, now) ?? 0) + "后成熟" : "浇水"}
+      {ready ? "收获" : locked ? lockedLabel : "浇水"}
     </button>
   </div>;
 }

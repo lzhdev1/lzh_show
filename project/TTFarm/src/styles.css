@@ -304,6 +304,17 @@ button {
   opacity: 0.72;
 }
 
+/* 变异种子：商店买不到，只在收获变异作物时掉落 */
+.seed.variant {
+  background: linear-gradient(135deg, #f6ecff, #f4e9d3);
+  border-color: #c9a6e8;
+}
+
+.seed.variant.active {
+  background: linear-gradient(135deg, #ecdcff, #eaf4dd);
+  border-color: #9b6fd6;
+}
+
 .seed-icon {
   display: grid;
   place-items: center;

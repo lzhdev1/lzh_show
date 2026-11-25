@@ -43,7 +43,7 @@ export function MushroomHUD() {
       </span>
       <div>
         <strong>{species.name}</strong>
-        <small>{MUSHROOM_RARITY_LABEL[species.rarity]}菌 · 生于{hostLabel || MUSHROOM_HABITAT_LABEL[species.habitat]} · {species.price} 金币{guest ? " · 归好友" : ""}</small>
+        <small>{MUSHROOM_RARITY_LABEL[species.rarity]}菌 · 生于{hostLabel || MUSHROOM_HABITAT_LABEL[species.habitat]} · {species.price} 金币/份 · 1–3 份{guest ? " · 归好友" : ""}</small>
       </div>
     </div>
     {mutation && <p className={`mushroom-mutation-line ${mutation}`}>{MUSHROOM_MUTATION_LABEL[mutation]}变异 · {

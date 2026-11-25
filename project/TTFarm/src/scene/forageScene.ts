@@ -11,6 +11,8 @@ import { FORAGE_ANCHORS } from "./forageAnchors";
 import { createWildAuras } from "./wildAuras";
 import { FENCE_X, FENCE_Z, RIVER_BED, ROAD_HALF_WIDTH, onBridge, riverInfo, roadInfo, WORLD_HALF } from "./layout";
 import { onRanchReserve } from "./ranchLayout";
+import { inHallParkingGround } from "./salesHallLayout";
+import { inTown } from "./town/townLayout";
 import type { WorldObstacles } from "./obstacles";
 
 /**
@@ -46,14 +48,15 @@ function openScore(p: THREE.Vector3, obstacles: WorldObstacles) {
 }
 
 function spawnAt(patch: WildPatch, obstacles: WorldObstacles) {
-  // 每轮把锚点整体错开 5 位，同一种菜不会永远刷在同一片草地；
-  // 具体 offset 仍按 patch.id 散开，避免整批菜像被平移了一格。
-  const rotation = Number(patch.id.split("-")[1]) || 0;
-  const anchorIndex = (patch.slot + rotation * 5) % FORAGE_ANCHORS.length;
+  // 位置直接由锚点下标决定：野菜每轮换一组 slot，草药按自己的 slot 固定下来；
+  // 相位用 id 散开，避免同一锚点上的几丛长得一模一样。
+  const anchorIndex = patch.slot % FORAGE_ANCHORS.length;
   const [cx, cz] = FORAGE_ANCHORS[anchorIndex];
   const phase = hash(patch.id) * Math.PI * 2;
   const acceptable = (p: THREE.Vector3) => {
     if (Math.abs(p.x) > WORLD_HALF - 8 || Math.abs(p.z) > WORLD_HALF - 8) return false;
+    // 城镇街区与售货大厅停车场不长野菜：只允许长在野外草地
+    if (inTown(p.x, p.z) || inHallParkingGround(p.x, p.z)) return false;
     if (Math.abs(p.x) < FENCE_X + 2 && Math.abs(p.z) < FENCE_Z + 2) return false;
     if (onRanchReserve(p.x, p.z, 2)) return false;
     // 河谷整道沟（含岸坡）都不长野菜：离河心至少岸肩外 2.5 米
@@ -132,13 +135,14 @@ export function createForageScene(obstacles: WorldObstacles, library: ReturnType
   function sync(now: number, forage: ForageState) {
     const rotation = forageRotationAt(now);
     const taken = forage.rotation === rotation ? forage.taken : [];
-    const key = `${rotation}:${taken.join(",")}`;
+    const herbs = forage.herbs;
+    const key = `${rotation}:${taken.join(",")}:${herbs.map((herb) => herb.id).join(",")}`;
     if (key === lastKey) return;
     lastKey = key;
-    const patches = wildPatchesAt(now);
+    const patches = [...wildPatchesAt(now), ...herbs];
     const wanted = new Set<string>();
     for (const patch of patches) {
-      if (taken.includes(patch.slot)) continue;
+      if (patch.source === "wild" && taken.includes(patch.slot)) continue;
       wanted.add(patch.id);
       if (actors.has(patch.id)) continue;
       const anchor = spawnAt(patch, obstacles);

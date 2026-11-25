@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp } from "../game/crops";
+import { CROP_LIST, LEVEL_XP, levelFromXp, nextLevelXp, produceName, seedInfoOf } from "../game/crops";
 import { AVATARS, useGame } from "../game/state";
 import { observeHomeRevision, useAccount } from "../game/account";
 import { startSocialSync, useSocial } from "../game/social";
@@ -112,7 +112,7 @@ export function App() {
   // 种子栏顺序：有种子且已解锁 → 有种子但未解锁 → 没有种子（含未解锁）；
   // 第一组按数量从多到少，其余按解锁等级，最后按 id 保证刷新后顺序稳定。
   const seedRows = useMemo(() => CROP_LIST
-    .filter((crop) => !crop.wild || (seeds[crop.id] ?? 0) > 0)
+    .filter((crop) => (!crop.wild && !crop.herb) || (seeds[crop.id] ?? 0) > 0)
     .sort((a, b) => {
       const countA = seeds[a.id] ?? 0;
       const countB = seeds[b.id] ?? 0;
@@ -124,6 +124,14 @@ export function App() {
       if (groupA === 0) return countB - countA || a.unlockLevel - b.unlockLevel || a.id.localeCompare(b.id);
       return a.unlockLevel - b.unlockLevel || a.id.localeCompare(b.id);
     }), [seeds, level]);
+
+  // 变异种子只在收获变异作物时掉，商店不卖；按持有量单独排一列
+  const mutationSeedRows = useMemo(() => Object.keys(seeds)
+    .filter((key) => key.includes(":") && (seeds[key] ?? 0) > 0)
+    .map((key) => ({ key, count: seeds[key] ?? 0, info: seedInfoOf(key)! }))
+    .filter((row) => row.info)
+    .sort((a, b) => a.info.def.unlockLevel - b.info.def.unlockLevel || a.key.localeCompare(b.key)),
+  [seeds]);
 
   // 没登录就先只给登录页：3D 场景照样在背后转，登录完直接就是农场
   if (!token) return <LoginPage />;
@@ -220,7 +228,7 @@ export function App() {
           <span>种子</span>
         </div>
         <div className="seed-scroll">
-          {/* 野菜种子只有捡到过才占格子，避免 20 个空位挤爆种子栏 */}
+          {/* 野菜/草药种子只有捡到过才占格子，避免空位挤爆种子栏 */}
           {seedRows.map((crop) => {
             const locked = level < crop.unlockLevel;
             return (
@@ -237,6 +245,26 @@ export function App() {
                   <span className="seed-count">
                     {locked ? `Lv${crop.unlockLevel}` : `×${seeds[crop.id]}`}
                   </span>
+                </span>
+                {locked && <LockIcon size={12} />}
+              </button>
+            );
+          })}
+          {mutationSeedRows.map((row) => {
+            const locked = level < row.info.def.unlockLevel;
+            return (
+              <button
+                key={row.key}
+                className={`seed variant${selectedSeed === row.key ? " active" : ""}${locked ? " locked" : ""}`}
+                onClick={() => selectSeed(row.key)}
+                title={`${produceName(row.info.def, row.info.mutation)}种子`}
+              >
+                <span className="seed-icon">
+                  <CropIcon crop={row.info.def.id} size={18} />
+                </span>
+                <span className="seed-text">
+                  <span className="seed-name">{produceName(row.info.def, row.info.mutation)}</span>
+                  <span className="seed-count">{locked ? `Lv${row.info.def.unlockLevel}` : `×${row.count}`}</span>
                 </span>
                 {locked && <LockIcon size={12} />}
               </button>

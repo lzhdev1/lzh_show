@@ -107,6 +107,20 @@ const SHAPE_TEXT: Record<MushroomShape, string> = {
   wax: "蜡质菌盖油亮，颜色比同族都更亮一截。",
 };
 
+/** 五个稀有度对应的单份收购价：30 / 120 / 480 / 1,920 / 6,666 */
+export const MUSHROOM_RARITY_PRICE: Record<number, number> = { 1: 30, 2: 120, 3: 480, 4: 1_920, 5: 6_666 };
+/** 一朵菌采到的份数：1–3 份 */
+export const MUSHROOM_YIELD_MIN = 1;
+export const MUSHROOM_YIELD_MAX = 3;
+
+/** 采一朵菌给的经验：固定 15 */
+export const MUSHROOM_PICK_XP = 15;
+
+/** 采一朵菌拿到的份数：1–3 份随机 */
+export function mushroomYieldOf(random = Math.random): number {
+  return MUSHROOM_YIELD_MIN + Math.floor(random() * (MUSHROOM_YIELD_MAX - MUSHROOM_YIELD_MIN + 1));
+}
+
 export const MUSHROOM_LIST: readonly MushroomSpecies[] = NAMES.map((name, index) => {
   const hue = (index * 47 + 8) % 360;
   const shape = SHAPES[index % SHAPES.length];
@@ -124,7 +138,7 @@ export const MUSHROOM_LIST: readonly MushroomSpecies[] = NAMES.map((name, index)
     pattern,
     habitat,
     rarity,
-    price: 6 + rarity * 9 + Math.floor(index / 20) * 5,
+    price: MUSHROOM_RARITY_PRICE[rarity],
     size: 0.18 + (index % 5) * 0.035 + (rarity - 1) * 0.012,
     blurb: `${HABITAT_TEXT[habitat]}${SHAPE_TEXT[shape]}${index % 17 === 0 ? "菌季只有雨后一个天气阶段，错过就要再等一场雨。" : ""}`,
   };
@@ -160,13 +174,16 @@ function hash(text: string) {
   return (n >>> 0) / 4294967296;
 }
 
-/** 每种菌按刷新阶段固定变异，重进同一阶段不会变。 */
+/** 雨后一场菌季在地面上最多同时保留的菌子数量 */
+export const MUSHROOM_GROUND_CAP = 30;
+/** 每种菌按刷新阶段固定变异：20% 概率变异，魔气 / 氤氲 / 通灵三者随机。 */
 export function mushroomMutationAt(id: string, seasonKey: number): MushroomMutation {
-  const roll = hash(`${id}:${seasonKey}`);
-  if (roll < 0.14) return "magic";
-  if (roll < 0.26) return "mist";
-  if (roll < 0.33) return "spirit";
-  return null;
+  const roll = hash(`${id}:${seasonKey}:mut`);
+  if (roll >= 0.20) return null;
+  const kind = hash(`${id}:${seasonKey}:kind`);
+  if (kind < 1 / 3) return "magic";
+  if (kind < 2 / 3) return "mist";
+  return "spirit";
 }
 
 export const MUSHROOM_MUTATION_LABEL: Record<Exclude<MushroomMutation, null>, string> = {
