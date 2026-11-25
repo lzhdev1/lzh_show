@@ -231,26 +231,30 @@ function MountPicker() {
     setOpen(false);
   };
   const toggle = () => {
+    if (ridingMount) {
+      dismount();
+      return;
+    }
     if (!mounts.length) {
       useGame.getState().notify("牧场还没有可骑的动物：收服野马，或让狼、熊、虎、狮子、大象、熊猫带上五行变异", "warn");
       return;
     }
     setOpen(value => !value);
   };
-  const label = "坐骑";
+  const label = ridingMount ? "下坐骑" : "坐骑";
   const icon = ridingMount ? MOUNT_EMOJI[ridingMount.species] ?? "🐎" : "🐎";
 
   return <div className="mount-picker" ref={wrap}>
-    <button type="button" className={`mount-toggle-top${mounts.length ? "" : " empty"}`}
-      onClick={toggle} aria-haspopup="menu" aria-expanded={open}
-      aria-label={ridingMount ? `坐骑，正在骑乘${animalName(ridingMount)}，点击换乘或下坐骑`
+    <button type="button" className={`mount-toggle-top${mounts.length ? "" : " empty"}${ridingMount ? " riding" : ""}`}
+      onClick={toggle} aria-haspopup={ridingMount ? undefined : "menu"} aria-expanded={ridingMount ? undefined : open}
+      aria-label={ridingMount ? `下坐骑，结束骑乘${animalName(ridingMount)}`
         : mounts.length ? `坐骑，已拥有 ${mounts.length} 只可骑动物` : "坐骑，暂无可用动物"}
-      title={ridingMount ? `正在骑乘${animalName(ridingMount)}，点击换乘或下坐骑`
+      title={ridingMount ? `点击下坐骑，结束骑乘${animalName(ridingMount)}`
         : mounts.length ? `点击选择坐骑，共 ${mounts.length} 只` : "还没有可骑的动物"}>
       <span className="mount-toggle-icon" aria-hidden="true">{icon}</span>
       <span className="mount-toggle-label">{label}</span>
     </button>
-    {open && <div className="mount-picker-menu" role="menu" aria-label="我的坐骑">
+    {open && !ridingMount && <div className="mount-picker-menu" role="menu" aria-label="我的坐骑">
       <div className="mount-picker-head"><b>我的坐骑</b><small>{mounts.length} 只</small></div>
       {mounts.map(animal => <button key={animal.id} type="button" role="menuitem"
         className={`mount-picker-item${animal.id === ranch.ridingId && ridingMount ? " active" : ""}`}
@@ -262,7 +266,6 @@ function MountPicker() {
         </span>
         {animal.id === ranch.ridingId && ridingMount && <em>骑乘中</em>}
       </button>)}
-      {ridingMount && <button type="button" className="mount-picker-dismount" onClick={dismount}>下坐骑</button>}
     </div>}
   </div>;
 }

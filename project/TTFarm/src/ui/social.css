@@ -230,6 +230,10 @@
 }
 .mount-toggle-top:hover { background: #fffaf0; }
 .mount-toggle-top.empty { opacity: .62; }
+.mount-toggle-top.riding {
+  border-color: #c6ad83;
+  background: #f7ecd7;
+}
 .mount-toggle-icon { font-size: 17px; line-height: 1; }
 .mount-toggle-label { white-space: nowrap; }
 .mount-picker-menu {
@@ -503,6 +507,10 @@
   .room-member-list { width: min(232px, calc(100vw - 16px)); }
   .mount-toggle-top { width: 44px; min-height: 44px; padding: 0; gap: 0; }
   .mount-toggle-label { display: none; }
+  /* 骑乘时按钮要显示「下坐骑」，窄屏隐藏图标、只留三个字 */
+  .mount-toggle-top.riding { padding: 0 2px; }
+  .mount-toggle-top.riding .mount-toggle-icon { display: none; }
+  .mount-toggle-top.riding .mount-toggle-label { display: inline; font-size: 10.5px; }
   .hud-menu-trigger { width: 40px; min-width: 40px; padding: 0; gap: 0; }
   .hud-menu-trigger span { display: none; }
   .mount-picker-menu { top: calc(100% + 52px); width: min(222px, calc(100vw - 18px)); max-height: min(44vh, 300px); }
