@@ -103,21 +103,24 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 }
 
 // 中脉有窄窄的浅色脊，叶缘有自然扭转。小萼片只需要三个横截面。
-function foldedLeaf(length: number, width: number, height: number, tip: number, ruffled = false): THREE.BufferGeometry {
+// petal=true 时改用花瓣剖面：基部窄、中段展宽、端部圆收，而不是叶子的两端尖。
+function foldedLeaf(length: number, width: number, height: number, tip: number, ruffled = false, petal = false): THREE.BufferGeometry {
   const vertices: number[] = [], colors: number[] = [], indices: number[] = [];
-  const rows = length < 0.13 ? 3 : 8;
-  const lanes = length < 0.13 ? [-1, 0, 1] : [-1, -0.12, 0, 0.12, 1];
+  const rows = length < 0.13 ? 3 : (ruffled || petal ? 14 : 8);
+  const lanes = length < 0.13 ? [-1, 0, 1] : (petal ? [-1, -0.6, -0.2, 0, 0.2, 0.6, 1] : [-1, -0.12, 0, 0.12, 1]);
   for (let i = 0; i <= rows; i++) {
     const t = i / rows;
     const arc = Math.sin(t * Math.PI);
-    const swell = arc ** (ruffled ? 0.57 : 0.85);
-    const scallop = ruffled ? 1 + 0.16 * Math.cos(t * Math.PI * 7) : 1;
+    const swell = petal
+      ? (t < 0.7 ? 0.25 + 0.75 * (t / 0.7) : Math.sqrt(Math.max(0.02, 1 - ((t - 0.7) / 0.3) ** 2)))
+      : arc ** (ruffled ? 0.57 : 0.85);
+    const scallop = ruffled ? 1 + 0.09 * Math.cos(t * Math.PI * 7) : 1;
     const edge = Math.max(0.004, swell) * width * scallop;
-    const curl = height * arc + tip * t;
+    const curl = petal ? height * Math.sin(t * Math.PI * 0.9) + tip * t : height * arc + tip * t;
     for (let j = 0; j < lanes.length; j++) {
       const u = lanes[j], rim = Math.abs(u);
       const lateral = width * 0.16 * Math.sin(t * Math.PI * 1.6);
-      const fold = (1 - rim) * swell * width * 0.42;
+      const fold = (1 - rim) * swell * width * (petal ? -0.34 : 0.42);
       const ripple = u * (t - 0.4) * swell * width * 0.48;
       vertices.push(lateral + u * edge, curl + fold + ripple, (t + 0.065 * rim * arc) * length);
       const tone = 0.82 + 0.22 * t + 0.1 * u;
@@ -146,8 +149,9 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   const leaf = variant?.leaf ?? CROPS[crop].leaf;
   const body = variant?.fruit ?? CROPS[crop].body;
 
-  function add(geo: THREE.BufferGeometry, color: number, pos: Point, rot: Point = [0, 0, 0], scale: Point = [1, 1, 1]) {
+  function add(geo: THREE.BufferGeometry, color: number, pos: Point, rot: Point = [0, 0, 0], scale: Point = [1, 1, 1], yxz = false) {
     transform.position.set(...pos);
+    transform.rotation.order = yxz ? "YXZ" : "XYZ";
     transform.rotation.set(...rot);
     transform.scale.set(...scale);
     transform.updateMatrix();
@@ -183,6 +187,24 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   }
   function stem(pos: Point, h: number, width: number, angle = 0, color = leaf) {
     add(new THREE.CylinderGeometry(width * 0.7, width, h, 6), color, pos, [0, 0, angle]);
+  }
+  /** 两点之间长一根锥形枝干：四元数定向，用来接出花序分叉与弯曲主茎 */
+  function limb(from: Point, to: Point, w0: number, w1: number, color = leaf) {
+    const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2];
+    const len = Math.hypot(dx, dy, dz) || 0.01;
+    const geo = new THREE.CylinderGeometry(w1, w0, len, 6);
+    geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, dy, dz).normalize()));
+    geo.translate((from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2);
+    add(geo, color, [0, 0, 0], [0, 0, 0]);
+  }
+  /** 茎上一个叶节点：绕茎散开若干片小叶，模拟羽状/轮生叶序 */
+  function leafNode(at: Point, count: number, len: number, wid: number, yaw = 0, lift = 0.16) {
+    for (let k = 0; k < count; k++) {
+      const a = yaw + k * TAU / count + 0.07 * Math.sin(k * 2.1);
+      const tone = tint.setHex(leaf).offsetHSL(0, 0, 0.03 * Math.cos(k * 1.7)).getHex();
+      add(foldedLeaf(len * (0.9 + (k % 3) * 0.08), wid, lift, wid * 0.4), tone, at, [0.1 * Math.sin(k), a, 0]);
+    }
   }
 
   /* —— 草药：11 类药圃形态，靠药性部位（根 / 菌盖 / 浆果 / 花序 / 树皮）区分 —— */
@@ -616,54 +638,79 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
         break;
       }
       case "tulip": {
-        for (let i = 0; i < 3; i++) {
-          const a = i * TAU / 3 + 0.3, x = Math.sin(a) * 0.2, z = Math.cos(a) * 0.2;
-          stem([x, 0.34, z], 0.72, 0.022);
-          add(foldedLeaf(0.48, 0.062, 0.22, 0.1), leaf, [x, 0.02, z], [0, a + 1.2, 0]);
-          add(foldedLeaf(0.34, 0.052, 0.16, 0.13), leaf, [x, 0.02, z], [0, a + 2.7, 0]);
-          if (ripe) {
+        // 四枝一丛：三枝盛开一枝含苞，每枝基部两枚宽叶 + 茎 mid 一枚抱茎叶
+        for (let i = 0; i < 4; i++) {
+          const a = i * TAU / 4 + 0.35, rad = 0.16 + (i % 2) * 0.05;
+          const x = Math.sin(a) * rad, z = Math.cos(a) * rad;
+          const h = 0.62 + (i % 3) * 0.07, lean = 0.05 + (i % 2) * 0.03;
+          const tx = x + Math.sin(a) * lean, tz = z + Math.cos(a) * lean;
+          limb([x, 0, z], [x + Math.sin(a) * lean * 0.4, h * 0.55, z + Math.cos(a) * lean * 0.4], 0.024, 0.019);
+          limb([x + Math.sin(a) * lean * 0.4, h * 0.55, z + Math.cos(a) * lean * 0.4], [tx, h, tz], 0.019, 0.014);
+          add(foldedLeaf(0.46, 0.066, 0.2, 0.1), leaf, [x, 0.02, z], [0, a + 1.2, 0]);
+          add(foldedLeaf(0.34, 0.055, 0.16, 0.13), leaf, [x, 0.02, z], [0, a + 2.7, 0]);
+          add(foldedLeaf(0.26, 0.045, 0.12, 0.1), tint.setHex(leaf).offsetHSL(0, 0, 0.04).getHex(),
+            [x + Math.sin(a) * lean * 0.3, h * 0.42, z + Math.cos(a) * lean * 0.3], [0, a + 0.4, 0]);
+          if (ripe && i < 3) {
             const out = tint.setHex(body).offsetHSL(0, -0.01, 0.08).getHex();
             const inside = tint.setHex(body).offsetHSL(0, 0.06, -0.09).getHex();
             // 郁金香的杯形花冠：外三片先立起来微微外翻，内三片错开夹角再收紧
             for (let k = 0; k < 3; k++) {
-              add(foldedLeaf(0.25, 0.11, 0.055, 0.014, true), out, [x, 0.66, z], [-1.1, a + k * TAU / 3, 0]);
+              add(foldedLeaf(0.22, 0.1, 0.05, 0.014, false, true), out, [tx, h - 0.05, tz], [-1.25, a + k * TAU / 3, 0], [1, 1, 1], true);
             }
             for (let k = 0; k < 3; k++) {
-              add(foldedLeaf(0.31, 0.09, 0.04, 0.006, true), inside, [x, 0.68, z], [-1.32, a + k * TAU / 3 + TAU / 6, 0]);
+              add(foldedLeaf(0.26, 0.085, 0.04, 0.006, false, true), inside, [tx, h - 0.04, tz], [-1.42, a + k * TAU / 3 + TAU / 6, 0], [1, 1, 1], true);
             }
-            orb(0xf3d272, [x, 0.68, z], [0.026, 0.055, 0.026]);
+            orb(0xf3d272, [tx, h - 0.03, tz], [0.018, 0.035, 0.018]);
           } else {
-            orb(0x8fbf6a, [x, 0.66, z], [0.055, 0.09, 0.055]);
-            for (let k = 0; k < 3; k++) add(foldedLeaf(0.11, 0.045, 0.025, 0.03), leaf, [x, 0.67, z], [-1.25, a + k * TAU / 3, 0]);
+            const by = h - 0.03;
+            orb(ripe ? tint.setHex(body).offsetHSL(0, 0, 0.05).getHex() : 0x8fbf6a, [tx, by, tz], [0.05, 0.085, 0.05]);
+            for (let k = 0; k < 3; k++) add(foldedLeaf(0.12, 0.045, 0.03, 0.03), leaf, [tx, by + 0.01, tz], [-1.25, a + k * TAU / 3, 0]);
           }
         }
         break;
       }
       case "lily": {
-        stem([0, 0.44, 0], 0.9, 0.028);
-        for (let j = 0; j < 4; j++) add(foldedLeaf(0.36, 0.056, 0.12, 0.07), leaf, [0, 0.12 + j * 0.2, 0], [0, j * 1.7, 0]);
-        if (ripe) {
+        // 一茎三花：顶花 + 两条侧枝各托一朵，茎上五轮细叶铺满
+        limb([0, 0, 0], [0.015, 0.5, 0], 0.03, 0.024);
+        limb([0.015, 0.5, 0], [0, 0.92, 0], 0.024, 0.017);
+        limb([0.01, 0.55, 0], [0.24, 0.74, 0.1], 0.016, 0.011);
+        limb([0, 0.66, 0], [-0.22, 0.82, -0.08], 0.015, 0.01);
+        for (let j = 0; j < 5; j++) leafNode([0.01 * (j % 2), 0.12 + j * 0.14, 0], 5, 0.3 - j * 0.02, 0.045, j * 0.7);
+        leafNode([0.13, 0.63, 0.05], 2, 0.2, 0.035, 1.2);
+        leafNode([-0.12, 0.73, -0.04], 2, 0.18, 0.032, 2.6);
+        const lilyHead = (cx: number, cy: number, cz: number, s: number, tilt: number, yaw: number) => {
           const pale = tint.setHex(body).lerp(new THREE.Color(0xffffff), 0.42).getHex();
           const deep = tint.setHex(body).offsetHSL(0, 0.06, -0.02).getHex();
           // 六瓣百合：外三瓣先开，内三瓣错开收拢，瓣缘带褶
           for (let k = 0; k < 3; k++) {
-            add(foldedLeaf(0.36, 0.13, 0.1, 0.15, true), pale, [0, 0.86, 0], [-0.6, k * TAU / 3 + 0.12, 0]);
+            const a = yaw + k * TAU / 3 + 0.12;
+            add(foldedLeaf(0.36 * s, 0.13 * s, 0.1 * s, 0.15 * s, false, true), pale,
+              [cx + Math.sin(a) * 0.02 * s, cy, cz + Math.cos(a) * 0.02 * s], [tilt - 0.6, a, 0], [1, 1, 1], true);
           }
           for (let k = 0; k < 3; k++) {
-            add(foldedLeaf(0.32, 0.11, 0.085, 0.13, true), deep, [0, 0.88, 0], [-0.34, k * TAU / 3 + TAU / 6 + 0.12, 0]);
+            const a = yaw + k * TAU / 3 + TAU / 6 + 0.12;
+            add(foldedLeaf(0.32 * s, 0.11 * s, 0.085 * s, 0.13 * s, false, true), deep,
+              [cx + Math.sin(a) * 0.015 * s, cy + 0.02 * s, cz + Math.cos(a) * 0.015 * s], [tilt - 0.34, a, 0], [1, 1, 1], true);
           }
           // 花蕊：六根雄蕊带紫黄花药，中间一根雌蕊更长
           for (let k = 0; k < 6; k++) {
             const a = k * TAU / 6 + 0.3;
-            add(new THREE.CylinderGeometry(0.0028, 0.004, 0.2, 4), 0xe8dfc6,
-              [Math.sin(a) * 0.05, 0.97, Math.cos(a) * 0.05], [0.15 * Math.cos(a), 0, -0.15 * Math.sin(a)]);
-            orb(0xc99a2c, [Math.sin(a) * 0.074, 1.06, Math.cos(a) * 0.074], [0.013, 0.009, 0.013]);
+            add(new THREE.CylinderGeometry(0.0028 * s, 0.004 * s, 0.2 * s, 4), 0xe8dfc6,
+              [cx + Math.sin(a) * 0.05 * s, cy + 0.11 * s, cz + Math.cos(a) * 0.05 * s], [0.15 * Math.cos(a), 0, -0.15 * Math.sin(a)]);
+            orb(0xc99a2c, [cx + Math.sin(a) * 0.074 * s, cy + 0.2 * s, cz + Math.cos(a) * 0.074 * s], [0.013 * s, 0.009 * s, 0.013 * s]);
           }
-          add(new THREE.CylinderGeometry(0.0042, 0.0055, 0.24, 4), 0xcfc2a0, [0, 0.99, 0], [0, 0, 0]);
-          orb(0xa99668, [0, 1.1, 0], [0.012, 0.016, 0.012]);
+          add(new THREE.CylinderGeometry(0.0042 * s, 0.0055 * s, 0.24 * s, 4), 0xcfc2a0, [cx, cy + 0.13 * s, cz], [0, 0, 0]);
+          orb(0xa99668, [cx, cy + 0.24 * s, cz], [0.012 * s, 0.016 * s, 0.012 * s]);
+        };
+        if (ripe) {
+          lilyHead(0, 0.94, 0, 1, 0, 0.2);
+          lilyHead(0.26, 0.76, 0.11, 0.8, -0.35, 1.1);
+          lilyHead(-0.24, 0.84, -0.09, 0.72, -0.3, 2.4);
         } else {
-          orb(0xcfe0b8, [0, 0.9, 0], [0.05, 0.11, 0.05]);
-          for (let k = 0; k < 3; k++) add(foldedLeaf(0.13, 0.052, 0.035, 0.05), leaf, [0, 0.9, 0], [-0.75, k * TAU / 3, 0]);
+          for (const [bx, by, bz, bs] of [[0, 0.94, 0, 1], [0.26, 0.76, 0.11, 0.8], [-0.24, 0.84, -0.09, 0.72]] as const) {
+            orb(0xcfe0b8, [bx, by, bz], [0.05 * bs, 0.11 * bs, 0.05 * bs]);
+            for (let k = 0; k < 3; k++) add(foldedLeaf(0.13 * bs, 0.052 * bs, 0.035 * bs, 0.05 * bs), leaf, [bx, by, bz], [-0.75, k * TAU / 3, 0]);
+          }
         }
         break;
       }
@@ -673,24 +720,41 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
       case "roseYellow":
       case "roseBlue":
       case "rosePurple": {
-        stem([0, 0.44, 0], 0.92, 0.032);
-        add(foldedLeaf(0.3, 0.08, 0.1, 0.035), leaf, [0, 0.24, 0], [0, 0.7, 0]);
-        add(foldedLeaf(0.28, 0.074, 0.085, 0.035), leaf, [0, 0.5, 0], [0, 3.5, 0]);
-        if (ripe) {
+        // 一丛三花：主茎顶花 + 两条侧枝各托一朵，茎上五节羽状复叶
+        limb([0, 0, 0], [0.02, 0.45, 0], 0.034, 0.027);
+        limb([0.02, 0.45, 0], [0, 0.92, 0], 0.027, 0.019);
+        limb([0.015, 0.4, 0], [0.26, 0.62, 0.1], 0.017, 0.012);
+        limb([0.005, 0.56, 0], [-0.24, 0.78, -0.08], 0.016, 0.011);
+        for (let j = 0; j < 5; j++) {
+          const y = 0.16 + j * 0.16, yaw = j * 1.35;
+          // 羽状复叶：顶生小叶 + 两侧各一枚侧小叶
+          leafNode([0.01 * (j % 2), y, 0], 3, 0.17 - j * 0.012, 0.055, yaw, 0.12);
+        }
+        leafNode([0.14, 0.5, 0.05], 2, 0.13, 0.045, 1.2, 0.12);
+        leafNode([-0.13, 0.66, -0.04], 2, 0.12, 0.042, 2.6, 0.12);
+        const roseHead = (cx: number, cy: number, cz: number, s: number, yaw: number) => {
           const inner = tint.setHex(body).offsetHSL(0, 0.03, -0.08).getHex();
           const mid = tint.setHex(body).offsetHSL(0, 0.01, 0.02).getHex();
           const outer = tint.setHex(body).offsetHSL(0, -0.02, 0.14).getHex();
-          // 花萼五片，压在花底下
-          for (let k = 0; k < 5; k++) add(foldedLeaf(0.13, 0.036, 0.03, -0.02), leaf, [0, 0.94, 0], [-0.95, k * TAU / 5 + 0.2, 0]);
+          // 花萼五片，向下外翻托在花底下
+          for (let k = 0; k < 5; k++) add(foldedLeaf(0.08 * s, 0.028 * s, 0.02 * s, -0.015 * s), leaf, [cx, cy - 0.035 * s, cz], [2.75, yaw + k * TAU / 5 + 0.2, 0], [1, 1, 1], true);
           // 三层花瓣由外向内一层层收，外圈最开、内圈几乎包成花心
-          for (let k = 0; k < 8; k++) add(foldedLeaf(0.23, 0.115, 0.09, 0.05, true), outer, [0, 0.95, 0], [-0.95, k * TAU / 8, 0]);
-          for (let k = 0; k < 6; k++) add(foldedLeaf(0.19, 0.098, 0.08, 0.04, true), mid, [0, 0.975, 0], [-0.6, k * TAU / 6 + 0.28, 0]);
-          for (let k = 0; k < 4; k++) add(foldedLeaf(0.15, 0.082, 0.07, 0.03, true), inner, [0, 0.995, 0], [-0.4, k * TAU / 4 + 0.6, 0]);
-          orb(inner, [0, 1.0, 0], [0.03, 0.038, 0.03]);
-          orb(outer, [0, 1.028, 0], [0.017, 0.022, 0.017]);
+          for (let k = 0; k < 8; k++) add(foldedLeaf(0.23 * s, 0.115 * s, 0.12 * s, 0.05 * s, false, true), outer, [cx, cy, cz], [-0.8, yaw + k * TAU / 8, 0], [1, 1, 1], true);
+          for (let k = 0; k < 6; k++) add(foldedLeaf(0.19 * s, 0.098 * s, 0.1 * s, 0.04 * s, false, true), mid, [cx, cy + 0.025 * s, cz], [-0.55, yaw + k * TAU / 6 + 0.28, 0], [1, 1, 1], true);
+          for (let k = 0; k < 4; k++) add(foldedLeaf(0.15 * s, 0.082 * s, 0.09 * s, 0.03 * s, false, true), inner, [cx, cy + 0.045 * s, cz], [-0.35, yaw + k * TAU / 4 + 0.6, 0], [1, 1, 1], true);
+          // 最内层三瓣几乎竖直抱合，旋出玫瑰花心，而不是一颗露出的果球
+          for (let k = 0; k < 3; k++) add(foldedLeaf(0.1 * s, 0.06 * s, 0.07 * s, 0.02 * s, false, true), inner, [cx, cy + 0.055 * s, cz], [-0.16, yaw + k * TAU / 3 + 1.0, 0], [1, 1, 1], true);
+          orb(inner, [cx, cy + 0.05 * s, cz], [0.012 * s, 0.016 * s, 0.012 * s]);
+        };
+        if (ripe) {
+          roseHead(0, 0.95, 0, 1, 0.2);
+          roseHead(0.28, 0.66, 0.12, 0.8, 1.1);
+          roseHead(-0.26, 0.82, -0.1, 0.72, 2.4);
         } else {
-          orb(0x8fbf6a, [0, 0.9, 0], [0.05, 0.07, 0.05]);
-          for (let k = 0; k < 3; k++) add(foldedLeaf(0.09, 0.03, 0.012, -0.015), leaf, [0, 0.88, 0], [-0.7, k * TAU / 3, 0]);
+          for (const [bx, by, bz, bs] of [[0, 0.92, 0, 1], [0.28, 0.64, 0.12, 0.8], [-0.26, 0.8, -0.1, 0.72]] as const) {
+            orb(0x8fbf6a, [bx, by, bz], [0.05 * bs, 0.07 * bs, 0.05 * bs]);
+            for (let k = 0; k < 3; k++) add(foldedLeaf(0.09 * bs, 0.03 * bs, 0.012 * bs, -0.015 * bs), leaf, [bx, by - 0.02 * bs, bz], [-0.7, k * TAU / 3, 0]);
+          }
         }
         break;
       }
@@ -862,7 +926,10 @@ export function createCropLibrary() {
     }
     return doll;
   }
-  const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const material = new THREE.MeshPhysicalMaterial({
+    vertexColors: true, side: THREE.DoubleSide, roughness: 0.5, metalness: 0,
+    clearcoat: 0.18, clearcoatRoughness: 0.6,
+  });
   const wind = { value: 0 };
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCropWind = wind;
