@@ -84,6 +84,11 @@ export const HERB_FORM: Record<HerbId, { arch: HerbArchetype; scale: number; blo
   jingjie:     { arch: "herb",  scale: 0.86, bloom: 1.0 },
 };
 
+/** 鲜花作物：玫瑰六色 / 百合 / 郁金香。观赏为主，一块地只种两棵大株 */
+export function isFlowerCrop(crop: CropId): boolean {
+  return crop === "lily" || crop === "tulip" || crop.startsWith("rose");
+}
+
 /** 按顶点位置重写颜色：阴阳双分、长生玉质都靠它（作用于合并后的整株） */
 function recolorVertices(geometry: THREE.BufferGeometry, fn: (x: number, y: number, z: number, base: THREE.Color) => THREE.Color) {
   const position = geometry.getAttribute("position");
@@ -146,8 +151,10 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   const transform = new THREE.Object3D();
   const tint = new THREE.Color();
   const variant = mutation ? MUTATIONS[mutation] : null;
-  const leaf = variant?.leaf ?? CROPS[crop].leaf;
-  const body = variant?.fruit ?? CROPS[crop].body;
+  // 鲜花变异只加强光效，不改花色：始终用品种本色
+  const flower = isFlowerCrop(crop);
+  const leaf = flower ? CROPS[crop].leaf : (variant?.leaf ?? CROPS[crop].leaf);
+  const body = flower ? CROPS[crop].body : (variant?.fruit ?? CROPS[crop].body);
 
   function add(geo: THREE.BufferGeometry, color: number, pos: Point, rot: Point = [0, 0, 0], scale: Point = [1, 1, 1], yxz = false) {
     transform.position.set(...pos);
@@ -860,7 +867,7 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
         break;
       }
     }
-    if (mutation && ripe && !isWildMutation(mutation)) {
+    if (mutation && ripe && !isWildMutation(mutation) && !flower) {
       // 形状和发光纹样分别构建，日光下也能读出剪影。
       for (let i = 0; i < 3; i++) {
         const a = i * TAU / 3 + 0.4;
@@ -887,7 +894,7 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
   const merged = mergeGeometries(pieces)!;
   pieces.forEach((part) => part.dispose());
   // 草药变异：仙品做玉质冷白渐变，神品整株向金黄压深（闪电与云雾交给特效层）
-  if (mutation === "xianpin" || mutation === "shenpin") {
+  if ((mutation === "xianpin" || mutation === "shenpin") && !flower) {
     const out = new THREE.Color();
     const root = new THREE.Color(mutation === "xianpin" ? 0xa9d8c2 : 0xb07c22);
     const tip = new THREE.Color(mutation === "xianpin" ? 0xfdfdff : 0xffe884);
@@ -897,7 +904,7 @@ function growModel(crop: CropId, stage: number, mutation: Mutation | null): THRE
     });
   }
   // 野菜变异是整株材质变化：阴阳按左右双分，长生做玉质渐变，生长期也可见
-  if (mutation && isWildMutation(mutation)) {
+  if (mutation && isWildMutation(mutation) && !flower) {
     const out = new THREE.Color();
     if (wildMutationFamily(mutation) === "yinyang") {
       const black = new THREE.Color(0x26262e), white = new THREE.Color(0xf4f1e8);

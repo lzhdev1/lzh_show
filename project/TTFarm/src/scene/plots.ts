@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { CropId } from "../game/crops";
 import { cropStage, growthProgress, PLOT_COLS, PLOT_ROWS, PLOT_SPACING } from "../game/growth";
 export { plotIdAt, PLOT_SPACING } from "../game/growth";
-import { createCropLibrary } from "./crops3d";
+import { createCropLibrary, isFlowerCrop } from "./crops3d";
 import { isSpirit, isWildMutation, type Mutation } from "../game/weather";
 import { createCropAuras } from "./cropAuras";
 import { createWildAuras } from "./wildAuras";
@@ -339,8 +339,12 @@ export function updatePlots(
     visual.soil.geometry = state.unlocked ? visual.bed : visual.meadow;
     visual.tufts.visible = !state.unlocked;
     const stage = state.crop ? cropStage(growthProgress(state, now)) : -1;
-    if (state.crop && (stage !== visual.stage || state.crop !== visual.cropId || state.mutation !== visual.mutation)) {
-      const { geometry, material } = plots.library.model(state.crop, stage, state.mutation);
+    // 变异从发芽阶段才显形：种子阶段一律按普通作物渲染
+    const mutation = stage >= 1 ? state.mutation : null;
+    // 鲜花观赏株：一块地两棵大株对角摆，其余作物仍四株
+    const flower = state.crop ? isFlowerCrop(state.crop) : false;
+    if (state.crop && (stage !== visual.stage || state.crop !== visual.cropId || mutation !== visual.mutation)) {
+      const { geometry, material } = plots.library.model(state.crop, stage, mutation);
       if (!visual.cropMesh) {
         const mesh = new THREE.InstancedMesh(geometry, material, 4);
         mesh.castShadow = true;
@@ -349,16 +353,16 @@ export function updatePlots(
       }
       visual.cropMesh.geometry = geometry;
       visual.cropMesh.material = material;
-      const spirit = stage === 3 && state.mutation && isSpirit(state.mutation);
+      const spirit = stage === 3 && mutation && isSpirit(mutation);
       // As on the playable avatars, keep the field's coarse moving shadow map off the painted face.
       visual.cropMesh.receiveShadow = !spirit;
-      visual.cropMesh.count = spirit ? 1 : 4;
+      visual.cropMesh.count = spirit ? 1 : flower ? 2 : 4;
       for (let k = 0; k < visual.cropMesh.count; k++) {
-        const x = spirit ? 0 : k % 2 === 0 ? -.49 : .49;
-        const z = spirit ? 0 : k < 2 ? -.49 : .49;
+        const x = spirit ? 0 : flower ? (k === 0 ? -.36 : .36) : k % 2 === 0 ? -.49 : .49;
+        const z = spirit ? 0 : flower ? (k === 0 ? -.36 : .36) : k < 2 ? -.49 : .49;
         cropStamp.position.set(x, bedHeightAt(x * 2 / PLOT_SIZE, z * 2 / PLOT_SIZE), z);
-        cropStamp.rotation.y = spirit ? .48 : (visual.id + k) * 1.8;
-        cropStamp.scale.setScalar(spirit ? 1.32 : .93 + (visual.id + k) % 3 * .055);
+        cropStamp.rotation.y = spirit ? .48 : flower ? (visual.id + k) * 2.4 : (visual.id + k) * 1.8;
+        cropStamp.scale.setScalar(spirit ? 1.32 : flower ? 1.34 + (visual.id + k) % 3 * .06 : .93 + (visual.id + k) % 3 * .055);
         cropStamp.updateMatrix();
         visual.cropMesh.setMatrixAt(k, cropStamp.matrix);
       }
@@ -370,19 +374,19 @@ export function updatePlots(
       }
     }
     if (visual.cropMesh) visual.cropMesh.visible = Boolean(state.crop);
-    if (stage !== visual.stage || state.mutation !== visual.mutation) {
-      plots.auras.setPlot(visual.id,state.mutation,stage);
+    if (stage !== visual.stage || mutation !== visual.mutation || state.crop !== visual.cropId) {
+      plots.auras.setPlot(visual.id, mutation, stage, undefined, flower ? 1.5 : 1);
       // 阴阳/长生走独立的柔光特效系统，生长期就可见
-      if (state.crop && state.mutation && isWildMutation(state.mutation) && stage >= 2) {
+      if (state.crop && mutation && isWildMutation(mutation) && stage >= 2) {
         const center = visual.group.position.clone();
         center.y += 0.3;
-        plots.wildAuras.setEmitter(`plot-${visual.id}`, center, state.mutation);
+        plots.wildAuras.setEmitter(`plot-${visual.id}`, center, mutation);
       } else {
         plots.wildAuras.setEmitter(`plot-${visual.id}`, null, null);
       }
     }
     visual.cropId = state.crop;
-    visual.mutation = state.mutation;
+    visual.mutation = mutation;
     visual.stage = stage;
 
     visual.readyMarker.visible = stage === 3;

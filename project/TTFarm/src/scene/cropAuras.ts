@@ -98,6 +98,8 @@ interface PlotAura {
   bolts: THREE.Sprite[];
   /** 野外草药丛没有固定地块，中心点随每次生成传入 */
   center?: THREE.Vector3;
+  /** 光效强度倍率：鲜花变异不改花色，只把光晕/粒子加强 */
+  boost?: number;
 }
 
 /** 神品落雷：程序化画出分叉闪电的柔光贴图（多层描边 + 阴影模糊），避免用折线几何硬拼 */
@@ -183,13 +185,16 @@ export function createCropAuras(centers: THREE.Vector3[] | ((id: number) => THRE
     for (const [id, aura] of plots) {
       const center = aura.center ?? centerOf(id);
       if (!center) continue;
-      const [rise, orbit, dust, fall, speed] = recipeOf(aura.mutation);
+      const b = aura.boost ?? 1;
+      const [rise0, orbit0, dust0, fall0, speed] = recipeOf(aura.mutation);
+      const rise = Math.round(rise0 * b), orbit = Math.round(orbit0 * b);
+      const dust = Math.round(dust0 * b), fall = Math.round(fall0 * b);
       const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
       const puff = fruit.clone().lerp(white, 0.45);
       const cloudTint = fruit.clone().lerp(white, 0.7);
       const mote = fruit.clone().lerp(white, 0.25);
       const flake = fruit.clone().lerp(white, 0.6);
-      const s = 0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28);
+      const s = (0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28)) * b;
       const c = center.clone();
       c.y += 0.1;
       const seedBase = (id * 0.618) % 1;
@@ -246,10 +251,11 @@ export function createCropAuras(centers: THREE.Vector3[] | ((id: number) => THRE
       const center = aura.center ?? centerOf(id);
       if (!center) continue;
       const fruit = new THREE.Color(MUTATIONS[aura.mutation].fruit);
-      const s = 0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28);
+      const b = aura.boost ?? 1;
+      const s = (0.55 + 0.45 * Math.min(1, 0.18 + aura.stage * 0.28)) * b;
       const add = (color: THREE.Color, opacity: number, size: number, y: number) => {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-          map: dot, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false,
+          map: dot, color, transparent: true, opacity: Math.min(0.42, opacity * b), blending: THREE.AdditiveBlending, depthWrite: false,
         }));
         sprite.position.set(center.x, center.y + y * s, center.z);
         sprite.scale.setScalar(size * s);
@@ -307,7 +313,7 @@ export function createCropAuras(centers: THREE.Vector3[] | ((id: number) => THRE
         }
       }
     },
-    setPlot(id: number, mutation: Mutation | null, stage: number, center?: THREE.Vector3) {
+    setPlot(id: number, mutation: Mutation | null, stage: number, center?: THREE.Vector3, boost = 1) {
       const existing = plots.get(id);
       // 野菜变异走 wildAuras 的黑白雾 / 玉云，这里不叠加
       if (!mutation || stage < 0 || isWildMutation(mutation)) {
@@ -319,11 +325,11 @@ export function createCropAuras(centers: THREE.Vector3[] | ((id: number) => THRE
         }
         return;
       }
-      if (existing && existing.mutation === mutation && existing.stage === stage
+      if (existing && existing.mutation === mutation && existing.stage === stage && (existing.boost ?? 1) === boost
         && (!center || !existing.center || existing.center.distanceToSquared(center) < 1e-4)) return;
       if (existing) existing.halos.forEach(h => { h.material.dispose(); h.removeFromParent(); });
       if (existing) existing.bolts.forEach(b => { b.material.dispose(); b.removeFromParent(); });
-      plots.set(id, { mutation, stage, halos: [], bolts: [], center });
+      plots.set(id, { mutation, stage, halos: [], bolts: [], center, boost });
       rebuild();
       rebuildHalos();
     },
