@@ -36,6 +36,8 @@ export class Player {
   private moving = false;
   private readonly direction = new THREE.Vector3();
   private jumpHeight = 0;
+  /** 起跳瞬间脚下的地面高度；空中位移以它为基准，避免土丘升高时人陷进坡里 */
+  private jumpBaseY = 0;
   private jumpTime = -1;
   private actionId: ActionId | null = null;
   private actionTime = 0;
@@ -227,6 +229,7 @@ export class Player {
 
   jump(): void {
     if (this.jumpTime < 0 && this.swimAmount < 0.35) {
+      this.jumpBaseY = this.groundY;
       this.jumpTime = 0;
       this.actionId = null;
     }
@@ -329,7 +332,7 @@ export class Player {
       const platformTop = this.obstacles.platformTopAt(
         this.position.x, this.position.z, jumpFootBefore + 0.02);
       const descending = this.jumpHeight < previousJumpHeight - 1e-5;
-      const newFootY = this.groundY + this.jumpHeight;
+      const newFootY = this.jumpBaseY + this.jumpHeight;
       if (descending && platformTop !== undefined && platformTop > surface.floorY + 0.02 &&
           jumpFootBefore >= platformTop - 0.02 && newFootY <= platformTop + 0.02) {
         this.groundY = platformTop;
@@ -338,7 +341,23 @@ export class Player {
         this.jumpTime = -1;
         motion.jumpWeight = 0;
       }
-      if (t >= end) this.jumpTime = -1;
+      // 土丘、草台这类连续地形没有单独的碰撞顶面：下落穿过坡面时直接落在坡上，
+      // 否则 groundY 还停在起跳低处，人会先陷进土丘再被阻尼抬出来。
+      if (descending && surface.floorY > this.jumpBaseY + 0.02 &&
+          newFootY <= surface.floorY + 0.02) {
+        this.groundY = surface.floorY;
+        this.cameraFloorY = Math.max(surface.floorY, surface.waterY);
+        this.jumpHeight = 0;
+        this.jumpTime = -1;
+        motion.jumpWeight = 0;
+      }
+      if (t >= end) {
+        this.jumpTime = -1;
+        this.jumpHeight = 0;
+        // 收尾帧也把脚下地面夹到当前坡面，避免落地后先埋进去再弹出来。
+        this.groundY = Math.max(this.groundY, surface.floorY);
+        this.cameraFloorY = Math.max(this.cameraFloorY, surface.floorY);
+      }
     }
     // 站在平台顶面时持续跟随它；跳跃中保持起跳基座不塌回地面。
     const platformTop = this.jumpTime < 0
@@ -361,7 +380,12 @@ export class Player {
     motion.action = this.actionId;
     motion.actionTime = this.actionTime;
     motion.actionWeight = this.actionId ? actionWeight(this.actionId, this.actionTime) : 0;
-    this.root.position.set(this.position.x, this.groundY + this.jumpHeight * (1 - motion.swimming), this.position.z);
+    const airborneFoot = this.groundY + this.jumpHeight * (1 - motion.swimming);
+    // 空中和站走都把脚底夹到当前坡面以上：土丘升高时让玩家沿坡面抬脚，不能穿进模型。
+    const footY = this.jumpTime >= 0
+      ? Math.max(airborneFoot, surface.floorY)
+      : Math.max(this.groundY, surface.floorY);
+    this.root.position.set(this.position.x, footY, this.position.z);
     this.root.rotation.y = this.facing;
     this.rig.animate?.(dt, t, motion);
   }
