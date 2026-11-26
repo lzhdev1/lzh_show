@@ -4,6 +4,7 @@ import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
 import { elementPaint, saddleHeight } from "./ranchSpecies";
 import { createMountRegalia } from "./mountRegalia";
 import { makeElementInsignia } from "./elementInsignia";
+import { createFlameHorseLook } from "./flameHorseFx";
 import type { AnimalElement, AnimalSpecies } from "../game/ranch";
 
 // The original armatures keep their authored joint axes. Only the outer mount
@@ -14,7 +15,7 @@ const anatomy = {
   elephant:["Elephantidae_Head","Elephantidae_Vertebrae_Dorsal"], fox:["Fox_head","Fox_spine2"],
   deer:["Deer01_Head","Deer01_Spine1"], rabbit:["Deer01_Head","Deer01_Spine1"],
   boar:["Boar_Head","Boar_Spine"], goat:["head","spine"], sheep:["Head","Spine"],
-  horse:["Horse_Head","Horse_Spine_2"], cow:["Bovidae_Head","Bovidae_spine1"],
+  horse:["Horse_Head","Horse_Spine_2"], flameHorse:["Horse_Head","Horse_Spine_2"], cow:["Bovidae_Head","Bovidae_spine1"],
 } as const;
 type Species = keyof typeof anatomy;
 export const isProfessionalSpecies = (species: AnimalSpecies): species is Species => Object.prototype.hasOwnProperty.call(anatomy,species);
@@ -170,8 +171,9 @@ function makeActor(asset: ReturnType<typeof prepare>, species: Species, element:
     if (!clone) { clone=finishMaterial(m,element,insignia); materials.set(m,clone); }
     return clone;
   }
+  const flameLook=species==="flameHorse"?createFlameHorseLook(outer,model,meshes):null;
   for (const mesh of meshes) {
-    mesh.material=Array.isArray(mesh.material) ? mesh.material.map(material) : material(mesh.material);
+    if(!flameLook) mesh.material=Array.isArray(mesh.material) ? mesh.material.map(material) : material(mesh.material);
     mesh.castShadow=mesh.receiveShadow=true;
   }
   const mixer=sampleNeutral(skin,asset.gltf.animations);
@@ -203,7 +205,7 @@ function makeActor(asset: ReturnType<typeof prepare>, species: Species, element:
   let previousTime=NaN,blend=0,runBlend=0,graze=0,restTime=0,seatHeight=saddleHeight(species);
   return {
     get seatHeight(){return seatHeight;},
-    animate(time:number,phase:number,stride:number,distanceSquared:number) {
+    animate(time:number,phase:number,stride:number,distanceSquared:number,wind?:THREE.Vector3) {
       const interval=distanceSquared>38**2?.10:distanceSquared>22**2?1/30:0;
       if (Number.isFinite(previousTime) && time-previousTime<interval) return;
       const dt=Number.isFinite(previousTime)?THREE.MathUtils.clamp(time-previousTime,0,.25):0;
@@ -221,6 +223,7 @@ function makeActor(asset: ReturnType<typeof prepare>, species: Species, element:
       walk?.setEffectiveWeight(blend*(1-runBlend)).setEffectiveTimeScale(.5+stride*.85);
       run?.setEffectiveWeight(blend*runBlend).setEffectiveTimeScale(1.16);
       mixer.update(dt);
+      flameLook?.update(time,dt,stride,wind);
       outer.updateWorldMatrix(true,false); model.updateMatrixWorld(true); inv.copy(outer.matrixWorld).invert();
       let floor=Infinity;
       for (let i=0;i<meshes.length;i++) for (const id of asset.feet[i]) {
@@ -243,6 +246,7 @@ function makeActor(asset: ReturnType<typeof prepare>, species: Species, element:
     },
     dispose() {
       mixer.stopAllAction(); mixer.uncacheRoot(skin);
+      flameLook?.dispose();
       regalia.dispose(); model.removeFromParent(); regalia.back.removeFromParent(); regalia.head.removeFromParent();
       for (const m of materials.values()) m.dispose();
       for (const mesh of meshes) mesh.skeleton.dispose();
@@ -260,7 +264,8 @@ export function createProfessionalLibrary() {
       let actor:ReturnType<typeof makeActor>|undefined,disposed=false;
       let pending=templates.get(species);
       if (!pending) {
-        pending=loader.loadAsync(files["./professionalModels/"+species+".glb"]).then(gltf=>prepare(species,gltf));
+        // 焰纹神驹复用同一匹马的骨架与动画，只在材质与火效上做专属处理。
+        pending=loader.loadAsync(files["./professionalModels/"+(species==="flameHorse"?"horse":species)+".glb"]).then(gltf=>prepare(species,gltf));
         templates.set(species,pending);
       }
       const ready=pending.then(asset=>{
@@ -270,7 +275,7 @@ export function createProfessionalLibrary() {
       })
         .catch(error=>{ if(templates.get(species)===pending) templates.delete(species); console.error("动物模型加载失败",species,error); });
       return {group,ready,get seatHeight(){return actor?.seatHeight??saddleHeight(species);},
-        animate(time:number,phase:number,stride:number,distanceSquared=0) { actor?.animate(time,phase,stride,distanceSquared); },
+        animate(time:number,phase:number,stride:number,distanceSquared=0,wind?:THREE.Vector3) { actor?.animate(time,phase,stride,distanceSquared,wind); },
         dispose(){disposed=true;actor?.dispose();group.clear();}};
     },
     dispose(){

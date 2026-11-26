@@ -59,12 +59,12 @@ class Metalwork {
 
 const headWidth: Record<AnimalSpecies,number>={
   wolf:.26,bear:.41,tiger:.32,lion:.39,elephant:.60,panda:.54,fox:.155,rabbit:.12,deer:.19,boar:.23,
-  goat:.16,alpaca:.21,sheep:.19,horse:.26,cow:.32,raccoon:.18,redPanda:.20,penguin:.11,duck:.105,crane:.09,
+  goat:.16,alpaca:.21,sheep:.19,horse:.26,flameHorse:.26,cow:.32,raccoon:.18,redPanda:.20,penguin:.11,duck:.105,crane:.09,
 };
 // Maximum half-width and skirt drop from sections of the animated mounts.
 // These describe the rib cage, not the visibly narrower leather seat across it.
 const blanketFit: Partial<Record<AnimalSpecies,[halfWidth:number,drop:number]>>={
-  wolf:[.226,.249],bear:[.423,.338],tiger:[.252,.280],lion:[.284,.269],elephant:[.509,.405],panda:[.533,.339],horse:[.28,.28],
+  wolf:[.226,.249],bear:[.423,.338],tiger:[.252,.280],lion:[.284,.269],elephant:[.509,.405],panda:[.533,.339],horse:[.28,.28],flameHorse:[.28,.28],
 };
 const saddleColours: Record<AnimalElement,number>={metal:0x273d59,wood:0x285044,water:0x273e70,fire:0x742e42,earth:0x514357};
 

@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { CROPS, harvestLots } from "../game/crops";
-import { animalName, animalValue, ANIMALS, ANIMAL_ELEMENTS, baitCount, HORSE_SPEED_FACTOR, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, RANCH_MAX_LEVEL, type AnimalSpecies, type RanchAnimal, type WildAnimal } from "../game/ranch";
+import { animalName, animalValue, ANIMALS, ANIMAL_ELEMENTS, baitCount, HORSE_SPEED_FACTOR, isHorseSpecies, isMountAnimal, MOUNT_UNLOCK_LEVEL, ranchCapacity, ranchUpgradeCost, RANCH_MAX_LEVEL, type AnimalSpecies, type RanchAnimal, type WildAnimal } from "../game/ranch";
 import { MEAT_YIELD, meatName } from "../game/market";
 import { useRanchInteraction } from "../game/ranchInteraction";
 import { useGame } from "../game/state";
@@ -10,6 +10,7 @@ import "./ranch.css";
 const portraits: Record<AnimalSpecies, string> = {
   wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼", fox: "🦊",
   rabbit: "🐇", deer: "🦌", boar: "🐗", goat: "🐐", alpaca: "🦙", sheep: "🐑", horse: "🐴",
+  flameHorse: "🔥",
   cow: "🐄", raccoon: "🦝", redPanda: "🐾", penguin: "🐧", duck: "🦆", crane: "🪶",
 };
 
@@ -146,8 +147,8 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
       </div>
       {residents.length === 0 ? <p className="ranch-empty">{tab === "pasture"
         ? "带上收获的作物，靠近野生动物后投喂。收服的动物会自动回到牧场。"
-        : hasStable ? "收服一匹野马就能在这里骑乘。五行变异的狼、熊、虎、狮子、大象和熊猫也可作为坐骑。"
-        : "牧场升至 3 级后，已收服的野马和适合骑乘的五行变异动物会自动进入坐骑栏。"}</p>
+        : hasStable ? "收服一匹野马或焰纹神驹就能在这里骑乘。五行变异的狼、熊、虎、狮子、大象和熊猫也可作为坐骑。"
+        : "牧场升至 3 级后，已收服的野马、焰纹神驹和适合骑乘的五行变异动物会自动进入坐骑栏。"}</p>
         : <ul className="ranch-list">{residents.map((animal) => {
           const pinned = tab === "stable" && pinnedMounts.includes(animal.id);
           return <li key={animal.id} className={pinned ? "pinned" : ""}>
@@ -155,7 +156,7 @@ export function RanchPanel({ onClose }: { onClose: () => void }) {
             <div className="resident-name"><strong>{animalName(animal)}{pinned && <span className="pin-tag">置顶</span>}</strong><small>
               {animal.element ? ANIMAL_ELEMENTS[animal.element].label + "系变异" : "普通动物"}
               {isMountAnimal(animal) && (ranch.ridingId === animal.id ? " · 骑乘中" : hasStable ? " · 可骑乘" : " · 3级可骑乘")}
-              {animal.species === "horse" && ` · ${HORSE_SPEED_FACTOR} 倍移速`}
+              {isHorseSpecies(animal.species) && ` · ${HORSE_SPEED_FACTOR} 倍移速`}
               {` · 售价 ${animalValue(animal)}`}
             </small></div>
             {selling === animal.id ? <div className="resident-actions">

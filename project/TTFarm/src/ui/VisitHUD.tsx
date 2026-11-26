@@ -192,7 +192,7 @@ export function FriendVisitInfo({ visit }: { visit: Visit }) {
 }
 
 const MOUNT_EMOJI: Partial<Record<AnimalSpecies, string>> = {
-  horse: "🐴", wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼",
+  horse: "🐴", flameHorse: "🔥", wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼",
 };
 
 /**

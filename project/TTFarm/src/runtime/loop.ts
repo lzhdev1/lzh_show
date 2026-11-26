@@ -551,8 +551,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       else game.setRiding(null);
       game.notify(visit ? "水变深了，已下坐骑" : "水变深了，坐骑已回到牧场");
     }
-    const onHorse = mount?.species === "horse" && player.swimAmount <= .35;
-    if (onHorse && trailHorseId !== mount.id) {
+    // 焰纹神驹自带余烬，不叠彩虹尾迹；彩虹尾迹只留给普通野马。
+    const onHorse = !!mount && mount.species === "horse" && player.swimAmount <= .35;
+    if (mount && onHorse && trailHorseId !== mount.id) {
       horseTrail.clear();
       trailHorseId = mount.id;
     }

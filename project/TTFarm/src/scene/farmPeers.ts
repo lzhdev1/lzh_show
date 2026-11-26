@@ -11,6 +11,7 @@ import { createScreenChatBubble } from "./chatBubble";
 import { bubbleText } from "../game/chat";
 import type { createRanchAuras } from "./ranchAuras";
 import type { RanchAnimal } from "../game/ranch";
+import { isHorseSpecies } from "../game/ranch";
 import { inRiver, onBridge } from "./layout";
 
 function nameplate(name: string) {
@@ -40,6 +41,7 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
   group.name = "farm-visitors";
   type Auras = ReturnType<typeof createRanchAuras>;
   let visitMount: ReturnType<typeof library.create> | undefined;
+  const visitWind = new THREE.Vector3();
   let visitMountId: string | undefined;
   let visitElement: RanchAnimal["element"] = null, visitHeight = 0, ridePhase = 0;
   function createPeer(sample: SocialPlayer, detailed: boolean) {
@@ -61,6 +63,7 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
     let jumpTime = 0;
     let actionId: ActionId | null = null, actionTime = 0;
     const motion: AvatarMotion = { phase: 0, moving: 0, running: 0, jumpPhase: 0, jumpWeight: 0, swimming: 0, swimPhase: 0 };
+    const mountWind = new THREE.Vector3();
     return {
       aura(auras: Auras, time: number) {
         if (root.visible && last?.mount?.element) auras.animal(root.position, saddleHeight(last.mount.species), last.mount.element, time, Number(last.id) % 31);
@@ -81,8 +84,8 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
           duration = last ? THREE.MathUtils.clamp((next.lastSeen - last.lastSeen) / 1000, .18, 1.8) : .8;
           start.copy(root.position); end.set(next.x, next.y, next.z);
           // At full gallop a horse can cross 15 metres between two normal heartbeats.
-          const jumpDistance = next.mount?.species === "horse"
-            ? Math.max(15, Player.maxMountedRunSpeed("horse") * duration + 4) : 15;
+          const jumpDistance = next.mount && isHorseSpecies(next.mount.species)
+            ? Math.max(15, Player.maxMountedRunSpeed(next.mount.species) * duration + 4) : 15;
           if (start.distanceToSquared(end) > jumpDistance ** 2) {
             start.copy(end);
             horseTrail?.clear();
@@ -100,6 +103,8 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
         root.visible = root.position.distanceToSquared(focus) < 95 ** 2;
         if (!root.visible) { horseTrail?.clear(); return; }
         const travel = Math.hypot(root.position.x - x, root.position.z - z);
+        if (travel > .001) mountWind.set(x - root.position.x, 0, z - root.position.z).normalize();
+        else mountWind.set(0, 0, 0);
         const galloping = next.mount?.species === "horse" && next.running && next.moving && travel > .001;
         if (galloping && !horseTrail) {
           horseTrail = createHorseTrail();
@@ -133,7 +138,7 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
           motion.actionWeight = THREE.MathUtils.damp(motion.actionWeight ?? 0, 0, 12, dt);
           if ((motion.actionWeight ?? 0) < 0.02) { motion.action = null; motion.actionWeight = 0; }
         }
-        mount?.animate(time, motion.phase * 2 * Math.PI, motion.moving * (.54 + .46 * motion.running), root.position.distanceToSquared(focus));
+        mount?.animate(time, motion.phase * 2 * Math.PI, motion.moving * (.54 + .46 * motion.running), root.position.distanceToSquared(focus), mountWind);
         motion.saddleHeight = mount?.seatHeight ?? 0;
         label.sprite.position.y = 1.92 + Math.max(0, motion.saddleHeight - .6);
         bubble.sprite.position.y = label.sprite.position.y + .34;
@@ -165,10 +170,14 @@ export function createFarmPeers(obstacles: WorldObstacles, heightAt: (x: number,
         }
       }
       if (!visitMount) return;
+      const visitMoveX = player.root.position.x - visitMount.group.position.x;
+      const visitMoveZ = player.root.position.z - visitMount.group.position.z;
+      if (visitMoveX * visitMoveX + visitMoveZ * visitMoveZ > 1e-8) visitWind.set(-visitMoveX, 0, -visitMoveZ).normalize();
+      else visitWind.set(0, 0, 0);
       visitMount.group.position.copy(player.root.position);
       visitMount.group.rotation.y = player.root.rotation.y;
       if (player.isMoving) ridePhase += dt * (player.isRunning ? 10 : 7);
-      visitMount.animate(time, ridePhase, player.isMoving ? (player.isRunning ? 1 : .54) : 0);
+      visitMount.animate(time, ridePhase, player.isMoving ? (player.isRunning ? 1 : .54) : 0, 0, visitWind);
     },
     emitAuras(auras: Auras, time: number) {
       if (visitMount && visitElement) auras.animal(visitMount.group.position, visitHeight, visitElement, time, 0);

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { AvatarId, OutfitId } from "../game/appearance";
-import { HORSE_SPEED_FACTOR, type AnimalSpecies } from "../game/ranch";
+import { HORSE_SPEED_FACTOR, isHorseSpecies, type AnimalSpecies } from "../game/ranch";
 import { walkingRoute } from "../game/walkingRoute";
 import type { ActionId, AvatarMotion, AvatarRig } from "./rig";
 import { ACTIONS, actionWeight } from "./actionMotion";
@@ -50,7 +50,7 @@ export class Player {
   private static readonly JUMP_HEIGHT = 1.0;
 
   static maxMountedRunSpeed(species: AnimalSpecies) {
-    return Player.RUN_SPEED * RIDING_SPEED_MULTIPLIER * (species === "horse" ? HORSE_SPEED_FACTOR : 1);
+    return Player.RUN_SPEED * RIDING_SPEED_MULTIPLIER * (isHorseSpecies(species) ? HORSE_SPEED_FACTOR : 1);
   }
   /** 脚下地面高度：田埂草台和地块都是抬起来的，人物要跟着抬起来 */
   private groundY = 0;
@@ -127,7 +127,7 @@ export class Player {
   get swimAmount() { return this.motion.swimming; }
   get cameraGroundY() { return this.cameraFloorY; }
   setSaddleHeight(height: number, species?: AnimalSpecies) {
-    const factor = height > 0 && species === "horse" ? HORSE_SPEED_FACTOR : 1;
+    const factor = height > 0 && species && isHorseSpecies(species) ? HORSE_SPEED_FACTOR : 1;
     this.speed *= factor / this.mountSpeedFactor;
     this.mountSpeedFactor = factor;
     this.motion.saddleHeight = height;

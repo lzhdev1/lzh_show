@@ -29,6 +29,7 @@ export const styles: Record<AnimalSpecies,SpeciesStyle> = {
   alpaca:style({width:.225,belly:.217,length:.532,leg:.61,neck:.72,face:.142},1.06,0xc3a580,0xf7edda,0x705748),
   sheep:style({...round,width:.43,leg:.33},.88,0xf3e4c3,0xfff2d7,0x806457),
   horse:style({...ungulate,neck:.53,leg:.70,length:.69},1.14,0xab6a48,0xeed2ad,0x533f41),
+  flameHorse:style({...ungulate,neck:.53,leg:.70,length:.69},1.16,0x141013,0xff6a22,0x2a1116),
   cow:style({...ungulate,width:.46,belly:.43,length:.66},1.12,0xf4e7d1,0xf2c4be,0x5b4c48),
   raccoon:style({width:.16,belly:.148,length:.435,leg:.24,neck:.089,face:.124},1.11,0x898376,0xd4c9af,0x373738),
   redPanda:style({width:.189,belly:.169,length:.461,leg:.24,neck:.115,face:.139},1.12,0xb45132,0xf1dfbd,0x463633),
@@ -47,7 +48,7 @@ export const elementPaint: Record<AnimalElement,{fur:number;shade:number;light:n
 export function backHeight(body: Body) { return body.leg + body.belly * 1.70; }
 const importedHeights:Partial<Record<AnimalSpecies,number>> = {
   wolf:1.08,bear:1.25,tiger:1.14,lion:1.19,elephant:1.80,
-  fox:.48,rabbit:.29,deer:.98,boar:.65,goat:.73,sheep:.65,horse:1.30,cow:1.04,
+  fox:.48,rabbit:.29,deer:.98,boar:.65,goat:.73,sheep:.65,horse:1.30,flameHorse:1.30,cow:1.04,
 };
 export function saddleHeight(species: AnimalSpecies) {
   if(importedHeights[species]!==undefined)return importedHeights[species]!;

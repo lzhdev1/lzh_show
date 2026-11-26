@@ -1,6 +1,6 @@
 import { CROPS, type CropId } from "./crops";
 import { FISH_LIST, FISH_RARITY, type FishSpecies } from "./fish";
-import { ANIMALS, MOUNT_SPECIES, MOUNT_UNLOCK_LEVEL, type AnimalSpecies } from "./ranch";
+import { ANIMALS, MOUNT_SPECIES, MOUNT_UNLOCK_LEVEL, isHorseSpecies, type AnimalSpecies } from "./ranch";
 import { HERB_MUTATIONS, MUTATIONS, type Mutation } from "./weather";
 import { MUSHROOM_LIST } from "./mushrooms";
 
@@ -29,6 +29,7 @@ export const CODEX_MUSHROOMS = MUSHROOM_LIST;
 export const ANIMAL_PORTRAITS: Record<AnimalSpecies, string> = {
   wolf: "🐺", bear: "🐻", tiger: "🐯", lion: "🦁", elephant: "🐘", panda: "🐼", fox: "🦊",
   rabbit: "🐇", deer: "🦌", boar: "🐗", goat: "🐐", alpaca: "🦙", sheep: "🐑", horse: "🐴",
+  flameHorse: "🔥",
   cow: "🐄", raccoon: "🦝", redPanda: "🐾", penguin: "🐧", duck: "🦆", crane: "🪶",
 };
 
@@ -185,6 +186,7 @@ const ANIMAL_BLURB: Record<AnimalSpecies, string> = {
   alpaca: "温顺亲人，毛能剪下来卖钱。最爱萝卜，不能骑乘。",
   sheep: "成群行动、毛厚实，白菜是它的日常口粮。不能骑乘。",
   horse: "脚力最好的野生动物，收服后不用变异就能骑，移速提升到 3 倍。萝卜就能引它过来。",
+  flameHorse: "只在荒野深处出没的黑曜石神驹，鬃尾燃着不灭的焰纹。萝卜就能引它靠近，收服后直接进坐骑栏，移速与野马同为 3 倍。",
   cow: "性子慢、产奶稳，最爱玉米。不能骑乘，是牧场里的固定收益。",
   raccoon: "夜里翻垃圾的小偷，番茄的味道一闻就来。不能骑乘。",
   redPanda: "爱爬树、尾巴蓬松，草莓是它的心头好。不能骑乘，观赏性很强。",
@@ -257,11 +259,11 @@ export const CODEX_ANIMALS: readonly AnimalEntry[] = (Object.keys(ANIMALS) as An
   name: ANIMALS[species].name,
   blurb: ANIMAL_BLURB[species],
   favorite: { crop: ANIMALS[species].favorite, name: CROPS[ANIMALS[species].favorite].name },
-  mount: species === "horse" ? "always" as const : MOUNT_SPECIES.includes(species) ? "mutated" as const : "never" as const,
+  mount: isHorseSpecies(species) ? "always" as const : MOUNT_SPECIES.includes(species) ? "mutated" as const : "never" as const,
 }));
 
 /** 坐骑条件文案，RanchPanel 与图鉴共用同一套说辞 */
-export const MOUNT_RULE = `牧场升到 ${MOUNT_UNLOCK_LEVEL} 级开启坐骑栏：野马收服即可骑乘（移速 3 倍），五行变异的狼、熊、虎、狮子、大象和熊猫也能骑。`;
+export const MOUNT_RULE = `牧场升到 ${MOUNT_UNLOCK_LEVEL} 级开启坐骑栏：野马和焰纹神驹收服即可骑乘（移速 3 倍），五行变异的狼、熊、虎、狮子、大象和熊猫也能骑。`;
 
 export function mountLabel(entry: AnimalEntry): string {
   if (entry.mount === "always") return "可当坐骑 · 无需变异";

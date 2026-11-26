@@ -46,7 +46,7 @@ describe("game data catalogs", () => {
   it("keeps the codex totals tied to the live catalogs", () => {
     expect(CODEX_PLANTS).toHaveLength(94);
     expect(CODEX_MUTATIONS).toHaveLength(27);
-    expect(CODEX_ANIMALS).toHaveLength(20);
+    expect(CODEX_ANIMALS).toHaveLength(21);
     expect(CODEX_FISH).toHaveLength(FISH_LIST.length);
     expect(CODEX_MUSHROOMS).toHaveLength(MUSHROOM_LIST.length);
   });

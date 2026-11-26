@@ -15,6 +15,7 @@ export const ANIMALS = {
   alpaca:   { name: "羊驼", favorite: "radish" },
   sheep:    { name: "绵羊", favorite: "cabbage" },
   horse:    { name: "野马", favorite: "radish" },
+  flameHorse: { name: "焰纹神驹", favorite: "radish" },
   cow:      { name: "花牛", favorite: "corn" },
   raccoon:  { name: "浣熊", favorite: "tomato" },
   redPanda: { name: "小熊猫", favorite: "strawberry" },
@@ -45,9 +46,12 @@ const upgradeCosts = [220, 460, 850, 1350, 2100, 3050, 4200, 5600, 7300];
 export const ranchCapacity = (level: number) => 4 + (level - 1) * 2;
 export const ranchUpgradeCost = (level: number): number | null => upgradeCosts[level - 1] ?? null;
 const ELEMENTAL_MOUNTS: readonly AnimalSpecies[] = ["wolf", "bear", "tiger", "lion", "elephant", "panda"];
-export const MOUNT_SPECIES: readonly AnimalSpecies[] = [...ELEMENTAL_MOUNTS, "horse"];
+/** 马类坐骑不靠五行变异，收服即可骑，移速都是 3 倍。 */
+export const HORSE_SPECIES: readonly AnimalSpecies[] = ["horse", "flameHorse"];
+export const isHorseSpecies = (species: AnimalSpecies) => HORSE_SPECIES.includes(species);
+export const MOUNT_SPECIES: readonly AnimalSpecies[] = [...ELEMENTAL_MOUNTS, ...HORSE_SPECIES];
 export const isMountAnimal = (animal: RanchAnimal) =>
-  MOUNT_SPECIES.includes(animal.species) && (animal.species === "horse" || animal.element !== null);
+  MOUNT_SPECIES.includes(animal.species) && (isHorseSpecies(animal.species) || animal.element !== null);
 export const animalName = (animal: RanchAnimal) =>
   (animal.element ? ANIMAL_ELEMENTS[animal.element].name + "·" : "") + ANIMALS[animal.species].name;
 export const baitCount = (animal: RanchAnimal, crop: CropId) =>
@@ -57,6 +61,7 @@ export const baitCount = (animal: RanchAnimal, crop: CropId) =>
 const ANIMAL_VALUE: Record<AnimalSpecies, number> = {
   wolf: 220, bear: 260, tiger: 320, lion: 340, elephant: 380, panda: 360, fox: 160,
   rabbit: 90, deer: 130, boar: 150, goat: 110, alpaca: 170, sheep: 120, horse: 480,
+  flameHorse: 980,
   cow: 190, raccoon: 100, redPanda: 180, penguin: 140, duck: 110, crane: 160,
 };
 /** 元素溢价：金最贵，木/水略低，火/土居中 */
@@ -114,6 +119,9 @@ export function wildAnimalsAt(now: number): readonly WildAnimal[] {
     const j = Math.floor(next() * (i + 1));
     [species[i], species[j]] = [species[j], species[i]];
   }
+  // 每一轮野外都保证有一匹焰纹神驹，收服后即可骑乘。
+  const flame = species.indexOf("flameHorse");
+  if (flame > 0) [species[0], species[flame]] = [species[flame], species[0]];
   const ridingSpecies = species.findIndex((kind, i) => i > 0 && ELEMENTAL_MOUNTS.includes(kind));
   [species[1], species[ridingSpecies]] = [species[ridingSpecies], species[1]];
   herd = species.slice(0, 12).map((kind, slot) => {

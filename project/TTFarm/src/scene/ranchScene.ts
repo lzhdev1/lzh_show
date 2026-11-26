@@ -39,6 +39,7 @@ interface Actor {
   range:number;
   wanderLeg:number;
   wanderTarget:THREE.Vector3;
+  wind:THREE.Vector3;
 }
 
 export function createRanchScene(obstacles:WorldObstacles) {
@@ -73,7 +74,7 @@ export function createRanchScene(obstacles:WorldObstacles) {
       }
       if(!actor){
         const seed=hash(animal.id);
-        actor={animal,wild,ridden,anchor:location(),range,seed,phase:tau*seed,wanderLeg:-1,wanderTarget:location(),rig:library.create(animal.species,animal.element,ridden)};
+        actor={animal,wild,ridden,anchor:location(),range,seed,phase:tau*seed,wanderLeg:-1,wanderTarget:location(),wind:new THREE.Vector3(),rig:library.create(animal.species,animal.element,ridden)};
         actor.rig.group.name=(wild?"wild-":"ranch-")+animal.species;
         actor.rig.group.userData.animalId=animal.id;
         actor.rig.group.position.copy(actor.anchor);
@@ -164,6 +165,7 @@ export function createRanchScene(obstacles:WorldObstacles) {
     for(const actor of actors.values()) {
       const model=actor.rig.group,p=model.position, h=saddleHeight(actor.animal.species);
       let stride=0;
+      const oldX=p.x,oldZ=p.z;
       if(actor.ridden){
         p.copy(playerRoot.position);model.rotation.y=playerRoot.rotation.y;
         stride=moving?(running?1:.54):0;
@@ -202,13 +204,16 @@ export function createRanchScene(obstacles:WorldObstacles) {
         }
         stride = strideNow;
       }
+      const dx=p.x-oldX,dz=p.z-oldZ;
+      if(dx*dx+dz*dz>1e-8)actor.wind.set(-dx,0,-dz).normalize();
+      else actor.wind.set(0,0,0);
       const d=p.distanceToSquared(playerPosition);
       if(!spectatorFocus && actor.wild && d<closestDist && obstacles.canWalk(playerPosition,p)){
         closestDist=d;closest=actor.wild;
       }
       if(d<70**2 || actor.ridden){
         actor.phase+=dt*stride*(actor.ridden?8.2:5.5);
-        actor.rig.animate(t+actor.seed*8,actor.phase,stride,d);
+        actor.rig.animate(t+actor.seed*8,actor.phase,stride,d,actor.wind);
         if(actor.animal.element)auras.animal(p,h,actor.animal.element,t,actor.seed*tau);
       }
     }
