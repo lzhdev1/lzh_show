@@ -34,9 +34,17 @@ const plot = (patch: Partial<PlotState> = {}): PlotState => ({
 });
 
 describe("普通作物生长时间", () => {
-  it("24 种商店作物时间越长的解锁等级越高，榴莲 18 小时封顶", () => {
+  const isFlower = (id: string) => id === "tulip" || id === "lily" || id.startsWith("rose");
+
+  it("24 种商店作物：花卉统一 20 分钟，其余时间越长的解锁等级越高，榴莲 18 小时封顶", () => {
     expect(SHOP_CROPS).toHaveLength(24);
-    const order = [...SHOP_CROPS].sort((a, b) => a.growMs - b.growMs);
+    const flowers = SHOP_CROPS.filter((crop) => isFlower(crop.id));
+    expect(flowers).toHaveLength(8);
+    for (const crop of flowers) {
+      expect(crop.growMs, `${crop.name} 应为 20 分钟`).toBe(20 * 60_000);
+    }
+
+    const order = SHOP_CROPS.filter((crop) => !isFlower(crop.id)).sort((a, b) => a.growMs - b.growMs);
     for (let i = 1; i < order.length; i += 1) {
       expect(order[i].growMs, `${order[i].name} 应不早于 ${order[i - 1].name}`)
         .toBeGreaterThanOrEqual(order[i - 1].growMs);
